@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark palette (matches index.html prefers-color-scheme: dark). "night" outranks "-vNN"
+     in resource selection, so these win over values-v23 / values-v26 in dark mode. -->
+<resources>
+    <color name="app_bg">#0d1b1e</color>
+    <color name="status_bar">#10232a</color>
+    <color name="nav_bar">#16292d</color>
+</resources>

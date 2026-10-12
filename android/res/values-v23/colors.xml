@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 23+: dark status-bar icons are available, so blend into the top bar (CSS var bg-grad). -->
+<resources>
+    <color name="status_bar">#dcedf3</color>
+</resources>

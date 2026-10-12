@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">רגוע וחזק</string>
+    <string name="ok">אישור</string>
+    <string name="cancel">ביטול</string>
+    <string name="save_ok">קובץ הגיבוי נשמר</string>
+    <string name="save_failed">השמירה בוטלה או נכשלה</string>
+    <string name="no_picker">לא נמצאה אפליקציה לבחירת קבצים</string>
+    <string name="no_browser">לא נמצא דפדפן לפתיחת הקישור</string>
+</resources>

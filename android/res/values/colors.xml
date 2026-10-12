@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Light palette (matches index.html :root). Dark overrides live in values-night. -->
+<resources>
+    <!-- Page background (CSS var bg): window + WebView background, avoids white flashes. -->
+    <color name="app_bg">#eaf6f4</color>
+    <!-- API 21-22 cannot draw dark status-bar icons, so use the brand teal (theme-color). -->
+    <color name="status_bar">#21958a</color>
+    <!-- API < 26 cannot draw dark nav-bar icons, so use a dark bar. -->
+    <color name="nav_bar">#16343a</color>
+</resources>

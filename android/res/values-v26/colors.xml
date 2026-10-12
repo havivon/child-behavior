@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 26+: dark nav-bar icons are available (flag set in MainActivity), match the bottom nav (CSS var surface). -->
+<resources>
+    <color name="nav_bar">#ffffff</color>
+</resources>
