@@ -1,0 +1,1390 @@
+#!/usr/bin/env node
+/* eslint-disable no-console */
+'use strict';
+/**
+ * End-to-end acceptance suite for "רגוע וחזק" (index.html).
+ *
+ *   node tests/e2e.js                 run everything
+ *   node tests/e2e.js stars calm      run only tests whose name contains one of the words
+ *   SHOTS=/tmp/qa-shots node tests/e2e.js   also save a screenshot when a test fails
+ *
+ * Every test gets a fresh browser context (mobile emulation 375x760, touch,
+ * Asia/Jerusalem time zone, he-IL locale) and a fake clock (page.clock), so the
+ * suite is hermetic: no network, no shared storage, no dependence on "today".
+ * Each test is mapped to the line of docs/spec.md it verifies ("spec:").
+ */
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const pw = require(require('child_process').execSync('npm root -g').toString().trim() + '/playwright');
+
+const APP = 'file://' + path.resolve(__dirname, '..', 'index.html');
+const KEY = 'ragua-vehazak-v1';
+const TZ = 'Asia/Jerusalem';
+const DAY = 864e5;
+const SHOTS = process.env.SHOTS || '';
+
+/* ------------------------------------------------------------------ *
+ * Time helpers (all expressed in Asia/Jerusalem wall-clock time)
+ * ------------------------------------------------------------------ */
+const fmtKey = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+const fmtHour = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+/** 'YYYY-MM-DD' of an instant, in Jerusalem */
+const keyJ = d => fmtKey.format(new Date(d));
+/** instant for a Jerusalem wall-clock time 'YYYY-MM-DDTHH:MM' (handles DST) */
+function tsJ(s) {
+  for (const off of ['+03:00', '+02:00']) {
+    const d = new Date(s + ':00' + off);
+    if (keyJ(d) === s.slice(0, 10) && fmtHour.format(d) === s.slice(11, 16)) return d.getTime();
+  }
+  throw new Error('bad local time ' + s);
+}
+const addDaysKey = (k, n) => { const d = new Date(k + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+/** Monday 12 Oct 2026, 10:00 Jerusalem — the default "now" of the suite */
+const NOW = tsJ('2026-10-12T10:00');
+const TODAY = keyJ(NOW);
+/** start date such that NOW falls in program week w (day 1 of that week) */
+const startForWeek = (w, now = NOW) => addDaysKey(keyJ(now), -(w - 1) * 7);
+/** wall-clock time on day `dayIndex` (0-based) of program week w, given start date */
+const tsIn = (start, w, dayIndex = 0, hhmm = '17:00') => tsJ(addDaysKey(start, (w - 1) * 7 + dayIndex) + 'T' + hhmm);
+
+const PHASE_NAMES = { 1: ['מיפוי'], 2: ['ויסות גופני'], 3: ['ויסות גופני'], 4: ['ויסות גופני', 'שליטה עצמית'], 5: ['שליטה עצמית'], 6: ['שליטה עצמית', 'ניהול כעס'], 7: ['שליטה עצמית', 'ניהול כעס'], 8: ['ניהול כעס', 'שתלטנות וחברה'], 9: ['ניהול כעס', 'שתלטנות וחברה'], 10: ['שתלטנות וחברה'], 11: ['שתלטנות וחברה'], 12: ['שתלטנות וחברה'] };
+
+/* ------------------------------------------------------------------ *
+ * State builders
+ * ------------------------------------------------------------------ */
+function makeState(o = {}) {
+  return {
+    v: 1,
+    settings: Object.assign({
+      childName: 'דני', startDate: startForWeek(1),
+      rules: ['שומרים על הידיים לעצמנו', 'מדברים בכבוד', 'עוצרים ונושמים'],
+      goals: [{ id: 'g1', text: 'שומר על ידיים לעצמו' }, { id: 'g2', text: 'משתמש בפינת הרגיעה' }],
+      reward: 'פיצה משפחתית', starsNeeded: 15, onboarded: true
+    }, o.settings || {}),
+    days: o.days || {}, stars: o.stars || [], celebrated: o.celebrated || {}, moods: o.moods || [],
+    incidents: o.incidents || [], ui: Object.assign({ tab: 'today', chartMode: 'all' }, o.ui || {})
+  };
+}
+let idSeq = 0;
+function inc(ts, o = {}) {
+  return Object.assign({ id: 'i' + (++idSeq), ts, trigger: 'הפסד', target: 'אח / אחות', actions: ['צעקה'], duration: '1–5 דקות', response: [], used: null, note: '' }, o);
+}
+/** a state rich enough to exercise every screen */
+function richState(week = 5) {
+  const start = startForWeek(week);
+  const incidents = [];
+  const trig = ['הפסד', 'מעבר בין פעילויות', 'מסכים', 'אח לקח לו משהו'];
+  for (let w = 1; w <= week; w++) {
+    const n = Math.max(1, (9 - w * 1.5) | 0);
+    for (let i = 0; i < n; i++) {
+      const ts = w === week ? NOW - (i + 1) * 600e3 : tsIn(start, w, i % 7, ['08:10', '13:30', '16:45', '19:20', '22:05'][i % 5]);
+      incidents.push(inc(ts, { trigger: trig[i % 4], actions: i % 2 ? ['מכה', 'צעקה'] : ['השתלטות'], used: i % 3 ? 'yes' : 'no', note: i === 0 ? 'הערה קצרה' : '' }));
+    }
+  }
+  const days = {};
+  days[TODAY] = { checks: { move: true }, praises: [{ ts: NOW - 3600e3, note: 'ויתר לאחיו על התור בלי שביקשו ממנו' }, { ts: NOW - 1800e3, note: '' }] };
+  return makeState({ settings: { startDate: start }, incidents, days, stars: [{ goalId: 'g1', ts: NOW - 1000 }, { goalId: 'g2', ts: NOW - 900 }], moods: [{ ts: NOW - 600e3, c: 'yellow' }] });
+}
+
+/* ------------------------------------------------------------------ *
+ * Mini test harness
+ * ------------------------------------------------------------------ */
+const tests = [];
+function test(name, spec, fn, opts = {}) { tests.push({ name, spec, fn, opts }); }
+class AssertionError extends Error {}
+function assert(c, msg) { if (!c) throw new AssertionError(msg); }
+function eq(a, b, msg) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new AssertionError(`${msg}\n      expected: ${JSON.stringify(b)}\n      actual:   ${JSON.stringify(a)}`); }
+const near = (a, b, tol, msg) => assert(Math.abs(a - b) <= tol, `${msg} (expected ≈${b}±${tol}, got ${a})`);
+
+let browser;
+/**
+ * Open the app in a fresh context.
+ * opts: state (object|string|null = no seeding), time (ms), clock (false = real clock),
+ *       width, height, scheme ('light'|'dark'), offline, init (extra init script fn/str), goto (false)
+ */
+async function open(t, opts = {}) {
+  const ctx = await browser.newContext({
+    viewport: { width: opts.width || 375, height: opts.height || 760 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2,
+    locale: 'he-IL', timezoneId: opts.tz || TZ, colorScheme: opts.scheme || 'light', acceptDownloads: true
+  });
+  t.ctxs.push(ctx);
+  // Hermetic network: stub the Google Fonts stylesheet, abort everything else that is remote.
+  await ctx.route(/^https?:\/\//, route => {
+    const u = route.request().url();
+    if (!opts.offline && u.startsWith('https://fonts.googleapis.com/')) return route.fulfill({ status: 200, contentType: 'text/css', body: '/* stub */' });
+    t.remote.push(u);
+    return route.abort();
+  });
+  const state = opts.state === undefined ? makeState() : opts.state;
+  if (state !== null) {
+    await ctx.addInitScript(([k, v]) => {
+      try { if (!sessionStorage.getItem('__qa_seeded')) { localStorage.setItem(k, v); sessionStorage.setItem('__qa_seeded', '1'); } } catch (e) { /* storage disabled by test */ }
+    }, [KEY, typeof state === 'string' ? state : JSON.stringify(state)]);
+  }
+  if (opts.init) await ctx.addInitScript(opts.init);
+  const page = await ctx.newPage();
+  page.errors = [];
+  page.dialogs = [];
+  page.dialogAnswer = true;
+  page.on('console', m => { if (m.type() === 'error' && !(opts.offline && /Failed to load resource|ERR_/.test(m.text()))) page.errors.push('console.error: ' + m.text()); });
+  page.on('pageerror', e => page.errors.push('pageerror: ' + e.message));
+  page.on('dialog', d => { page.dialogs.push(d.message()); page.dialogAnswer ? d.accept() : d.dismiss(); });
+  t.pages.push(page);
+  if (opts.clock !== false) {
+    const time = opts.time || NOW;
+    await page.clock.install({ time: time - 10000 });
+    await page.clock.pauseAt(time);
+  }
+  if (opts.goto !== false) { await page.goto(APP); await page.waitForSelector('main .tab.active', { state: 'attached' }); }
+  return page;
+}
+const getState = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+const go = (page, tab) => page.click(`nav.bottom [data-tab=${tab}]`);
+const txt = (page, sel) => page.locator(sel).first().innerText();
+const toastText = page => page.textContent('#toast');
+const visible = (page, sel) => page.locator(sel).first().isVisible();
+async function setSettings(page, fields) {
+  await page.click('.topbar [data-act=openSettings]');
+  for (const [id, v] of Object.entries(fields)) await page.fill('#' + id, String(v));
+  await page.click('#setOverlay [data-act=saveSettings]');
+}
+const fileFrom = (name, content) => ({ name, mimeType: 'application/json', buffer: Buffer.from(content) });
+
+/* In-page overflow probe: returns the scroll width and any element sticking out of the viewport. */
+function overflowProbe() {
+  const vw = document.documentElement.clientWidth;
+  const sw = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+  const off = [];
+  const desc = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '') + ' "' + (el.textContent || '').trim().slice(0, 30) + '"';
+  for (const el of document.querySelectorAll('body *')) {
+    if (el.closest('[hidden]') || el.classList.contains('confetti') || el.id === 'toast' || el.closest('#toast')) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden') continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    if (/(auto|scroll)/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT') off.push('scrolls horizontally: ' + desc(el) + ` (${el.scrollWidth}>${el.clientWidth})`);
+    if (r.right > vw + 1 || r.left < -1) {
+      let a = el.parentElement, clipped = false;
+      while (a && a !== document.body && a !== document.documentElement) {
+        const o = getComputedStyle(a).overflowX;
+        if (/(hidden|clip)/.test(o)) { const ar = a.getBoundingClientRect(); if (ar.right <= vw + 1 && ar.left >= -1) { clipped = true; break; } }
+        if (/(auto|scroll)/.test(o)) break; // reported by the scroll-container rule
+        a = a.parentElement;
+      }
+      if (!clipped) off.push('outside viewport: ' + desc(el) + ` [${Math.round(r.left)}..${Math.round(r.right)} of ${vw}]`);
+    }
+  }
+  return { vw, sw, off: [...new Set(off)].slice(0, 6) };
+}
+
+/* ================================================================== *
+ * 1. Layout: no horizontal scroll, light & dark, all screens
+ * ================================================================== */
+async function tourScreens(page, label, problems) {
+  const check = async where => {
+    const r = await page.evaluate(overflowProbe);
+    if (r.sw > r.vw + 1) problems.push(`${label} ${where}: page scrollWidth ${r.sw} > ${r.vw}`);
+    r.off.forEach(o => problems.push(`${label} ${where}: ${o}`));
+  };
+  for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) {
+    await go(page, tab);
+    if (tab === 'calm') await page.click('#tab-calm .mood[data-c=red]');
+    if (tab === 'incident') await page.evaluate(() => { document.querySelector('#tab-incident details').open = true; });
+    if (tab === 'guide') await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+    await check('tab ' + tab);
+  }
+  await page.click('.topbar [data-act=openSettings]');
+  await check('settings');
+  await page.click('#setOverlay [data-act=closeSettings]');
+  await go(page, 'calm');
+  for (const ex of ['stop', 'balloon', 'candle', 'box', 'robot', 'wall']) {
+    await page.click(`#tab-calm .card:not(#moodTools) [data-ex=${ex}]`);
+    await check('exercise ' + ex);
+    if (ex === 'wall') { await page.clock.runFor(15000); await check('exercise completion screen'); }
+    await page.click('#exOverlay [data-act=exClose] >> nth=-1');
+  }
+  await page.evaluate(() => celebrate(1));
+  await check('celebration');
+  await page.click('#celOverlay [data-act=celClose]');
+  await page.evaluate(() => openSettings(true));
+  await check('onboarding');
+}
+for (const scheme of ['light', 'dark']) {
+  for (const width of [320, 360, 375, 390, 414]) {
+    test(`layout: no horizontal overflow @${width}px ${scheme} (all tabs + overlays)`, 'עיצוב / דרישות טכניות: "בדיקה ב-375px רוחב, בלי גלילה אופקית"; "מצב כהה אוטומטי"', async t => {
+      const page = await t.open({ width, scheme, state: richState(5) });
+      const problems = [];
+      await tourScreens(page, `${width}/${scheme}`, problems);
+      assert(!problems.length, 'horizontal overflow:\n      ' + problems.join('\n      '));
+    });
+  }
+}
+test('layout: dark mode is applied automatically from prefers-color-scheme', 'עיצוב: "מצב כהה אוטומטי"', async t => {
+  const light = await t.open({ scheme: 'light' });
+  const dark = await t.open({ scheme: 'dark' });
+  const bg = p => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
+  const lb = await bg(light), db = await bg(dark);
+  assert(lb && db && lb !== db, `--bg should differ between light (${lb}) and dark (${db})`);
+  const lum = await dark.evaluate(() => { const c = getComputedStyle(document.querySelector('.card:not(.hero)')).backgroundColor.match(/\d+/g).map(Number); return (c[0] + c[1] + c[2]) / 3; });
+  assert(lum < 80, 'cards should be dark in dark mode, average channel = ' + lum);
+});
+test('layout: long unbroken user text does not overflow the screen', 'דרישות טכניות: "בלי גלילה אופקית" (adversarial input)', async t => {
+  const long = 'א'.repeat(30), longGoal = 'ב'.repeat(50), longNote = 'ג'.repeat(120);
+  const st = richState(3);
+  st.settings.childName = long; st.settings.goals[0].text = longGoal; st.settings.reward = 'ד'.repeat(80);
+  st.days[TODAY].praises.push({ ts: NOW - 60e3, note: longNote });
+  st.incidents.push(inc(NOW - 120e3, { note: 'ה'.repeat(200) }));
+  const page = await t.open({ width: 360, state: st });
+  const problems = [];
+  for (const tab of ['today', 'incident']) {
+    await go(page, tab);
+    if (tab === 'incident') await page.evaluate(() => { document.querySelector('#tab-incident details').open = true; });
+    const r = await page.evaluate(overflowProbe);
+    if (r.sw > r.vw + 1) problems.push(`${tab}: scrollWidth ${r.sw} > ${r.vw}`);
+    r.off.forEach(o => problems.push(`${tab}: ${o}`));
+  }
+  assert(!problems.length, 'content cut off / overflowing:\n      ' + problems.join('\n      '));
+});
+
+/* ================================================================== *
+ * 2. Onboarding & settings
+ * ================================================================== */
+test('onboarding: first run shows welcome settings; cannot be dismissed; save starts the program', 'הגדרות; היום: "מחושב מתאריך התחלה שנבחר בהגדרות"', async t => {
+  const page = await t.open({ state: null });
+  assert(await visible(page, '#setOverlay'), 'welcome overlay must be visible on first run');
+  assert((await txt(page, '#setTitle')).includes('ברוכים הבאים'), 'welcome title');
+  eq(await page.locator('#setOverlay [data-act=closeSettings]').count(), 0, 'no close button during onboarding');
+  await page.keyboard.press('Escape');
+  assert(await visible(page, '#setOverlay'), 'Escape must not dismiss onboarding');
+  eq(await page.inputValue('#sStart'), TODAY, 'start date defaults to today');
+  await page.fill('#sName', '  יוסי  ');
+  await page.fill('#sStart', startForWeek(3));
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert(!(await visible(page, '#setOverlay')), 'overlay closes after save');
+  const s = await getState(page);
+  eq([s.settings.onboarded, s.settings.childName, s.settings.startDate], [true, 'יוסי', startForWeek(3)], 'saved settings (name trimmed)');
+  assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 3 מתוך 12'), 'hero week after onboarding');
+  assert((await txt(page, '.hero .eyebrow')).includes('יוסי'), 'child name in greeting');
+  await page.reload();
+  assert(!(await visible(page, '#setOverlay')), 'onboarding not shown again after reload');
+});
+test('settings: values are saved and reflected (rules, goals, reward, stars needed)', 'הגדרות: "שם הילד, תאריך התחלה, 3 חוקי הבית, יעדי הכוכבים, הפרס ומספר הכוכבים הנדרש"', async t => {
+  const page = await t.open();
+  await setSettings(page, { sRule0: 'חוק א', sRule1: 'חוק ב', sRule2: 'חוק ג', sGoal0: 'יעד ראשון', sGoal1: 'יעד שני', sGoal2: 'יעד שלישי', sReward: 'טיול לים', sNeed: 9 });
+  assert(!(await visible(page, '#setOverlay')), 'settings closed');
+  eq(await toastText(page), 'נשמר ✓', 'toast');
+  const goals = await page.locator('#tab-today .goal > b').allInnerTexts();
+  eq(goals, ['יעד ראשון', 'יעד שני', 'יעד שלישי'], 'three goals rendered');
+  eq(await page.locator('#tab-today ol.bullets li').allInnerTexts(), ['חוק א', 'חוק ב', 'חוק ג'], 'rules rendered');
+  assert((await txt(page, '#tab-today .pill.blue')).includes('0/9'), 'stars needed in pill');
+  assert((await txt(page, '#tab-today .reward')).includes('טיול לים'), 'reward text');
+  await page.reload();
+  const s = await getState(page);
+  eq([s.settings.reward, s.settings.starsNeeded, s.settings.goals.length], ['טיול לים', 9, 3], 'persisted');
+});
+test('settings: validation (min 2 goals, bad/empty date kept, star target clamped to 1..200)', 'הגדרות + טבלת כוכבים: "2–3 יעדים"', async t => {
+  const page = await t.open();
+  const before = await getState(page);
+  await page.click('.topbar [data-act=openSettings]');
+  await page.fill('#sName', 'שם חדש');
+  await page.fill('#sGoal1', '');
+  await page.fill('#sGoal2', '');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert(await visible(page, '#setOverlay'), 'overlay must stay open when <2 goals');
+  assert((await toastText(page)).includes('לפחות 2 יעדים'), 'toast explains the 2-goal minimum');
+  eq((await getState(page)).settings.childName, before.settings.childName, 'nothing saved on validation failure');
+  await page.fill('#sGoal1', 'יעד 2');
+  await page.fill('#sStart', '');
+  await page.fill('#sNeed', '500');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  let s = await getState(page);
+  eq(s.settings.startDate, before.settings.startDate, 'empty date keeps previous start date');
+  eq(s.settings.starsNeeded, 200, 'star target clamped to max 200');
+  await setSettings(page, { sNeed: -4 });
+  eq((await getState(page)).settings.starsNeeded, 1, '-4 clamps to 1');
+  await setSettings(page, { sNeed: 0 });
+  s = await getState(page);
+  eq(s.settings.starsNeeded, 1, 'entering 0 (below min=1) should clamp to 1, not silently become 15');
+});
+test('settings: Escape / ✕ close without saving', 'הגדרות', async t => {
+  const page = await t.open();
+  await page.click('.topbar [data-act=openSettings]');
+  await page.fill('#sName', 'לא נשמר');
+  await page.keyboard.press('Escape');
+  assert(!(await visible(page, '#setOverlay')), 'Escape closes');
+  await page.click('.topbar [data-act=openSettings]');
+  eq(await page.inputValue('#sName'), 'דני', 'unsaved change discarded');
+  await page.click('#setOverlay [data-act=closeSettings]');
+  assert(!(await visible(page, '#setOverlay')), '✕ closes');
+  eq(await page.evaluate(() => document.body.style.overflow), '', 'body scroll restored');
+});
+
+/* ================================================================== *
+ * 3. Week number & phase
+ * ================================================================== */
+test('today: "שבוע X מתוך 12" + phase name(s) for weeks 1..12 (via settings start date)', 'היום: "כותרת: שבוע X מתוך 12 ושם השלב הנוכחי"', async t => {
+  const page = await t.open();
+  const bad = [];
+  for (let w = 1; w <= 12; w++) {
+    for (const dayOff of [0, 6]) { // first and last day of each program week
+      const start = addDaysKey(startForWeek(w), -dayOff);
+      await setSettings(page, { sStart: start });
+      const h1 = (await txt(page, '.hero h1')).replace(/\s+/g, ' ').trim();
+      const chips = await page.locator('.hero .phase-chip').allInnerTexts();
+      if (h1 !== `שבוע ${w} מתוך 12`) bad.push(`start ${start}: h1="${h1}" expected week ${w}`);
+      if (JSON.stringify(chips) !== JSON.stringify(PHASE_NAMES[w])) bad.push(`week ${w}: phases ${JSON.stringify(chips)} expected ${JSON.stringify(PHASE_NAMES[w])}`);
+      const nowIdx = await page.evaluate(() => [...document.querySelectorAll('.weeks i')].findIndex(i => i.classList.contains('now')));
+      if (nowIdx !== w - 1) bad.push(`week ${w}: progress pip index ${nowIdx}`);
+    }
+  }
+  assert(!bad.length, bad.join('\n      '));
+});
+test('today: before the start date and after week 12', 'היום: "שבוע X מתוך 12" (edge cases)', async t => {
+  const page = await t.open({ state: makeState({ settings: { startDate: addDaysKey(TODAY, 3) } }) });
+  const note = await txt(page, '.hero p');
+  assert(note.includes('התוכנית מתחילה ב-15.10.2026'), 'before start: shows start date note, got: ' + note);
+  eq(await page.locator('.weeks i.now').count(), 0, 'no "current" pip before start');
+  await setSettings(page, { sStart: addDaysKey(TODAY, -84) }); // day 85 = week 13
+  assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 12 מתוך 12'), 'after program: capped at 12');
+  assert((await txt(page, '.hero p')).includes('סיימתם 12 שבועות'), 'after program: finished message');
+  eq(await page.locator('.weeks i.done').count(), 12, 'all pips done');
+  await setSettings(page, { sStart: addDaysKey(TODAY, -83) }); // last day of week 12
+  assert((await txt(page, '.hero p')).includes('סיימתם') === false, 'last day of week 12 is still in program');
+});
+test('robustness: week number across DST and month/year boundaries', 'היום: שבוע מחושב מתאריך התחלה (DST, month boundaries)', async t => {
+  const cases = [
+    ['2026-10-19', '2026-10-25T23:59', 1], ['2026-10-19', '2026-10-26T00:30', 2], // DST ends 25 Oct 2026 in Israel
+    ['2027-03-22', '2027-03-28T23:50', 1], ['2027-03-22', '2027-03-29T00:10', 2], // DST starts 26 Mar 2027
+    ['2026-01-29', '2026-02-04T23:00', 1], ['2026-01-29', '2026-02-05T00:01', 2], // month boundary
+    ['2026-12-28', '2027-01-04T07:00', 2], ['2028-02-26', '2028-03-04T12:00', 2], // year & leap day
+    ['2026-10-01', '2026-12-23T12:00', 12], ['2026-10-01', '2026-12-24T00:00', 12] // 12 & 13 (capped)
+  ];
+  const bad = [];
+  for (const [start, now, w] of cases) {
+    const page = await t.open({ time: tsJ(now), state: makeState({ settings: { startDate: start } }) });
+    const h1 = (await txt(page, '.hero h1')).replace(/\s+/g, ' ');
+    if (!h1.includes(`שבוע ${w} מתוך`)) bad.push(`start ${start}, now ${now}: "${h1}" expected week ${w}`);
+    await page.context().close();
+  }
+  assert(!bad.length, bad.join('\n      '));
+});
+
+/* ================================================================== *
+ * 4. Checklist
+ * ================================================================== */
+test('checklist: 5 items, toggle (click + keyboard), counter, persistence across reload', 'היום: "צ\'קליסט של סדר היום"', async t => {
+  const page = await t.open();
+  const items = page.locator('#tab-today .check');
+  eq(await items.count(), 5, 'five routine items');
+  const titles = (await page.locator('#tab-today .check .ctitle').allInnerTexts()).join('|');
+  for (const k of ['נשימת בלון', '30–60 דקות תנועה', '10–15 דקות משחק עצירה', '15 דקות אחד-על-אחד', 'מה הצלחת היום']) assert(titles.includes(k), 'item text: ' + k);
+  assert((await txt(page, '#tab-today .check[data-id=morning]')).includes('איפה אתה במדחום'), 'morning includes thermometer question');
+  assert((await txt(page, '#tab-today .check[data-id=stop] .game')).includes('המשחק של היום'), 'stop game shows game of the day');
+  await page.click('#tab-today .check[data-id=move]');
+  eq(await page.getAttribute('#tab-today .check[data-id=move]', 'aria-checked'), 'true', 'checked after click');
+  assert((await txt(page, '#tab-today .card:nth-of-type(2) .pill')).includes('1/5'), 'counter 1/5');
+  await page.focus('#tab-today .check[data-id=one]');
+  await page.keyboard.press('Space');
+  eq(await page.getAttribute('#tab-today .check[data-id=one]', 'aria-checked'), 'true', 'Space toggles focused item');
+  await page.click('#tab-today .check[data-id=move]');
+  eq(await page.getAttribute('#tab-today .check[data-id=move]', 'aria-checked'), 'false', 'second click unchecks');
+  await page.reload();
+  eq(await page.getAttribute('#tab-today .check[data-id=one]', 'aria-checked'), 'true', 'persisted across reload');
+  eq((await getState(page)).days[TODAY].checks, { move: false, one: true }, 'stored under today key');
+  for (const id of ['morning', 'move', 'stop', 'bed']) await page.click(`#tab-today .check[data-id=${id}] .box`);
+  assert((await toastText(page)).includes('כל סדר היום הושלם'), 'all-done toast');
+});
+test('checklist: resets on the next day (reload) and the game of the day rotates', 'היום: "מתאפס כל יום"; "משחק מומלץ של היום, מתחלף"', async t => {
+  const page = await t.open();
+  await page.click('#tab-today .check[data-id=move]');
+  await page.click('#tab-today .check[data-id=bed]');
+  const game1 = await txt(page, '#tab-today .game b');
+  await page.clock.setSystemTime(tsJ(addDaysKey(TODAY, 1) + 'T07:30'));
+  await page.reload();
+  eq(await page.locator('#tab-today .check.done').count(), 0, 'no item checked on the new day');
+  const game2 = await txt(page, '#tab-today .game b');
+  assert(game1 !== game2, `game should change daily ("${game1}" vs "${game2}")`);
+  const s = await getState(page);
+  eq(s.days[TODAY].checks, { move: true, bed: true }, 'yesterday kept in history');
+});
+test('checklist: resets when the app returns to foreground on a new day', 'היום: "מתאפס כל יום"', async t => {
+  const page = await t.open();
+  await page.click('#tab-today .check[data-id=move]');
+  await page.clock.setSystemTime(tsJ(addDaysKey(TODAY, 1) + 'T07:30'));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  eq(await page.locator('#tab-today .check.done').count(), 0, 'reset after visibilitychange');
+});
+test('checklist: resets at midnight while the app stays open in the foreground', 'היום: "מתאפס כל יום"', async t => {
+  const page = await t.open({ time: tsJ(TODAY + 'T23:58') });
+  await page.click('#tab-today .check[data-id=move]');
+  await page.click('#tab-today .check[data-id=one]');
+  await page.clock.runFor(5 * 60e3); // 00:03 next day, no user interaction, page still visible
+  const done = await page.locator('#tab-today .check.done').count();
+  eq(done, 0, 'checklist on screen should show the new (empty) day after midnight');
+});
+test('checklist: morning breathing button runs 3 minutes and completes the item', 'היום: "בוקר: 3 דקות נשימת בלון"', async t => {
+  const page = await t.open();
+  await page.click('#tab-today [data-act=morningBreath]');
+  assert(await visible(page, '#exOverlay'), 'exercise overlay opens');
+  eq(await page.getAttribute('#tab-today .check[data-id=morning]', 'aria-checked'), 'false', 'tapping the button does not toggle the item itself');
+  assert((await txt(page, '#exTitle')).includes('נשימת בלון'), 'balloon breathing');
+  assert((await txt(page, '#exMeta')).includes('3:00'), 'total 3:00 shown, got ' + await txt(page, '#exMeta'));
+  await page.clock.runFor(179e3);
+  eq(await page.locator('#exInner .done-face').count(), 0, 'not finished at 2:59');
+  await page.clock.runFor(1000);
+  assert(await page.locator('#exInner .done-face').count() === 1, 'finished at 3:00');
+  await page.click('#exInner .sheet-head [data-act=exClose]');
+  eq(await page.getAttribute('#tab-today .check[data-id=morning]', 'aria-checked'), 'true', 'morning item completed');
+  eq(await page.locator('#tab-today [data-act=morningBreath]').count(), 0, 'button hidden when done');
+  eq((await getState(page)).days[TODAY].checks.morning, true, 'persisted');
+});
+test('checklist: closing the morning breathing early does NOT complete the item', 'היום: "בוקר: 3 דקות נשימת בלון"', async t => {
+  const page = await t.open();
+  await page.click('#tab-today [data-act=morningBreath]');
+  await page.clock.runFor(30e3);
+  await page.click('#exOverlay .ex-actions [data-act=exClose]');
+  eq(await page.getAttribute('#tab-today .check[data-id=morning]', 'aria-checked'), 'false', 'not completed');
+});
+
+/* ================================================================== *
+ * 5. Praise counter
+ * ================================================================== */
+test('praise: daily counter with target 5, note saved, Enter key, delete', 'היום: "תפסתי אותו מתנהג יפה: מונה יומי עם יעד 5, ושדה קצר"', async t => {
+  const page = await t.open();
+  assert((await txt(page, '#tab-today .praise-btn')).includes('(0/5)'), 'starts at 0/5');
+  await page.fill('#praiseNote', 'עזר לאחותו');
+  await page.click('#tab-today .praise-btn');
+  eq(await page.inputValue('#praiseNote'), '', 'input cleared after save');
+  assert((await txt(page, '#tab-today .note-list')).includes('עזר לאחותו'), 'note listed');
+  assert((await txt(page, '#tab-today .note-list')).includes('10:00'), 'time listed');
+  await page.fill('#praiseNote', 'שיתף משחק');
+  await page.press('#praiseNote', 'Enter');
+  assert((await txt(page, '#tab-today .praise-btn')).includes('(2/5)'), 'Enter key records praise');
+  for (let i = 0; i < 3; i++) await page.click('#tab-today .praise-btn');
+  assert((await txt(page, '#tab-today .praise-btn')).includes('(5/5)'), '5/5');
+  assert((await txt(page, '#tab-today')).includes('הגעתם ליעד היומי'), 'daily target message');
+  eq(await page.locator('#tab-today .praise-dots i.on').count(), 5, '5 dots on');
+  page.dialogAnswer = false;
+  await page.click('#tab-today [data-act=delPraise][data-i="0"]');
+  assert((await txt(page, '#tab-today .praise-btn')).includes('(5/5)'), 'cancelled delete keeps it');
+  page.dialogAnswer = true;
+  await page.click('#tab-today [data-act=delPraise][data-i="0"]');
+  assert((await txt(page, '#tab-today .praise-btn')).includes('(4/5)'), 'deleted');
+  assert(!(await txt(page, '#tab-today .note-list')).includes('עזר לאחותו'), 'the right entry was deleted');
+  await page.reload();
+  eq((await getState(page)).days[TODAY].praises.length, 4, 'persisted');
+  await page.clock.setSystemTime(tsJ(addDaysKey(TODAY, 1) + 'T08:00'));
+  await page.reload();
+  assert((await txt(page, '#tab-today .praise-btn')).includes('(0/5)'), 'counter is daily');
+});
+
+/* ================================================================== *
+ * 6. Stars & celebration
+ * ================================================================== */
+test('stars: add star, no way to remove one', 'היום: "לחיצה מוסיפה כוכב. לא ניתן להוריד כוכב"', async t => {
+  const page = await t.open();
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  eq(await page.locator('#tab-today .goal').first().locator('.stars .s').count(), 1, 'one star on goal 1');
+  assert((await txt(page, '#tab-today .pill.blue')).includes('1/15'), 'pill 1/15');
+  const removers = await page.evaluate(() => [...document.querySelectorAll('[data-act]')].map(e => e.dataset.act).filter(a => /star/i.test(a) && a !== 'star'));
+  eq(removers, [], 'no star-removal actions in the DOM');
+  await page.click('#tab-today .goal .stars .s');
+  await page.dblclick('#tab-today .goal .stars .s');
+  eq((await getState(page)).stars.length, 1, 'tapping a star does not remove it');
+  await page.click('.topbar [data-act=openSettings]');
+  const ids = await page.evaluate(() => [...document.querySelectorAll('#setOverlay [data-act]')].map(e => e.dataset.act));
+  assert(!ids.some(a => /star/i.test(a)), 'no star removal in settings either');
+});
+test('stars: celebration fires exactly once when weekly target is reached; resets next week', 'היום: "כשמגיעים ליעד הכוכבים – אנימציה ופרס שהוגדר מראש"', async t => {
+  const page = await t.open({ state: makeState({ settings: { starsNeeded: 3, reward: 'סרט בקולנוע' } }) });
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  await page.click('#tab-today [data-act=star][data-id=g2]');
+  assert(!(await visible(page, '#celOverlay')), 'no celebration at 2/3');
+  assert((await txt(page, '#tab-today .reward')).includes('עוד 1'), '1 more star to reward');
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  assert(await visible(page, '#celOverlay'), 'celebration at 3/3');
+  const cel = await txt(page, '#celInner');
+  assert(cel.includes('סרט בקולנוע') && cel.includes('דני') && cel.includes('3 כוכבים'), 'celebration shows name, target and reward: ' + cel);
+  assert(await page.locator('.confetti').count() > 0, 'confetti animation');
+  await page.click('#celOverlay [data-act=celClose]');
+  assert(!(await visible(page, '#celOverlay')), 'closes');
+  assert((await txt(page, '#tab-today .reward')).includes('הפרס הורווח השבוע'), 'reward earned banner');
+  await page.click('#tab-today [data-act=star][data-id=g2]');
+  assert(!(await visible(page, '#celOverlay')), 'no second celebration (4/3)');
+  await page.reload();
+  await page.click('#tab-today [data-act=star][data-id=g2]');
+  assert(!(await visible(page, '#celOverlay')), 'no second celebration after reload');
+  eq((await getState(page)).stars.length, 5, '5 stars stored');
+  // next program week
+  await page.clock.setSystemTime(NOW + 7 * DAY);
+  await page.reload();
+  assert((await txt(page, '#tab-today .pill.blue')).includes('0/3'), 'weekly stars reset in week 2');
+  eq(await page.locator('#tab-today .goal .stars .s').count(), 0, 'no stars shown in new week');
+  for (let i = 0; i < 2; i++) await page.click('#tab-today [data-act=star][data-id=g1]');
+  assert(!(await visible(page, '#celOverlay')), 'not yet');
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  assert(await visible(page, '#celOverlay'), 'celebrates again in the new week');
+});
+test('stars: celebration respects a target raised after it was already celebrated', 'היום: "כשמגיעים ליעד הכוכבים"', async t => {
+  const page = await t.open({ state: makeState({ settings: { starsNeeded: 2 } }) });
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  assert(await visible(page, '#celOverlay'), 'celebrated at 2');
+  await page.click('#celOverlay [data-act=celClose]');
+  await setSettings(page, { sNeed: 4 });
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  assert(await visible(page, '#celOverlay'), 'reaching the new target (4) this week should celebrate and show the reward');
+});
+test('robustness: accidental double tap on "add star" adds only one (stars cannot be removed)', 'היום: "לא ניתן להוריד כוכב" + robustness', async t => {
+  const page = await t.open();
+  const b = page.locator('#tab-today [data-act=star][data-id=g1]');
+  await b.tap();
+  await b.tap(); // ~100 ms later
+  eq((await getState(page)).stars.length, 1, 'irreversible action should be protected against an accidental double tap');
+});
+test('robustness: rapid double taps elsewhere (save incident, checklist, tool, tab)', 'robustness', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.locator('#tab-incident [data-act=saveIncident]').dblclick();
+  eq((await getState(page)).incidents.length, 1, 'double tap on save creates one incident');
+  await go(page, 'today');
+  await page.locator('#tab-today .check[data-id=move]').dblclick();
+  const s = await getState(page);
+  eq(!!s.days[TODAY].checks.move, false, 'double tap toggles twice consistently');
+  await go(page, 'calm');
+  await page.locator('#tab-calm .card:not(#moodTools) [data-ex=box]').dblclick({ force: true });
+  await page.clock.runFor(1000);
+  eq(await txt(page, '#exNum'), '3', 'only one timer running after double tap on a tool');
+  await page.click('#exOverlay .ex-actions [data-act=exClose]');
+  await page.locator('nav.bottom [data-tab=guide]').dblclick();
+  assert(await page.locator('#tab-guide.active').count() === 1, 'tab active');
+});
+
+/* ================================================================== *
+ * 7. Calm tab
+ * ================================================================== */
+test('calm: 4 thermometer colors, selection saved with time, matching tools per color', 'רגיעה: "מדחום רגשות … 4 צבעים … הבחירה נשמרת עם שעה"; "לפי הצבע מוצעים כלים מתאימים"', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  const moods = await page.locator('#tab-calm .mood').evaluateAll(els => els.map(e => [e.dataset.c, e.innerText.replace(/\s+/g, ' ').trim()]));
+  eq(moods.map(m => m[0]).sort(), ['green', 'orange', 'red', 'yellow'], 'four colors');
+  const labels = { green: ['ירוק', 'רגוע'], yellow: ['צהוב', 'מתעצבן'], orange: ['כתום', 'כועס'], red: ['אדום', 'עומד להתפוצץ'] };
+  for (const [c, text] of moods) for (const w of labels[c]) assert(text.includes(w), `${c} label should include "${w}" (got "${text}")`);
+  const heights = {};
+  const toolsBy = {};
+  let n = 0;
+  for (const c of ['green', 'yellow', 'orange', 'red']) {
+    await page.clock.runFor(60e3); n++;
+    await page.click(`#tab-calm .mood[data-c=${c}]`);
+    eq(await page.getAttribute(`#tab-calm .mood[data-c=${c}]`, 'aria-pressed'), 'true', c + ' pressed');
+    heights[c] = await page.evaluate(() => parseFloat(document.querySelector('.thermo .fill').style.height));
+    toolsBy[c] = await page.locator('#moodTools [data-ex]').evaluateAll(els => els.map(e => e.dataset.ex));
+    assert(toolsBy[c].length >= 2, c + ': at least two suggested tools');
+  }
+  assert(heights.green < heights.yellow && heights.yellow < heights.orange && heights.orange < heights.red, 'thermometer fill rises with intensity ' + JSON.stringify(heights));
+  assert(toolsBy.red.includes('stop') && toolsBy.red.includes('wall'), 'red suggests the stop sentence and pushing the wall');
+  assert(toolsBy.green.some(x => ['balloon', 'candle', 'box'].includes(x)), 'green suggests breathing practice');
+  const s = await getState(page);
+  eq(s.moods.map(m => m.c), ['green', 'yellow', 'orange', 'red'], 'all selections saved');
+  eq(s.moods.map(m => m.ts), [1, 2, 3, 4].map(i => NOW + i * 60e3), 'saved with timestamp');
+  const chips = await page.locator('#tab-calm .today-moods span:not(.muted)').allInnerTexts();
+  eq(chips.map(x => x.trim()), ['10:01', '10:02', '10:03', '10:04'], 'today\'s selections shown with time');
+});
+test('calm: all 6 tools listed + allowed ways to vent anger', 'רגיעה: כלים + "דרכים מותרות להוציא כעס"', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  const all = await page.locator('#tab-calm .card:not(#moodTools) [data-ex]').evaluateAll(els => els.map(e => e.dataset.ex).sort());
+  eq(all, ['balloon', 'box', 'candle', 'robot', 'stop', 'wall'], 'six tools');
+  const vent = (await page.locator('#tab-calm .vent li').allInnerTexts()).join('|');
+  for (const k of ['לדחוף קיר', 'לקמט נייר', 'להכות כרית', 'לרקוע', 'אני כועס!', 'לצייר את הכעס']) assert(vent.includes(k), 'vent item: ' + k);
+});
+
+const EX_EXPECT = {
+  // durations in seconds per step, cycles. Spec-mandated values marked in comments.
+  box: { cycles: 4, steps: [4, 4, 4, 4] },              // spec: "נשימת קובייה (4-4-4-4)"
+  robot: { cycles: 3, steps: [5, 5] },                  // spec: "5 שניות כיווץ ו-5 שחרור, 3 סבבים"
+  wall: { cycles: 1, first: 10 },                       // spec: "טיימר של 10 שניות"
+  balloon: { cycles: null, circle: true },
+  candle: { cycles: null, circle: true },
+  stop: { cycles: null, words: ['עצור', 'נושם', 'חושב', 'בוחר'] } // spec: "עצור – נושם – חושב – בוחר"
+};
+async function exState(page) {
+  return page.evaluate(() => {
+    const q = s => document.querySelector(s);
+    const on = q('.stopwords div.on');
+    const c = q('#exCircle');
+    return {
+      key: q('#exText') ? q('#exText').textContent : on ? 'w' + on.dataset.i : null,
+      num: q('#exNum') ? q('#exNum').textContent : null,
+      meta: q('#exMeta') ? q('#exMeta').textContent : null,
+      done: !!q('.done-face'),
+      dur: c ? c.style.transitionDuration : null, scale: c ? c.style.transform : null, cls: c ? c.className : null
+    };
+  });
+}
+async function recordExercise(page, maxSec) {
+  const segs = [];
+  let st = await exState(page);
+  const initialMeta = st.meta;
+  let cur = { key: st.key, cycle: st.meta.match(/סבב (\d+)/)[1], len: 0, nums: [st.num], dur: st.dur, scale: st.scale, cls: st.cls };
+  let t = 0;
+  while (t < maxSec) {
+    await page.clock.runFor(1000); t++;
+    st = await exState(page);
+    cur.len++;
+    if (st.done) { segs.push(cur); return { segs, total: t, initialMeta }; }
+    const cyc = st.meta.match(/סבב (\d+)/)[1];
+    if (st.key !== cur.key || cyc !== cur.cycle) { segs.push(cur); cur = { key: st.key, cycle: cyc, len: 0, nums: [st.num], dur: st.dur, scale: st.scale, cls: st.cls }; }
+    else cur.nums.push(st.num);
+  }
+  return { segs, total: null, initialMeta };
+}
+for (const ex of ['candle', 'balloon', 'box', 'robot', 'wall', 'stop']) {
+  test(`exercise ${ex}: step durations, cycles, countdown, completion screen`, 'רגיעה: "כל אחת עם אנימציה של עיגול שמתרחב ומתכווץ, טיימר והנחיה כתובה"; robot 5/5×3; wall 10s; box 4-4-4-4', async t => {
+    const page = await t.open();
+    await go(page, 'calm');
+    await page.click(`#tab-calm .card:not(#moodTools) [data-ex=${ex}]`);
+    assert(await visible(page, '#exOverlay'), 'overlay opens');
+    eq(await page.evaluate(() => document.body.style.overflow), 'hidden', 'background scroll locked');
+    const exp = EX_EXPECT[ex];
+    const rec = await recordExercise(page, 400);
+    assert(rec.total != null, 'exercise must finish');
+    const per = rec.segs.map(s => s.len);
+    // countdown: each step shows len, len-1, ..., 1
+    for (const s of rec.segs) if (s.nums[0] !== null) eq(s.nums.map(Number), Array.from({ length: s.len }, (_, i) => s.len - i), `countdown in step "${s.key}"`);
+    // the initially announced remaining time equals the real duration
+    const m = rec.initialMeta.match(/(\d+):(\d\d)/);
+    eq(+m[1] * 60 + +m[2], rec.total, 'announced total time vs actual duration');
+    const cycles = +rec.initialMeta.match(/מתוך (\d+)/)[1];
+    if (exp.cycles) eq(cycles, exp.cycles, 'cycles');
+    const stepsPerCycle = rec.segs.length / cycles;
+    assert(Number.isInteger(stepsPerCycle), `segments ${rec.segs.length} not divisible by cycles ${cycles}`);
+    if (exp.steps) eq(per, Array(cycles).fill(exp.steps).flat(), 'step durations (s)');
+    if (exp.first) eq(per[0], exp.first, 'first step duration (s)');
+    if (exp.words) {
+      eq(rec.segs.slice(0, 4).map(s => s.key), ['w0', 'w1', 'w2', 'w3'], 'words highlighted in order');
+    }
+    if (exp.circle || exp.steps) {
+      // circle animation: transition duration equals step duration; inhale expands, exhale shrinks
+      for (const s of rec.segs) eq(s.dur, s.len + 's', `circle transition duration for "${s.key}"`);
+      const scales = rec.segs.slice(0, stepsPerCycle).map(s => parseFloat(s.scale.match(/scale\(([\d.]+)/)[1]));
+      assert(new Set(scales).size > 1, 'circle should expand and contract: ' + scales);
+    }
+    if (ex === 'robot') assert(/tense/.test(rec.segs[0].cls) && !/tense/.test(rec.segs[1].cls), 'robot: tense then loose');
+    // completion screen
+    const doneTxt = await txt(page, '#exInner');
+    assert(doneTxt.includes('כל הכבוד'), 'completion screen');
+    await page.click('#exInner [data-goto=calm]');
+    assert(!(await visible(page, '#exOverlay')), 'closes');
+    assert(await page.locator('#tab-calm.active').count() === 1, 'returns to calm tab');
+    eq(await page.evaluate(() => document.body.style.overflow), '', 'scroll unlocked');
+  });
+}
+test('exercise: pause/resume freezes the timer; total = nominal + pause', 'רגיעה: טיימר', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=box]');
+  await page.clock.runFor(2000);
+  const before = await exState(page);
+  eq(before.num, '2', 'two seconds elapsed');
+  await page.click('#exPauseBtn');
+  assert((await txt(page, '#exPauseBtn')).includes('המשך'), 'button shows resume');
+  await page.clock.runFor(10000);
+  const during = await exState(page);
+  eq([during.num, during.meta, during.key], [before.num, before.meta, before.key], 'frozen while paused');
+  await page.click('#exPauseBtn');
+  assert((await txt(page, '#exPauseBtn')).includes('השהיה'), 'button shows pause again');
+  let t2 = 0;
+  while (!(await exState(page)).done && t2 < 120) { await page.clock.runFor(1000); t2++; }
+  near(t2 + 2, 64, 1, 'remaining run time after resume');
+});
+test('exercise: ✕, "סיום" and Escape close the overlay and stop the timer', 'רגיעה', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  for (const how of ['x', 'finish', 'escape']) {
+    await page.click('#tab-calm .card:not(#moodTools) [data-ex=balloon]');
+    await page.clock.runFor(3000);
+    if (how === 'x') await page.click('#exInner .sheet-head [data-act=exClose]');
+    if (how === 'finish') await page.click('#exInner .ex-actions [data-act=exClose]');
+    if (how === 'escape') await page.keyboard.press('Escape');
+    assert(!(await visible(page, '#exOverlay')), how + ' closes');
+    eq(await page.evaluate(() => EX), null, how + ' stops the exercise');
+  }
+  await page.clock.runFor(70000);
+  eq(await page.locator('#exInner .done-face').count(), 0, 'no completion screen pops up later');
+});
+
+/* ================================================================== *
+ * 8. Incident form
+ * ================================================================== */
+test('incident: chip groups match spec, single vs multi select', 'רישום אירוע: "מה קרה לפני … כלפי מי … מה עשה … כמה זמן … איך הגבנו … כלי הרגעה (כן או לא)"', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  const grp = f => page.locator(`#tab-incident [data-group=${f}] .chip`).evaluateAll(els => els.map(e => e.dataset.val));
+  const trig = await grp('trigger');
+  for (const k of ['מעבר בין פעילויות', 'הפסד', 'אח לקח לו משהו', 'עייפות / רעב', 'מסכים', 'אחר']) assert(trig.includes(k), 'trigger option ' + k);
+  assert(trig.some(x => /^ל?א$|ללא|לא /.test(x)), 'a "nothing/no trigger" option (spec: "לא")');
+  eq((await grp('target')).length, 4, '4 targets');
+  for (const k of ['אח', 'חבר', 'הורה', 'חפץ']) assert((await grp('target')).some(x => x.includes(k)), 'target ' + k);
+  eq(await grp('actions'), ['מכה', 'צעקה', 'שבירה', 'השתלטות'], 'actions');
+  assert((await grp('duration')).length >= 3, 'duration options');
+  assert((await grp('response')).length >= 3, 'response options');
+  eq(await grp('used'), ['yes', 'no'], 'used tool yes/no');
+  const pressed = f => page.locator(`#tab-incident [data-group=${f}] .chip[aria-pressed=true]`).evaluateAll(els => els.map(e => e.dataset.val));
+  await page.click('#tab-incident [data-field=trigger][data-val="הפסד"]');
+  await page.click('#tab-incident [data-field=trigger][data-val="מסכים"]');
+  eq(await pressed('trigger'), ['מסכים'], 'single select replaces');
+  await page.click('#tab-incident [data-field=trigger][data-val="מסכים"]');
+  eq(await pressed('trigger'), [], 'tap again deselects');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.click('#tab-incident [data-field=actions][data-val="שבירה"]');
+  eq(await pressed('actions'), ['מכה', 'שבירה'], 'multi select');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  eq(await pressed('actions'), ['שבירה'], 'multi deselect');
+  await page.click('#tab-incident [data-field=used][data-val=yes]');
+  await page.click('#tab-incident [data-field=used][data-val=no]');
+  eq(await pressed('used'), ['no'], 'yes/no exclusive');
+  // draft survives tab switch
+  await go(page, 'today'); await go(page, 'incident');
+  eq(await pressed('actions'), ['שבירה'], 'draft kept across tabs');
+});
+test('incident: required field validation, auto date/time, save, recent list, delete', 'רישום אירוע: "טופס מהיר … תאריך ושעה אוטומטיים"', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  eq(await page.inputValue('#incTs'), TODAY + 'T10:00', 'date/time pre-filled with now');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  assert((await toastText(page)).includes('מה עשה'), 'validation toast for missing action');
+  eq((await getState(page)).incidents.length, 0, 'nothing saved');
+  await page.clock.runFor(5 * 60e3); // the form was opened 5 min ago; save time should be 'now'
+  await page.click('#tab-incident [data-field=trigger][data-val="מעבר בין פעילויות"]');
+  await page.click('#tab-incident [data-field=target][data-val="חבר"]');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.click('#tab-incident [data-field=actions][data-val="צעקה"]');
+  await page.click('#tab-incident [data-field=duration][data-val="5–15 דקות"]');
+  await page.click('#tab-incident [data-field=response][data-val="הפרדה"]');
+  await page.click('#tab-incident [data-field=response][data-val="הצעתי כלי הרגעה"]');
+  await page.click('#tab-incident [data-field=used][data-val=yes]');
+  await page.fill('#incNote', 'בהפסקה');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  const s = await getState(page);
+  eq(s.incidents.length, 1, 'saved');
+  const i = s.incidents[0];
+  eq([i.trigger, i.target, i.actions, i.duration, i.response, i.used, i.note], ['מעבר בין פעילויות', 'חבר', ['מכה', 'צעקה'], '5–15 דקות', ['הפרדה', 'הצעתי כלי הרגעה'], 'yes', 'בהפסקה'], 'all fields stored');
+  near(i.ts, NOW, 6 * 60e3, 'auto timestamp ~now');
+  eq(await page.locator('#tab-incident .chip[aria-pressed=true]').count(), 0, 'form reset after save');
+  eq(await page.inputValue('#incNote'), '', 'note reset');
+  await page.click('#tab-incident details summary');
+  const item = await txt(page, '#tab-incident .inc-item');
+  assert(item.includes('12.10') && item.includes('מכה, צעקה') && item.includes('חבר') && item.includes('השתמש בכלי') && item.includes('בהפסקה'), 'recent list row: ' + item);
+  assert((await txt(page, '#tab-incident details summary .pill')) === '1', 'count pill');
+  page.dialogAnswer = false;
+  await page.click('#tab-incident [data-act=delIncident]');
+  eq((await getState(page)).incidents.length, 1, 'cancel keeps');
+  page.dialogAnswer = true;
+  await page.click('#tab-incident [data-act=delIncident]');
+  eq((await getState(page)).incidents.length, 0, 'deleted');
+  assert((await txt(page, '#tab-incident details')).includes('עוד לא נרשמו'), 'empty state');
+});
+test('incident: date/time can be edited before saving', 'רישום אירוע: "תאריך ושעה אוטומטיים" (editable)', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  await page.fill('#incTs', '2026-10-10T08:15');
+  await page.click('#tab-incident [data-field=actions][data-val="שבירה"]');
+  await go(page, 'guide'); await go(page, 'incident'); // edited time must survive tab switch
+  eq(await page.inputValue('#incTs'), '2026-10-10T08:15', 'edited time kept');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  eq((await getState(page)).incidents[0].ts, tsJ('2026-10-10T08:15'), 'stored edited time');
+  await page.click('#tab-incident details summary');
+  assert((await txt(page, '#tab-incident .inc-item')).includes('10.10 · 08:15'), 'shown with edited time');
+  eq(await page.inputValue('#incTs'), TODAY + 'T10:00', 'next form back to now');
+});
+test('incident: auto time is "now" when the app is resumed hours later on the incident tab', 'רישום אירוע: "תאריך ושעה אוטומטיים"', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  await page.clock.runFor(3 * 3600e3); // parent switches to another app; returns 3 hours later (same day)
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  const ts = (await getState(page)).incidents[0].ts;
+  near(ts, NOW + 3 * 3600e3, 2 * 60e3, `auto timestamp should be ~13:00, got ${new Date(ts).toLocaleTimeString('he-IL', { timeZone: TZ })}`);
+});
+test('incident: future date/time is rejected', 'רישום אירוע (validation)', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  await page.fill('#incTs', '2027-05-01T12:00');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  const s = await getState(page);
+  assert(!s.incidents.some(i => i.ts > NOW + 60e3), 'an incident in the future should not be accepted (got ' + s.incidents.map(i => new Date(i.ts).toISOString()) + ')');
+});
+test('incident: "מה עושים עכשיו" card has all protocol content', 'רישום אירוע: כרטיס "מה עושים עכשיו"', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  const card = await txt(page, '#tab-incident .steps-card');
+  assert(card.includes('מה עושים עכשיו'), 'title');
+  for (const k of ['ברגע ההתפרצות', 'לעצור פיזית ובשקט', 'אני לא אתן לך להכות', 'להגן על האח הקטן', 'מעט מילים', 'להציע כלי', 'לחכות שיירגע',
+    'אחרי שנרגע', 'בפרטיות', 'לא מול האחים', 'לתת שם לרגש', 'מותר לכעוס, אסור להכות', 'מה במקום', 'תיקון מול הנפגע',
+    'תוצאה הגיונית', 'קצרה וצמודה למעשה', 'מחר מתחילים דף חדש']) assert(card.includes(k), 'protocol text missing: ' + k);
+});
+
+/* ================================================================== *
+ * 9. Progress
+ * ================================================================== */
+function progressFixture() {
+  const start = startForWeek(4);
+  const I = [];
+  // week 1: 10 incidents, 6 hits, used: 2 yes / 8 no
+  for (let i = 0; i < 10; i++) I.push(inc(tsIn(start, 1, i % 7, i < 5 ? '17:30' : '21:30'), { actions: i < 6 ? ['מכה'] : ['צעקה'], used: i < 2 ? 'yes' : 'no', trigger: i < 6 ? 'הפסד' : 'מסכים', target: i < 7 ? 'אח / אחות' : 'הורה' }));
+  // week 2: 7 incidents, 3 hits, used 3 yes / 2 no / 2 unknown
+  for (let i = 0; i < 7; i++) I.push(inc(tsIn(start, 2, i, '19:00'), { actions: i < 3 ? ['מכה', 'צעקה'] : ['השתלטות'], used: i < 3 ? 'yes' : i < 5 ? 'no' : null, trigger: 'מעבר בין פעילויות', target: 'חבר' }));
+  // week 3: 4 incidents, 1 hit, all used
+  for (let i = 0; i < 4; i++) I.push(inc(tsIn(start, 3, i * 2, '13:00'), { actions: i === 0 ? ['מכה'] : ['צעקה'], used: 'yes', trigger: 'הפסד' }));
+  // week 4 (current, today): 2 incidents, 0 hits
+  I.push(inc(NOW - 3600e3, { actions: ['צעקה'], used: 'no' }), inc(NOW - 1800e3, { actions: ['שבירה'], used: 'yes', target: 'חפץ' }));
+  const stars = [...Array(3)].map((_, i) => ({ goalId: 'g1', ts: tsIn(start, 1, i) })).concat([...Array(5)].map((_, i) => ({ goalId: 'g2', ts: tsIn(start, 2, i) })), [{ goalId: 'g1', ts: NOW - 5000 }]);
+  const days = {};
+  days[addDaysKey(start, 1)] = { checks: {}, praises: [{ ts: tsIn(start, 1, 1), note: '' }, { ts: tsIn(start, 1, 1), note: '' }] };
+  days[addDaysKey(start, 8)] = { checks: {}, praises: [1, 2, 3, 4].map(() => ({ ts: tsIn(start, 2, 1), note: '' })) };
+  days[TODAY] = { checks: {}, praises: [{ ts: NOW - 100, note: '' }] };
+  return makeState({ settings: { startDate: start }, incidents: I, stars, days });
+}
+test('progress: weekly table (incidents, hits, tool %, stars, praise)', 'התקדמות: "אחוז האירועים שבהם השתמש בכלי"; "סיכום כוכבים ו\'תפסתי אותו\' לפי שבוע"', async t => {
+  const page = await t.open({ state: progressFixture() });
+  await go(page, 'progress');
+  const rows = await page.locator('#tab-progress table.wk tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(c => c.textContent.trim())));
+  eq(rows, [['1', '10', '6', '20%', '3', '2'], ['2', '7', '3', '60%', '5', '4'], ['3', '4', '1', '100%', '0', '0'], ['4', '2', '0', '50%', '1', '1']], 'weekly summary rows');
+  eq(await page.locator('#tab-progress table.wk tr.cur td').first().innerText(), '4', 'current week highlighted');
+  const kpi = await page.locator('#tab-progress .kpi').allInnerTexts();
+  assert(kpi[0].includes('2') && kpi[0].includes('ירידה של 80%'), 'KPI incidents this week + change: ' + kpi[0]);
+  assert(kpi[1].includes('50%'), 'KPI tool use: ' + kpi[1]);
+  assert(kpi[2].includes('1'), 'KPI praise: ' + kpi[2]);
+});
+test('progress: bar chart values, baseline (week 1) and −70% target lines, "all/hits" toggle', 'התקדמות: "גרף עמודות … קו בסיס של שבוע 1 וקו יעד של מינוס 70%"', async t => {
+  const page = await t.open({ state: progressFixture() });
+  await go(page, 'progress');
+  const read = () => page.evaluate(() => {
+    const svg = document.querySelectorAll('#tab-progress svg.chart')[0];
+    const bars = [...svg.querySelectorAll('path')].map(p => { const m = p.getAttribute('d').match(/^M([\d.]+) ([\d.]+)V([\d.]+)Q[\d.]+ ([\d.]+)/); return { x: +m[1], bottom: +m[2], top: +m[4] }; });
+    const refs = [...svg.querySelectorAll('line[pointer-events=none]')].map(l => ({ y: +l.getAttribute('y1'), color: l.getAttribute('stroke'), dash: l.hasAttribute('stroke-dasharray') }));
+    const legend = svg.parentElement.querySelector('.legend').textContent;
+    return { bars, refs, legend };
+  });
+  let r = await read();
+  eq(r.bars.length, 4, 'one bar per elapsed week (weeks 5–12 empty)');
+  const H = r.bars[0].bottom; // baseline pixel of value 0
+  const unit = (H - r.bars[0].top) / 10; // px per incident (week 1 = 10)
+  [10, 7, 4, 2].forEach((v, i) => near(H - r.bars[i].top, v * unit, 0.6, `bar height week ${i + 1}`));
+  const base = r.refs.find(x => x.dash), tgt = r.refs.find(x => !x.dash);
+  assert(base && tgt, 'baseline and target lines exist');
+  near(base.y, H - 10 * unit, 0.6, 'baseline at week-1 value (10)');
+  near(tgt.y, H - 3 * unit, 0.6, 'target line at 30% of baseline (3)');
+  assert(r.legend.includes('בסיס שבוע 1: 10') && r.legend.includes('יעד (ירידה של 70%): 3'), 'legend: ' + r.legend);
+  await page.click('#tab-progress [data-act=chartMode][data-mode=hits]');
+  eq(await page.getAttribute('#tab-progress [data-mode=hits]', 'aria-pressed'), 'true', 'hits pressed');
+  r = await read();
+  assert(r.legend.includes('בסיס שבוע 1: 6') && r.legend.includes('1.8'), 'hits legend: ' + r.legend);
+  eq(r.bars.length, 3, 'hits mode: weeks with hits (6,3,1) have bars, week 4 has 0');
+  near((r.bars[0].bottom - r.bars[1].top) / (r.bars[0].bottom - r.bars[0].top), 0.5, 0.02, 'hits week 2 = half of week 1');
+  await page.reload();
+  await go(page, 'progress');
+  eq(await page.getAttribute('#tab-progress [data-mode=hits]', 'aria-pressed'), 'true', 'chart mode persisted');
+  // tapping a bar shows details
+  await page.click('#tab-progress [data-act=chartMode][data-mode=all]');
+  await page.locator('#tab-progress svg.chart').first().locator('rect[data-w="2"]').click({ force: true });
+  assert((await txt(page, '#tab-progress .chart-info')).includes('שבוע 2: 7 אירועים, מתוכם 3 עם מכות'), 'bar tap info');
+});
+test('progress: tool-usage chart per week', 'התקדמות: "אחוז האירועים שבהם השתמש בכלי הרגעה, לפי שבוע"', async t => {
+  const page = await t.open({ state: progressFixture() });
+  await go(page, 'progress');
+  const hs = await page.evaluate(() => {
+    const svg = document.querySelectorAll('#tab-progress svg.chart')[1];
+    return [...svg.querySelectorAll('path')].map(p => { const m = p.getAttribute('d').match(/^M[\d.]+ ([\d.]+)V[\d.]+Q[\d.]+ ([\d.]+)/); return +m[1] - +m[2]; });
+  });
+  eq(hs.length, 4, '4 bars');
+  [20, 60, 100, 50].forEach((p, i) => near(hs[i] / hs[2], p / 100, 0.02, `tool % week ${i + 1}`));
+});
+test('progress: trigger / hour / target analysis', 'התקדמות: "ניתוח טריגרים: הטריגרים הנפוצים, השעות המועדות ומול מי"', async t => {
+  const page = await t.open({ state: progressFixture() });
+  await go(page, 'progress');
+  const lists = await page.locator('#tab-progress .hbars').evaluateAll(uls => uls.map(ul => [...ul.querySelectorAll('.lab')].map(l => [l.children[0].textContent, +l.children[1].textContent])));
+  eq(lists.length, 3, 'three analyses');
+  eq(lists[0][0], ['הפסד', 12], 'top trigger');
+  eq(lists[0][1], ['מעבר בין פעילויות', 7], 'second trigger');
+  eq(lists[1][0], ['ערב (18–21)', 7], 'top hour bucket');
+  assert(lists[1].some(([k, v]) => k.startsWith('אחר הצהריים') && v === 5), 'afternoon bucket = 5');
+  eq(lists[2][0], ['אח / אחות', 12], 'top target');
+});
+test('progress: encouragement message is always present', 'התקדמות: "הודעה מעודדת: ירידה הדרגתית עם עליות קטנות היא מהלך תקין"', async t => {
+  for (const st of [makeState(), progressFixture()]) {
+    const page = await t.open({ state: st });
+    await go(page, 'progress');
+    const e = await txt(page, '#tab-progress .encourage');
+    assert(e.includes('ירידה הדרגתית') && e.includes('עליות קטנות') && e.includes('תקין'), 'encouragement: ' + e);
+  }
+});
+test('progress: empty state with no incidents', 'התקדמות (empty state)', async t => {
+  const page = await t.open();
+  await go(page, 'progress');
+  assert((await txt(page, '#tab-progress')).includes('עוד אין אירועים רשומים'), 'empty-state text');
+  eq(await page.locator('#tab-progress .pro').count(), 0, 'no pro card');
+});
+test('progress: KPI does not claim the −70% target on the first day of a new week', 'התקדמות: השוואה לשבוע 1 (partial week)', async t => {
+  const start = startForWeek(2);
+  const I = [...Array(10)].map((_, i) => inc(tsIn(start, 1, i % 7)));
+  const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: I }) }); // Monday 10:00 of week 2, no incident yet
+  await go(page, 'progress');
+  const enc = await txt(page, '#tab-progress .encourage');
+  const kpi = await txt(page, '#tab-progress .kpi');
+  assert(!enc.includes('הגעתם ליעד') && !kpi.includes('100%'), `2 hours into week 2 the app reports: "${kpi.replace(/\s+/g, ' ')}" / "${enc.slice(0, 60)}…"`);
+});
+test('progress: chart axis labels match gridline positions', 'התקדמות: גרף (scaling)', async t => {
+  const bad = [];
+  for (const n of [3, 5, 7, 13, 50]) {
+    const start = startForWeek(2);
+    const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: [...Array(n)].map((_, i) => inc(tsIn(start, 1, i % 7))) }) });
+    await go(page, 'progress');
+    const r = await page.evaluate(() => {
+      const svg = document.querySelector('#tab-progress svg.chart');
+      const grid = [...svg.querySelectorAll('line:not([pointer-events])')].map(l => +l.getAttribute('y1'));
+      const labels = [...svg.querySelectorAll('text[text-anchor=end]')].map(tx => +tx.textContent);
+      return { grid, labels };
+    });
+    const [y0, , yMax] = r.grid, [l0, lMid, lMax] = r.labels;
+    const yMid = r.grid[1];
+    const expectedMidY = y0 + (yMax - y0) * (lMid - l0) / (lMax - l0);
+    if (Math.abs(expectedMidY - yMid) > 0.5) bad.push(`max ${n}: mid gridline labelled "${lMid}" but drawn at value ${(lMax * (y0 - yMid) / (y0 - yMax)).toFixed(1)}`);
+    await page.context().close();
+  }
+  assert(!bad.length, bad.join('\n      '));
+});
+
+/* professional help card */
+const proCases = [
+  ['after week 8 with no decline → card', 10, [10, 9, 10, 9, 10, 10, 9, 10, 10], true],
+  ['after week 8 with a clear decline → no card', 10, [10, 9, 8, 7, 6, 5, 4, 3, 2], false],
+  ['exactly week 8, no decline → no card (spec: "after week 8")', 8, [10, 10, 10, 10, 10, 10, 10], false],
+  ['week 12+ (program over), no decline → card', 14, [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8], true],
+  ['week 10, baseline week empty but incidents every week since → card', 10, [0, 5, 5, 5, 5, 5, 5, 5, 5], true]
+];
+for (const [name, week, perWeek, expectCard] of proCases) {
+  test(`progress: pro-help card — ${name}`, 'התקדמות: "אם אחרי שבוע 8 אין ירידה, או שיש אירועים כמעט כל יום, הצג כרטיס \'כדאי לפנות לאיש מקצוע\'"', async t => {
+    const start = startForWeek(week);
+    const I = [];
+    // spread incidents on days 0,2,4 (never "almost every day"), short duration
+    perWeek.forEach((n, wi) => { for (let i = 0; i < n; i++) I.push(inc(tsIn(start, wi + 1, [0, 2, 4][i % 3], '16:00'))); });
+    const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: I }) });
+    await go(page, 'progress');
+    const has = await page.locator('#tab-progress .pro').count() === 1;
+    eq(has, expectCard, 'pro card shown');
+    if (has) { const p = await txt(page, '#tab-progress .pro'); assert(p.includes('כדאי לפנות לאיש מקצוע') && p.includes('שפ״ח') && p.includes('קופת החולים'), 'pro card content'); }
+  });
+}
+for (const [days, expectCard] of [[7, true], [6, true], [3, false]]) {
+  test(`progress: pro-help card — incidents on ${days} of the last 7 days (week 3) → ${expectCard ? 'card' : 'no card'}`, 'התקדמות: "…או שיש אירועים כמעט כל יום…"', async t => {
+    const start = startForWeek(3);
+    const I = [];
+    for (let d = 0; d < days; d++) I.push(inc(NOW - d * DAY - 3600e3));
+    const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: I }) });
+    await go(page, 'progress');
+    eq(await page.locator('#tab-progress .pro').count(), expectCard ? 1 : 0, 'pro card');
+  });
+}
+test('robustness: 500 incidents still render progress quickly', 'התקדמות (performance)', async t => {
+  const start = startForWeek(12);
+  const I = [];
+  for (let i = 0; i < 500; i++) I.push(inc(tsIn(start, 1 + (i % 12), i % 7, pad2(6 + i % 16) + ':' + pad2(i % 60)), { actions: i % 3 ? ['מכה'] : ['צעקה'], used: i % 2 ? 'yes' : 'no' }));
+  const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: I }) });
+  const t0 = Date.now();
+  await go(page, 'progress');
+  await page.waitForSelector('#tab-progress table.wk');
+  const ms = Date.now() - t0;
+  assert(ms < 1500, `progress render took ${ms} ms`);
+  const sum = await page.locator('#tab-progress table.wk tbody tr td:nth-child(2)').evaluateAll(tds => tds.reduce((a, td) => a + +td.textContent, 0));
+  eq(sum, 500, 'all incidents counted');
+  const t1 = Date.now();
+  await go(page, 'incident');
+  assert(Date.now() - t1 < 1000, 'incident tab fast with 500 incidents');
+  eq(await page.locator('#tab-incident .inc-item').count(), 15, 'recent list capped at 15');
+});
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/* ================================================================== *
+ * 10. Guide
+ * ================================================================== */
+test('guide: current phase(s) open + highlighted for every week 1..12', 'מדריך: "תוכן לפי שלבים, כשהשלב הנוכחי פתוח ומודגש"', async t => {
+  const page = await t.open();
+  const bad = [];
+  for (let w = 1; w <= 12; w++) {
+    await setSettings(page, { sStart: startForWeek(w) });
+    await go(page, 'guide');
+    const r = await page.evaluate(() => [...document.querySelectorAll('#tab-guide .phase-card')].slice(0, 5).map(c => ({
+      cur: c.classList.contains('current'), open: c.querySelector('details').open, badge: !!c.querySelector('.now-badge'),
+      name: c.querySelector('summary').textContent.replace('השלב הנוכחי', '').replace(/שבועות? [\d–]+/, '').trim()
+    })));
+    const curNames = r.filter(x => x.cur).map(x => x.name);
+    if (JSON.stringify(curNames) !== JSON.stringify(PHASE_NAMES[w])) bad.push(`week ${w}: highlighted ${JSON.stringify(curNames)}`);
+    r.forEach(x => { if (x.cur !== x.open || x.cur !== x.badge) bad.push(`week ${w}: "${x.name}" current=${x.cur} open=${x.open} badge=${x.badge}`); });
+    await go(page, 'today');
+  }
+  assert(!bad.length, bad.join('\n      '));
+});
+test('guide: all spec sections and key content present', 'מדריך: שלבים, "הבכור מתוך 7", "5 כללי יסוד", "מתי לפנות לאיש מקצוע"', async t => {
+  const page = await t.open();
+  await go(page, 'guide');
+  await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+  const g = await txt(page, '#tab-guide');
+  const must = {
+    'phase labels': ['שבוע 1', 'שבועות 2–4', 'שבועות 4–7', 'שבועות 6–9', 'שבועות 8–12'],
+    'week 1': ['רק מתעדים', 'שינה', 'ארוחות', 'מסכים', 'תנועה'],
+    'weeks 2–4': ['פריקת אנרגיה', 'נשימה', 'מדחום', 'פינת רגיעה', 'לא פינת עונש'],
+    'weeks 4–7': ['צבע-מילה', 'תופסת קפואה', 'ג׳נגה על זמן', 'ראש-כתפיים הפוך', 'שחמט', 'דמקה', 'דחיית סיפוק', 'לגו', 'פאזל 500', 'משחק תפקידים'],
+    'weeks 6–9': ['ניהול כעס', 'ברגע ההתפרצות', 'אחרי שנרגע'],
+    'weeks 8–12': ['בחירה בין שתיים', 'תפקיד אחריות', 'אחד-על-אחד', 'תור למנהיג', 'משא ומתן', 'משחקי צוות', 'שאלות אמפתיה', 'חבר אחד'],
+    'firstborn of 7': ['הבכור מתוך 7', 'זמן אישי קבוע', 'בכור ולא שמרטף', 'זכויות של גדול', 'מקום נעול', 'לא להשוות', 'הפרדה', 'תפקיד מנהיגות'],
+    '5 rules': ['5 כללי יסוד', 'קודם אתה רגוע', 'ביטחון לפני חינוך', '5 שבחים ביום', '3 חוקי בית', 'להאריך את הנשימה'],
+    'seek help': ['מתי לפנות לאיש מקצוע', '6–8 שבועות', 'בעלי חיים', '20–30 דקות', 'כמעט כל יום', 'במסגרת החינוכית', 'קשב', 'שפ״ח', 'קופת החולים']
+  };
+  const missing = [];
+  for (const [sec, words] of Object.entries(must)) for (const w of words) if (!g.includes(w)) missing.push(`${sec}: "${w}"`);
+  assert(!missing.length, 'missing:\n      ' + missing.join('\n      '));
+});
+
+/* ================================================================== *
+ * 11. Data: export / import / reset / storage failures
+ * ================================================================== */
+test('data: export downloads valid JSON identical to stored state', 'עיצוב: "כפתור ייצוא וייבוא JSON בהגדרות"', async t => {
+  const page = await t.open({ state: richState(3) });
+  await page.click('.topbar [data-act=openSettings]');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#setOverlay [data-act=export]')]);
+  eq(dl.suggestedFilename(), `ragua-vehazak-${TODAY}.json`, 'file name');
+  const text = fs.readFileSync(await dl.path(), 'utf8');
+  let data;
+  try { data = JSON.parse(text); } catch (e) { throw new AssertionError('export is not valid JSON'); }
+  eq(data, await getState(page), 'export equals stored state');
+  assert(data.incidents.length > 0 && data.settings.childName === 'דני', 'contains data');
+});
+test('data: import of a valid backup replaces all data (round trip)', 'עיצוב: "ייצוא וייבוא JSON"', async t => {
+  const page = await t.open();
+  const backup = richState(6); backup.settings.childName = 'רותי'; backup.ui.tab = 'progress';
+  await page.click('.topbar [data-act=openSettings]');
+  page.dialogAnswer = false;
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(backup)));
+  for (let i = 0; i < 50 && !page.dialogs.length; i++) await new Promise(r => setTimeout(r, 20));
+  eq(page.dialogs.length, 1, 'confirmation dialog shown');
+  eq((await getState(page)).settings.childName, 'דני', 'cancel in confirm keeps current data');
+  page.dialogAnswer = true;
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(backup)));
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  assert(page.dialogs.some(d => d.includes('הייבוא יחליף')), 'confirmation asked');
+  assert((await toastText(page)).includes('יובאו בהצלחה'), 'success toast');
+  const s = await getState(page);
+  eq([s.settings.childName, s.incidents.length, s.settings.startDate], ['רותי', backup.incidents.length, backup.settings.startDate], 'data replaced');
+  await go(page, 'today');
+  assert((await txt(page, '.hero .eyebrow')).includes('רותי'), 'UI shows imported data');
+  assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 6'), 'imported start date applied');
+});
+test('data: malformed import files are rejected and the app keeps working', 'עיצוב: ייבוא JSON (robustness)', async t => {
+  const page = await t.open({ state: richState(3) });
+  const before = await getState(page);
+  const files = ['not json at all', '', '[]', 'null', '{"foo":1}', '{"settings":null}', '"string"', '{"settings":'];
+  for (const f of files) {
+    await page.click('.topbar [data-act=openSettings]');
+    await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+    await page.setInputFiles('#importFile', fileFrom('bad.json', f));
+    await page.waitForFunction(() => document.querySelector('#toast').textContent !== '');
+    assert((await toastText(page)).includes('הקובץ לא תקין'), `"${f}" → toast, got ${await toastText(page)}`);
+    eq(await getState(page), before, `"${f}" must not change data`);
+    await page.click('#setOverlay [data-act=closeSettings]');
+  }
+  for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) await go(page, tab);
+  eq(page.dialogs.length, 0, 'no confirm dialog for invalid files');
+});
+const hostile = {
+  'non-string child name': { settings: { childName: 12345 } },
+  'null goal entry': { settings: { goals: [null, { id: 'g2', text: 'x' }] } },
+  'rules not strings': { settings: { rules: [1, null, {}] } },
+  'incident with invalid ts': { settings: {}, incidents: [{ id: 'a', ts: 'yesterday', actions: ['מכה'] }] },
+  'incident null / actions string': { settings: {}, incidents: [null, { id: 'b', ts: NOW, actions: 'מכה' }] },
+  'day with null checks/praises': { settings: {}, days: { [TODAY]: { checks: null, praises: null } } },
+  'ui.tab = "__proto__"': { settings: {}, ui: { tab: '__proto__' } }
+};
+test('data: structurally hostile import is rejected or sanitized; app never breaks (also after reload)', 'עיצוב: "שמירת כל הנתונים ב-localStorage (עטוף ב-try/catch)" + ייבוא JSON', async t => {
+  const fails = [];
+  for (const [name, data] of Object.entries(hostile)) {
+    const page = await t.open({ state: richState(3) });
+    await page.click('.topbar [data-act=openSettings]');
+    await page.setInputFiles('#importFile', fileFrom('h.json', JSON.stringify(data)));
+    await page.waitForFunction(() => document.querySelector('#toast').textContent !== '');
+    for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) { await page.evaluate(() => document.querySelector('#setOverlay').hidden = true); await go(page, tab).catch(() => {}); }
+    await page.reload();
+    const rendered = await page.evaluate(() => { const a = document.querySelector('main .tab.active'); return !!a && a.innerHTML.length > 100; });
+    if (page.errors.length || !rendered) fails.push(`${name}: ${rendered ? '' : 'app blank after reload; '}${page.errors.slice(0, 2).join(' | ')}`);
+    page.errors.length = 0; // reported here, not by the harness
+    await page.context().close();
+  }
+  assert(!fails.length, 'hostile files broke the app:\n      ' + fails.join('\n      '));
+});
+test('security: hostile import (ids / mood color) must not execute script', 'XSS via backup file', async t => {
+  const page = await t.open();
+  const payload = '"><img src=x onerror="window.__xss=(window.__xss||0)+1">';
+  const data = makeState({
+    settings: { goals: [{ id: payload, text: 'a' }, { id: 'g2', text: 'b' }] },
+    incidents: [inc(NOW - 1000, { id: payload })],
+    moods: [{ ts: NOW - 1000, c: payload }]
+  });
+  await page.click('.topbar [data-act=openSettings]');
+  await page.setInputFiles('#importFile', fileFrom('x.json', JSON.stringify(data)));
+  await page.waitForFunction(() => document.querySelector('#toast').textContent !== '');
+  for (const tab of ['today', 'calm', 'incident']) await go(page, tab);
+  await page.evaluate(() => { document.querySelector('#tab-incident details').open = true; });
+  await page.waitForTimeout(200);
+  const x = await page.evaluate(() => ({ xss: window.__xss || 0, imgs: document.querySelectorAll('img[src=x]').length }));
+  eq(x, { xss: 0, imgs: 0 }, 'injected markup executed / inserted');
+});
+test('data: reset clears everything after double confirmation; cancel keeps data', 'הגדרות: "איפוס"', async t => {
+  const page = await t.open({ state: richState(3) });
+  await page.click('.topbar [data-act=openSettings]');
+  page.dialogAnswer = false;
+  await page.click('#setOverlay [data-act=reset]');
+  assert((await getState(page)).incidents.length > 0, 'cancel keeps data');
+  page.dialogAnswer = true;
+  await page.click('#setOverlay [data-act=reset]');
+  eq(page.dialogs.length, 3, 'two confirmations for reset (1 cancelled + 2)');
+  const s = await getState(page);
+  eq([s.incidents.length, s.stars.length, Object.keys(s.days).length, s.moods.length, s.settings.childName, s.settings.onboarded], [0, 0, 0, 0, '', false], 'all data cleared');
+  assert(await visible(page, '#setOverlay') && (await txt(page, '#setTitle')).includes('ברוכים הבאים'), 'back to onboarding');
+});
+test('data: localStorage methods throwing → app renders and works in memory', 'עיצוב: "localStorage (עטוף ב-try/catch)"', async t => {
+  const page = await t.open({ state: null, init: () => { const thr = () => { throw new DOMException('denied', 'SecurityError'); }; Storage.prototype.setItem = thr; Storage.prototype.getItem = thr; Storage.prototype.removeItem = thr; } });
+  assert(await visible(page, '#setOverlay'), 'onboarding shown');
+  await page.fill('#sName', 'נועם');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert(!(await visible(page, '#setOverlay')), 'settings work in memory');
+  assert((await txt(page, '.hero .eyebrow')).includes('נועם'), 'name shown');
+  await page.click('#tab-today .praise-btn');
+  await page.click('#tab-today .praise-btn');
+  assert((await txt(page, '#tab-today .praise-btn')).includes('(2/5)'), 'praise works');
+  await page.click('#tab-today .check[data-id=move]');
+  eq(await page.getAttribute('#tab-today .check[data-id=move]', 'aria-checked'), 'true', 'checklist works');
+  for (const tab of ['calm', 'incident', 'progress', 'guide', 'today']) await go(page, tab);
+  const warned = await page.evaluate(() => typeof storageWarned !== 'undefined' && storageWarned);
+  assert(warned, 'user is warned that data cannot be saved');
+});
+test('data: window.localStorage getter throwing (storage blocked) → app still works', 'עיצוב: "localStorage (עטוף ב-try/catch)"', async t => {
+  const page = await t.open({ state: null, init: () => { Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('blocked', 'SecurityError'); } }); } });
+  assert(await page.evaluate(() => { try { return !window.localStorage; } catch (e) { return true; } }), 'precondition: localStorage access throws');
+  assert(await visible(page, '#setOverlay'), 'onboarding shown');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  await go(page, 'incident');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  await page.click('#tab-incident details summary');
+  eq(await page.locator('#tab-incident .inc-item').count(), 1, 'incident kept in memory');
+});
+test('data: corrupt JSON in storage → app recovers to a usable state', 'עיצוב: localStorage (robustness)', async t => {
+  for (const bad of ['{"v":1,"settings":', 'undefined', '<html>', '{"settings":{"startDate":"not-a-date","starsNeeded":"abc","goals":[]}}']) {
+    const page = await t.open({ state: bad });
+    const ok = await page.evaluate(() => !!document.querySelector('#tab-today .hero'));
+    assert(ok, `renders with storage "${bad}"`);
+    const s = await page.evaluate(() => S.settings);
+    assert(/^\d{4}-\d\d-\d\d$/.test(s.startDate) && s.starsNeeded >= 1 && s.goals.length >= 2, 'settings normalized: ' + JSON.stringify(s));
+    if (await visible(page, '#setOverlay')) await page.click('#setOverlay [data-act=saveSettings]');
+    await go(page, 'progress');
+    await page.context().close();
+  }
+});
+test('data: works offline (all remote requests fail)', 'דרישות טכניות: "עובד גם אופליין"', async t => {
+  const page = await t.open({ offline: true, state: richState(4) });
+  for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) { await go(page, tab); assert((await page.locator(`#tab-${tab}`).innerHTML()).length > 200, tab + ' renders'); }
+  const font = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
+  assert(/Arial|sans-serif/.test(font), 'has local font fallbacks: ' + font);
+  const remoteNonFont = t.remote.filter(u => !/fonts\.(googleapis|gstatic)\.com/.test(u));
+  eq(remoteNonFont, [], 'no remote dependencies besides fonts');
+});
+
+/* ================================================================== *
+ * 12. Security (XSS through the UI)
+ * ================================================================== */
+test('security: HTML in name / rules / goals / reward / notes renders as text', 'XSS', async t => {
+  const page = await t.open({ state: makeState({ settings: { starsNeeded: 1 } }) });
+  const p = n => `<img src=x onerror="window.__xss=${n}">`;
+  await page.click('.topbar [data-act=openSettings]');
+  await page.fill('#sName', p(1).slice(0, 30));
+  await page.fill('#sRule0', p(2));
+  await page.fill('#sGoal0', p(3));
+  await page.fill('#sReward', p(4));
+  await page.click('#setOverlay [data-act=saveSettings]');
+  await page.fill('#praiseNote', p(5));
+  await page.click('#tab-today .praise-btn');
+  await page.click('#tab-today [data-act=star] >> nth=0'); // celebration shows name + reward
+  await page.click('#celOverlay [data-act=celClose]');
+  await go(page, 'incident');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.fill('#incNote', p(6));
+  await page.click('#tab-incident [data-act=saveIncident]');
+  await page.click('#tab-incident details summary');
+  await go(page, 'guide');
+  await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=closeSettings]');
+  await page.waitForTimeout(200);
+  eq(await page.evaluate(() => [window.__xss || 0, document.querySelectorAll('img').length]), [0, 0], 'no script / no injected <img>');
+  await go(page, 'today');
+  assert((await txt(page, '#tab-today .goal b')).includes('<img src=x'), 'goal shown literally as text');
+});
+
+/* ================================================================== *
+ * 13. Install: embedded manifest & icons
+ * ================================================================== */
+test('install: embedded manifest is a valid data-URL JSON with name, start_url, icons; apple-touch-icon present', 'דרישות טכניות: "manifest מוטמע כדי שאפשר יהיה להוסיף אותו למסך הבית"', async t => {
+  const page = await t.open();
+  const r = await page.evaluate(async () => {
+    const href = document.querySelector('link[rel=manifest]').href;
+    const apple = document.querySelector('link[rel=apple-touch-icon]').href;
+    const sizeOf = src => new Promise(res => { const i = new Image(); i.onload = () => res(i.naturalWidth + 'x' + i.naturalHeight); i.onerror = () => res('error'); i.src = src; });
+    let m = null;
+    try { m = await (await fetch(href)).json(); } catch (e) { m = { error: String(e) }; }
+    const iconSizes = m && m.icons ? await Promise.all(m.icons.map(i => sizeOf(i.src))) : [];
+    return { href: href.slice(0, 40), m, apple: apple.slice(0, 22), appleSize: await sizeOf(apple), iconSizes, metas: [...document.querySelectorAll('meta[name=apple-mobile-web-app-capable],meta[name=viewport],meta[name=theme-color]')].length };
+  });
+  assert(r.href.startsWith('data:application/manifest+json'), 'manifest is a data URL: ' + r.href);
+  assert(r.m && !r.m.error, 'manifest parses as JSON: ' + JSON.stringify(r.m && r.m.error));
+  eq([r.m.name, r.m.lang, r.m.dir, r.m.display], ['רגוע וחזק', 'he', 'rtl', 'standalone'], 'manifest fields');
+  assert(r.m.start_url && r.m.start_url.endsWith('index.html'), 'start_url: ' + r.m.start_url);
+  assert(r.m.icons.some(i => i.sizes === '192x192') && r.m.icons.some(i => i.sizes === '512x512'), '192 & 512 icons');
+  r.m.icons.forEach((i, k) => eq(r.iconSizes[k], i.sizes, 'icon decodes at declared size'));
+  assert(r.apple.startsWith('data:image/png'), 'apple-touch-icon is an embedded PNG');
+  eq(r.appleSize, '180x180', 'apple-touch-icon size');
+  assert(r.metas >= 3, 'mobile meta tags');
+});
+
+/* ================================================================== *
+ * 14. Accessibility basics
+ * ================================================================== */
+async function visitAllScreens(page, fn) {
+  for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) {
+    await go(page, tab);
+    if (tab === 'calm') await page.click('#tab-calm .mood[data-c=orange]');
+    if (tab === 'incident') await page.evaluate(() => { document.querySelector('#tab-incident details').open = true; });
+    if (tab === 'guide') await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+    await fn('tab ' + tab);
+  }
+  await page.click('.topbar [data-act=openSettings]'); await fn('settings'); await page.click('#setOverlay [data-act=closeSettings]');
+  await go(page, 'calm'); await page.click('#tab-calm .card:not(#moodTools) [data-ex=box]'); await fn('exercise'); await page.click('#exOverlay .ex-actions [data-act=exClose]');
+  await page.evaluate(() => celebrate(1)); await fn('celebration'); await page.click('#celOverlay [data-act=celClose]');
+}
+test('a11y: html lang="he" dir="rtl"', 'עיצוב: "בעברית מלאה ו-RTL"', async t => {
+  const page = await t.open();
+  eq(await page.evaluate(() => [document.documentElement.lang, document.documentElement.dir, getComputedStyle(document.body).direction]), ['he', 'rtl', 'rtl'], 'lang/dir');
+});
+test('a11y: every button / interactive control has an accessible name', 'נגישות', async t => {
+  const page = await t.open({ state: richState(4) });
+  const bad = [];
+  await visitAllScreens(page, async where => {
+    const r = await page.evaluate(() => [...document.querySelectorAll('button, [role=checkbox], [role=button], input:not([type=hidden]), a[href], summary')].filter(e => e.offsetParent !== null || getComputedStyle(e).position === 'fixed').filter(e => {
+      const lbl = e.getAttribute('aria-label') || (e.labels && [...e.labels].map(l => l.textContent).join('')) || e.getAttribute('title') || e.getAttribute('placeholder') || '';
+      const name = (lbl || e.textContent || '').replace(/\s+/g, ' ').trim();
+      return !name || /^[✕×🗑️⏸▶\s]+$/u.test(name) && !e.getAttribute('aria-label');
+    }).map(e => e.outerHTML.slice(0, 90)));
+    r.forEach(x => bad.push(`${where}: ${x}`));
+  });
+  assert(!bad.length, [...new Set(bad)].join('\n      '));
+});
+test('a11y: primary controls are at least 44×44 px', 'עיצוב: "כפתורים גדולים ללחיצה באגודל"', async t => {
+  const page = await t.open({ state: richState(4) });
+  const bad = [];
+  await visitAllScreens(page, async where => {
+    const r = await page.evaluate(() => [...document.querySelectorAll('nav.bottom button, .btn, .chip, .mood, .tool, .check, .icon-btn, .star-btn, .praise-btn')]
+      .filter(e => e.offsetParent !== null || getComputedStyle(e).position === 'fixed')
+      .map(e => { const r = e.getBoundingClientRect(); return [e.className + ' "' + e.textContent.trim().slice(0, 15) + '"', Math.round(r.width), Math.round(r.height)]; })
+      .filter(([, w, h]) => w < 44 || h < 44));
+    r.forEach(([n, w, h]) => bad.push(`${where}: ${n} ${w}x${h}`));
+  });
+  assert(!bad.length, [...new Set(bad)].join('\n      '));
+});
+test('a11y: secondary controls (delete ×/🗑, chart toggle, summaries) are at least 44×44 px', 'עיצוב: "כפתורים גדולים ללחיצה באגודל"', async t => {
+  const page = await t.open({ state: richState(4) });
+  const bad = [];
+  await visitAllScreens(page, async where => {
+    const r = await page.evaluate(() => [...document.querySelectorAll('.x-btn, .seg button, details > summary')]
+      .filter(e => e.offsetParent !== null)
+      .map(e => { const r = e.getBoundingClientRect(); return [(e.className || e.tagName.toLowerCase()) + ' "' + e.textContent.trim().slice(0, 12) + '"', Math.round(r.width), Math.round(r.height)]; })
+      .filter(([, w, h]) => w < 44 || h < 44));
+    r.forEach(([n, w, h]) => bad.push(`${where}: ${n} ${w}x${h}`));
+  });
+  assert(!bad.length, [...new Set(bad)].join('\n      '));
+});
+test('a11y: dialogs move focus inside when opened and Escape closes them (incl. celebration)', 'נגישות (overlays)', async t => {
+  const page = await t.open({ state: makeState({ settings: { starsNeeded: 1 } }) });
+  const problems = [];
+  await page.click('.topbar [data-act=openSettings]');
+  if (!(await page.evaluate(() => document.querySelector('#setOverlay').contains(document.activeElement)))) problems.push('settings: focus stays behind the dialog');
+  await page.keyboard.press('Escape');
+  await go(page, 'calm');
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=box]');
+  if (!(await page.evaluate(() => document.querySelector('#exOverlay').contains(document.activeElement)))) problems.push('exercise: focus stays behind the dialog');
+  await page.keyboard.press('Escape');
+  await go(page, 'today');
+  await page.click('#tab-today [data-act=star] >> nth=0');
+  if (!(await page.evaluate(() => document.querySelector('#celOverlay').contains(document.activeElement)))) problems.push('celebration: focus stays behind the dialog');
+  await page.keyboard.press('Escape');
+  if (await visible(page, '#celOverlay')) problems.push('celebration: Escape does not close it');
+  assert(!problems.length, problems.join('\n      '));
+});
+
+/* ================================================================== *
+ * 15. Global smoke: no console errors across a full session
+ * ================================================================== */
+test('smoke: full tour with rich data, no console errors or page errors', 'כללי', async t => {
+  const page = await t.open({ state: richState(9) });
+  await visitAllScreens(page, async () => {});
+  await page.clock.runFor(70e3);
+  await go(page, 'progress');
+  await page.click('#tab-progress [data-mode=hits]');
+  await page.locator('#tab-progress svg.chart >> nth=1').locator('rect[data-w="3"]').click({ force: true });
+  // harness asserts page.errors is empty
+});
+
+/* ------------------------------------------------------------------ *
+ * Runner
+ * ------------------------------------------------------------------ */
+(async () => {
+  const filters = process.argv.slice(2).map(s => s.toLowerCase());
+  const selected = filters.length ? tests.filter(t => filters.some(f => t.name.toLowerCase().includes(f))) : tests;
+  browser = await pw.chromium.launch();
+  let pass = 0, fail = 0;
+  const failures = [];
+  const t0 = Date.now();
+  for (const [i, tc] of selected.entries()) {
+    const t = { ctxs: [], pages: [], remote: [] };
+    t.open = opts => open(t, opts);
+    const start = Date.now();
+    let err = null;
+    try {
+      await Promise.race([tc.fn(t), new Promise((_, rej) => setTimeout(() => rej(new Error('test timeout (90s)')), 90e3))]);
+      const pe = t.pages.flatMap(p => p.errors);
+      if (pe.length) throw new AssertionError('console / page errors:\n      ' + [...new Set(pe)].slice(0, 5).join('\n      '));
+    } catch (e) { err = e; }
+    if (err && SHOTS && t.pages.length) {
+      try { fs.mkdirSync(SHOTS, { recursive: true }); await t.pages[t.pages.length - 1].screenshot({ path: path.join(SHOTS, `fail-${String(i + 1).padStart(2, '0')}.png`) }); } catch (e) { /* page may be closed */ }
+    }
+    for (const c of t.ctxs) await c.close().catch(() => {});
+    const ms = Date.now() - start;
+    const n = String(i + 1).padStart(2, '0');
+    if (!err) { pass++; console.log(`PASS ${n} ${tc.name} (${ms} ms)`); }
+    else {
+      fail++;
+      const msg = err instanceof AssertionError ? err.message : (err.stack || String(err)).split('\n').slice(0, 3).join('\n      ');
+      failures.push({ n, name: tc.name, spec: tc.spec, msg });
+      console.log(`FAIL ${n} ${tc.name} (${ms} ms)\n      spec: ${tc.spec}\n      ${msg}`);
+    }
+  }
+  await browser.close();
+  console.log('\n' + '='.repeat(70));
+  console.log(`SUMMARY: ${selected.length} tests, ${pass} passed, ${fail} failed  (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  failures.forEach(f => console.log(`  ✗ ${f.n} ${f.name}`));
+  process.exit(fail ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(2); });
