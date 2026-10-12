@@ -238,11 +238,16 @@ test('layout: long unbroken user text does not overflow the screen', 'דרישו
   const page = await t.open({ width: 360, state: st });
   const problems = [];
   for (const tab of ['today', 'incident']) {
-    await go(page, tab);
-    if (tab === 'incident') await page.evaluate(() => { document.querySelector('#tab-incident details').open = true; });
+    // navigate programmatically: when the layout overflows, mobile Chrome zooms out and the nav buttons end up off-screen
+    await page.evaluate(tb => { showTab(tb); if (tb === 'incident') document.querySelector('#tab-incident details').open = true; }, tab);
     const r = await page.evaluate(overflowProbe);
+    const vv = await page.evaluate(() => ({ scale: visualViewport.scale, w: innerWidth }));
+    if (vv.w > 361) problems.push(`${tab}: mobile layout viewport grew to ${vv.w}px (page zoomed out, scale ${vv.scale.toFixed(2)})`);
     if (r.sw > r.vw + 1) problems.push(`${tab}: scrollWidth ${r.sw} > ${r.vw}`);
-    r.off.forEach(o => problems.push(`${tab}: ${o}`));
+    // culprits: elements whose own content is wider than their box
+    const culprits = await page.evaluate(() => [...document.querySelectorAll('main .tab.active *')].filter(e => e.children.length === 0 || e.matches('h2,li,b,span')).filter(e => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === 'visible' && e.clientWidth > 0)
+      .map(e => `${e.tagName.toLowerCase()}${e.className ? '.' + e.className : ''} (content ${e.scrollWidth}px in ${e.clientWidth}px box)`).slice(0, 4));
+    culprits.forEach(c => problems.push(`${tab}: overflowing element ${c}`));
   }
   assert(!problems.length, 'content cut off / overflowing:\n      ' + problems.join('\n      '));
 });
@@ -536,6 +541,23 @@ test('stars: celebration respects a target raised after it was already celebrate
   await page.click('#tab-today [data-act=star][data-id=g1]');
   await page.click('#tab-today [data-act=star][data-id=g1]');
   assert(await visible(page, '#celOverlay'), 'reaching the new target (4) this week should celebrate and show the reward');
+});
+test('stars: editing goals in settings never moves earned stars to another goal', 'היום: "לא ניתן להוריד כוכב"; הגדרות: יעדי הכוכבים', async t => {
+  const page = await t.open({ state: makeState({ settings: { goals: [{ id: 'g1', text: 'A' }, { id: 'g2', text: 'B' }, { id: 'g3', text: 'C' }] }, stars: [{ goalId: 'g1', ts: NOW - 3000 }, { goalId: 'g1', ts: NOW - 2000 }, { goalId: 'g3', ts: NOW - 1000 }] }) });
+  const read = () => page.locator('#tab-today .goal').evaluateAll(gs => gs.map(g => g.querySelector('b').textContent + ':' + g.querySelectorAll('.s').length));
+  eq(await read(), ['A:2', 'B:0', 'C:1'], 'initial');
+  await setSettings(page, { sGoal0: '' }); // remove goal A
+  eq(await read(), ['B:0', 'C:1'], 'after removing A, B and C keep their stars');
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=saveSettings]'); // save again without any change
+  eq(await read(), ['B:0', 'C:1'], 'saving settings unchanged must not move stars between goals');
+});
+test('praise: a typed (unsaved) note survives other actions on the Today screen', 'היום: "שדה קצר לרשום מה ראית"', async t => {
+  const page = await t.open();
+  await page.fill('#praiseNote', 'ויתר על התור');
+  await page.click('#tab-today .check[data-id=move]');
+  await page.click('#tab-today [data-act=star] >> nth=0');
+  eq(await page.inputValue('#praiseNote'), 'ויתר על התור', 'typed note is wiped by re-render');
 });
 test('robustness: accidental double tap on "add star" adds only one (stars cannot be removed)', 'היום: "לא ניתן להוריד כוכב" + robustness', async t => {
   const page = await t.open();
@@ -1022,7 +1044,7 @@ test('guide: current phase(s) open + highlighted for every week 1..12', 'מדר�
     await go(page, 'guide');
     const r = await page.evaluate(() => [...document.querySelectorAll('#tab-guide .phase-card')].slice(0, 5).map(c => ({
       cur: c.classList.contains('current'), open: c.querySelector('details').open, badge: !!c.querySelector('.now-badge'),
-      name: c.querySelector('summary').textContent.replace('השלב הנוכחי', '').replace(/שבועות? [\d–]+/, '').trim()
+      name: (() => { const sp = c.querySelector('summary > span').cloneNode(true); sp.querySelectorAll('.wk,.now-badge').forEach(x => x.remove()); return sp.textContent.trim(); })()
     })));
     const curNames = r.filter(x => x.cur).map(x => x.name);
     if (JSON.stringify(curNames) !== JSON.stringify(PHASE_NAMES[w])) bad.push(`week ${w}: highlighted ${JSON.stringify(curNames)}`);
@@ -1351,7 +1373,8 @@ test('smoke: full tour with rich data, no console errors or page errors', 'כל�
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */
-(async () => {
+module.exports = { makeState, richState, progressFixture, inc, tsJ, keyJ, startForWeek, NOW, TODAY, KEY, APP };
+if (require.main === module) (async () => {
   const filters = process.argv.slice(2).map(s => s.toLowerCase());
   const selected = filters.length ? tests.filter(t => filters.some(f => t.name.toLowerCase().includes(f))) : tests;
   browser = await pw.chromium.launch();
