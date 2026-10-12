@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>רגוע וחזק</title>
+<meta name="description" content="ליווי יומיומי להורים בתוכנית בת 12 שבועות: רגיעה, שליטה עצמית והפחתת אלימות.">
+<meta name="theme-color" content="#21958a" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1c1f" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="רגוע וחזק">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" id="manifestLink">
+<link rel="apple-touch-icon" id="appleIcon">
+<link rel="icon" id="favIcon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eaf6f4; --bg-grad:#dcedf3;
+  --surface:#ffffff; --surface2:#f2f9f8;
+  --text:#16343a; --muted:#56757a; --line:#d4e7e5;
+  --accent:#21958a; --accent-strong:#14776e; --accent-soft:#d2eeea; --on-accent:#ffffff;
+  --blue:#3a83b5; --blue-soft:#dcebf6;
+  --good:#2b8f55; --good-soft:#dbf2e3;
+  --warn:#a86f00; --warn-soft:#fbefd2;
+  --danger:#c43d3d; --danger-soft:#fbe1e1;
+  --green:#3bb273; --yellow:#f2c230; --orange:#f08a24; --red:#e04848;
+  --shadow:0 6px 22px rgba(22,80,90,.09);
+  --radius:22px;
+  --nav-h:70px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1b1e; --bg-grad:#10232a;
+    --surface:#16292d; --surface2:#1c3236;
+    --text:#e3f1ef; --muted:#9db9b7; --line:#284442;
+    --accent:#4cc3b6; --accent-strong:#73d8cc; --accent-soft:#1c3f3c; --on-accent:#06201d;
+    --blue:#72b4e2; --blue-soft:#18334a;
+    --good:#6fd39a; --good-soft:#173a29;
+    --warn:#f0c15a; --warn-soft:#3a3015;
+    --danger:#f08a8a; --danger-soft:#3e1d1d;
+    --shadow:0 6px 22px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+html{background:var(--bg)}
+body{
+  font-family:'Heebo','Rubik','Arial Hebrew','Segoe UI',Arial,sans-serif;
+  font-size:17px; line-height:1.55; color:var(--text);
+  background:linear-gradient(180deg,var(--bg-grad) 0,var(--bg) 260px);
+  min-height:100vh; overflow-x:hidden;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3{margin:0;line-height:1.25}
+p{margin:.4em 0}
+a{color:var(--accent-strong)}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background:color-mix(in srgb, var(--bg-grad) 82%, transparent);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
+.brand-logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--blue));display:grid;place-items:center}
+.brand-logo span{width:14px;height:14px;border-radius:50%;border:3px solid #fff;animation:breathe 5s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(.8)}50%{transform:scale(1.25)}}
+.icon-btn{width:48px;height:48px;border-radius:16px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;box-shadow:var(--shadow)}
+.icon-btn svg{width:24px;height:24px}
+
+/* ---------- layout ---------- */
+main{max-width:560px;margin:0 auto;padding:6px 16px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom))}
+.tab{display:none;animation:fadeUp .35s ease}
+.tab.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin:0 0 14px;box-shadow:var(--shadow)}
+.card h2{font-size:20px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card h3{font-size:17px;margin:14px 0 6px}
+.sub{color:var(--muted);font-size:15px}
+.small{font-size:14px}
+.row{display:flex;gap:10px;align-items:center}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent-strong);font-weight:700;font-size:14px}
+.pill.blue{background:var(--blue-soft);color:var(--blue)}
+.muted{color:var(--muted)}
+ul.clean{list-style:none;margin:0;padding:0}
+.bullets{margin:.3em 0;padding-inline-start:1.2em}
+.bullets li{margin:.35em 0}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:54px;padding:12px 20px;border-radius:18px;border:none;
+  background:var(--accent);color:var(--on-accent);font-weight:700;font-size:17px;
+  box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 35%,transparent);
+  transition:transform .12s ease,filter .2s;
+}
+.btn:active{transform:scale(.97)}
+.btn.block{width:100%}
+.btn.ghost{background:var(--surface2);color:var(--text);border:1px solid var(--line);box-shadow:none}
+.btn.danger{background:var(--danger-soft);color:var(--danger);box-shadow:none;border:1px solid color-mix(in srgb,var(--danger) 30%,transparent)}
+.btn.small{min-height:44px;padding:8px 14px;font-size:15px;border-radius:14px}
+.btn.big{min-height:68px;font-size:19px;border-radius:22px}
+
+/* ---------- hero ---------- */
+.hero{background:linear-gradient(135deg,var(--accent) 0%,var(--blue) 100%);color:#fff;border:none;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset-inline-start:-50px;bottom:-70px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.12)}
+.hero .eyebrow{opacity:.9;font-weight:500}
+.hero h1{font-size:34px;font-weight:800;margin:2px 0 6px}
+.hero h1 small{font-size:18px;font-weight:500;opacity:.9}
+.hero .phase-chip{display:inline-block;background:rgba(255,255,255,.2);border-radius:999px;padding:3px 12px;margin:2px 0 2px 6px;font-weight:700;font-size:15px}
+.weeks{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin:14px 0 8px;position:relative;z-index:1}
+.weeks i{height:8px;border-radius:4px;background:rgba(255,255,255,.28)}
+.weeks i.done{background:rgba(255,255,255,.75)}
+.weeks i.now{background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.4)}
+.hero p{position:relative;z-index:1;margin:0}
+
+/* ---------- checklist ---------- */
+.check{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:18px;border:1px solid var(--line);background:var(--surface2);margin-bottom:10px;width:100%;text-align:start;transition:background .2s}
+.check .box{flex:0 0 34px;height:34px;border-radius:50%;border:2.5px solid var(--accent);display:grid;place-items:center;margin-top:2px;transition:all .2s}
+.check .box svg{width:20px;height:20px;opacity:0;transform:scale(.5);transition:all .2s;color:var(--on-accent)}
+.check.done{background:var(--accent-soft)}
+.check.done .box{background:var(--accent)}
+.check.done .box svg{opacity:1;transform:none}
+.check.done .ctitle{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--text) 40%,transparent)}
+.check .when{font-size:13px;color:var(--muted);font-weight:700}
+.check .ctitle{font-weight:700}
+.check .cbody{flex:1;min-width:0}
+.check .game{margin-top:6px;padding:8px 10px;border-radius:12px;background:var(--surface);border:1px dashed var(--line);font-size:15px}
+.progress{height:10px;border-radius:6px;background:var(--surface2);overflow:hidden;border:1px solid var(--line)}
+.progress > span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--blue));border-radius:6px;transition:width .5s ease}
+
+/* ---------- praise ---------- */
+.praise-btn{width:100%;min-height:76px;font-size:19px;border-radius:24px;background:linear-gradient(135deg,#f5b942,#f08a24);color:#3a2100;box-shadow:0 6px 18px rgba(240,138,36,.35)}
+.praise-dots{display:flex;gap:8px;justify-content:center;margin:12px 0 4px}
+.praise-dots i{width:22px;height:22px;border-radius:50%;background:var(--surface2);border:2px solid var(--line)}
+.praise-dots i.on{background:#f5b942;border-color:#f08a24;animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.4)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+.input{width:100%;min-height:52px;padding:12px 14px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface2);outline:none}
+.input:focus{border-color:var(--accent)}
+textarea.input{min-height:80px;resize:vertical}
+label.lbl{display:block;font-weight:700;margin:14px 0 6px}
+.note-list li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+.note-list li:last-child{border-bottom:none}
+.x-btn{border:none;background:none;color:var(--muted);width:40px;height:40px;border-radius:12px;font-size:20px;flex:0 0 auto}
+
+/* ---------- stars ---------- */
+.goal{padding:12px;border-radius:18px;background:var(--surface2);border:1px solid var(--line);margin-bottom:10px}
+.goal .stars{display:flex;flex-wrap:wrap;gap:3px;min-height:28px;margin:6px 0 8px;font-size:22px;line-height:1}
+.goal .stars .s{animation:pop .4s ease}
+.goal .stars .empty{color:var(--muted);font-size:14px;align-self:center}
+.star-btn{background:var(--surface);color:var(--text);border:1.5px solid var(--accent);box-shadow:none}
+.reward{display:flex;align-items:center;gap:10px;padding:12px;border-radius:16px;background:var(--warn-soft);color:var(--text);margin-top:6px}
+.reward b{color:var(--warn)}
+
+/* ---------- thermometer ---------- */
+.thermo-wrap{display:flex;gap:14px;align-items:stretch}
+.thermo{flex:0 0 46px;display:flex;flex-direction:column;align-items:center}
+.thermo .tube{flex:1;width:22px;border-radius:12px 12px 0 0;background:var(--surface2);border:2px solid var(--line);border-bottom:none;position:relative;overflow:hidden}
+.thermo .fill{position:absolute;bottom:0;left:0;right:0;height:0;transition:height .6s cubic-bezier(.3,1.4,.5,1),background .4s}
+.thermo .bulb{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);margin-top:-4px;transition:background .4s}
+.moods{flex:1;display:flex;flex-direction:column;gap:10px}
+.mood{display:flex;align-items:center;gap:12px;min-height:72px;padding:10px 16px;border-radius:22px;border:3px solid transparent;font-weight:800;font-size:19px;color:#1d1d1d;text-align:start;transition:transform .15s,box-shadow .2s}
+.mood .face{font-size:34px;line-height:1}
+.mood small{display:block;font-weight:500;font-size:14px;opacity:.85}
+.mood[data-c=red]{background:var(--red);color:#fff}
+.mood[data-c=orange]{background:var(--orange)}
+.mood[data-c=yellow]{background:var(--yellow)}
+.mood[data-c=green]{background:var(--green);color:#fff}
+.mood.sel{border-color:var(--text);transform:scale(1.02);box-shadow:0 8px 22px rgba(0,0,0,.18)}
+.mood:active{transform:scale(.97)}
+.mood-msg{padding:14px;border-radius:18px;font-weight:700;margin:14px 0 4px;border-inline-start:6px solid}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:110px;padding:12px 8px;border-radius:22px;border:1px solid var(--line);background:var(--surface2);font-weight:800;font-size:16px;text-align:center}
+.tool .ti{font-size:36px;line-height:1}
+.tool small{font-weight:500;color:var(--muted);font-size:13px}
+.tool:active{transform:scale(.97)}
+.tool.wide{grid-column:1 / -1;flex-direction:row;min-height:76px;gap:12px;background:linear-gradient(135deg,var(--danger-soft),var(--warn-soft))}
+.vent{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vent li{display:flex;align-items:center;gap:8px;padding:12px;border-radius:16px;background:var(--surface2);border:1px solid var(--line);font-weight:700;font-size:15px}
+.vent li span{font-size:24px}
+.today-moods{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.today-moods span{display:inline-flex;align-items:center;gap:5px;font-size:14px;padding:3px 10px;border-radius:999px;background:var(--surface2);border:1px solid var(--line)}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+
+/* ---------- incident form ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:46px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface2);font-weight:500;font-size:16px;transition:all .15s}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
+.chip:active{transform:scale(.96)}
+.yn{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.yn .chip{border-radius:18px;min-height:56px;font-size:18px}
+.yn .chip[data-val=no][aria-pressed=true]{background:var(--surface);color:var(--text);border-color:var(--text)}
+.steps-card h3{display:flex;align-items:center;gap:8px}
+.steps-card .num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-size:15px;font-weight:800;flex:0 0 auto}
+.callout{padding:12px 14px;border-radius:16px;background:var(--blue-soft);margin:8px 0;font-weight:700}
+.inc-item{padding:10px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+.inc-item:last-child{border-bottom:none}
+details > summary{cursor:pointer;list-style:none;font-weight:800;font-size:18px;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px}
+details > summary::-webkit-details-marker{display:none}
+details > summary::after{content:"";flex:0 0 auto;width:10px;height:10px;margin:0 6px 6px;border-right:2.5px solid var(--muted);border-bottom:2.5px solid var(--muted);transform:rotate(45deg);transition:transform .2s}
+details[open] > summary::after{transform:rotate(-135deg);margin-bottom:0;margin-top:6px}
+
+/* ---------- progress ---------- */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px 8px;text-align:center;box-shadow:var(--shadow)}
+.kpi b{display:block;font-size:26px;font-weight:800;line-height:1.2}
+.kpi span{font-size:12.5px;color:var(--muted);display:block}
+.kpi em{font-style:normal;font-size:12.5px;font-weight:700}
+.good-t{color:var(--good)} .bad-t{color:var(--danger)}
+.chart{width:100%;height:auto;display:block;direction:ltr}
+.chart text{font-family:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13.5px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:22px;height:0;border-top:2px dashed var(--muted);vertical-align:middle;margin-inline-end:6px}
+.legend i.tgt{border-top:2.5px solid var(--good)}
+.legend i.bar{height:10px;border:none;border-radius:3px;background:var(--accent);width:14px}
+.chart-info{min-height:26px;font-size:14.5px;font-weight:700;margin-top:6px;color:var(--accent-strong)}
+.seg{display:inline-flex;background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:3px;gap:3px}
+.seg button{border:none;background:none;min-height:38px;padding:4px 12px;border-radius:11px;font-size:14.5px;font-weight:700;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.hbars li{margin:8px 0}
+.hbars .lab{display:flex;justify-content:space-between;font-size:15px;gap:8px}
+.hbars .track{height:12px;border-radius:6px;background:var(--surface2);border:1px solid var(--line);overflow:hidden;margin-top:3px}
+.hbars .track span{display:block;height:100%;background:var(--blue);border-radius:6px}
+table.wk{width:100%;border-collapse:collapse;font-size:14px;text-align:center}
+table.wk th{font-size:12.5px;color:var(--muted);font-weight:700;padding:6px 2px;border-bottom:1px solid var(--line)}
+table.wk td{padding:7px 2px;border-bottom:1px solid var(--line)}
+table.wk tr.cur td{background:var(--accent-soft);font-weight:700}
+.encourage{background:linear-gradient(135deg,var(--good-soft),var(--accent-soft));border:none}
+.pro{background:var(--warn-soft);border:1.5px solid color-mix(in srgb,var(--warn) 45%,transparent)}
+.empty-state{text-align:center;padding:18px 8px;color:var(--muted)}
+.empty-state .big{font-size:40px}
+
+/* ---------- guide ---------- */
+.phase-card{padding:0;overflow:hidden}
+.phase-card > details > summary{padding:16px 18px}
+.phase-card .body{padding:0 18px 16px}
+.phase-card.current{border:2px solid var(--accent);box-shadow:0 8px 26px color-mix(in srgb,var(--accent) 25%,transparent)}
+.phase-card .wk{font-size:13px;color:var(--muted);font-weight:700;display:block}
+.now-badge{display:inline-block;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:800;padding:2px 10px;border-radius:999px;margin-inline-start:6px;vertical-align:middle}
+.item{padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:none}
+.item b{display:block}
+
+/* ---------- bottom nav ---------- */
+nav.bottom{
+  position:fixed;bottom:0;left:0;right:0;z-index:30;
+  display:grid;grid-template-columns:repeat(5,1fr);
+  height:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding:6px 6px env(safe-area-inset-bottom);
+  background:color-mix(in srgb,var(--surface) 92%,transparent);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);
+}
+nav.bottom button{border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12.5px;font-weight:700;color:var(--muted);border-radius:16px;min-width:0}
+nav.bottom button svg{width:26px;height:26px;transition:transform .2s}
+nav.bottom button.active{color:var(--accent-strong);background:var(--accent-soft)}
+nav.bottom button.active svg{transform:translateY(-2px)}
+.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));animation:fadeUp .25s ease}
+.overlay[hidden]{display:none}
+.overlay .inner{max-width:560px;margin:0 auto}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.sheet-head h2{font-size:24px}
+
+/* exercise */
+.ex{display:flex;flex-direction:column;background:linear-gradient(180deg,var(--bg-grad),var(--bg))}
+.ex .inner{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;width:100%}
+.ex h2{font-size:26px;margin:4px 0 0}
+.ex .stage{position:relative;width:min(78vw,300px);aspect-ratio:1;display:grid;place-items:center;margin:18px 0 8px}
+.ex .ring{position:absolute;inset:0;border-radius:50%;border:2px dashed color-mix(in srgb,var(--accent) 45%,transparent)}
+.ex .circle{width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 55%,#fff),var(--accent) 60%,var(--blue));display:grid;place-items:center;transform:scale(.45);transition-property:transform,border-radius,background;transition-timing-function:ease-in-out;box-shadow:0 10px 40px color-mix(in srgb,var(--accent) 40%,transparent)}
+.ex .circle.tense{border-radius:28%;background:radial-gradient(circle,#9aa7b3,#5d6b78);animation:shake .18s linear infinite}
+.ex .circle.push{background:radial-gradient(circle,#f5b942,#f08a24);animation:pulse 1s ease-in-out infinite}
+@keyframes shake{0%,100%{translate:0 0}25%{translate:2px -1px}75%{translate:-2px 1px}}
+@keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.15)}}
+.ex .num{font-size:64px;font-weight:800;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.2);transform:scale(2)}
+.ex .ex-text{font-size:22px;font-weight:700;min-height:3.2em;max-width:420px;margin:6px 0}
+.ex .meta{color:var(--muted);font-weight:500}
+.ex .ex-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:420px;margin-top:auto;padding-top:16px}
+.stopwords{display:flex;flex-direction:column;gap:12px;width:100%;max-width:420px;margin:20px 0}
+.stopwords div{font-size:40px;font-weight:800;padding:14px;border-radius:22px;background:var(--surface);border:2px solid var(--line);opacity:.45;transition:all .4s}
+.stopwords div.on{opacity:1;transform:scale(1.04);border-color:var(--accent);background:var(--accent-soft);color:var(--accent-strong)}
+.ex .done-face{font-size:90px;animation:pop .5s ease}
+
+/* celebration */
+.celebrate{display:grid;place-items:center;text-align:center;background:color-mix(in srgb,var(--bg) 97%,transparent)}
+.celebrate .trophy{font-size:110px;animation:bounce 1s ease infinite alternate}
+@keyframes bounce{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-14px) rotate(4deg)}}
+.confetti{position:fixed;top:-20px;width:10px;height:14px;z-index:60;pointer-events:none;border-radius:2px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+
+.toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:12px 20px;border-radius:16px;font-weight:700;z-index:70;opacity:0;pointer-events:none;transition:all .3s;max-width:calc(100vw - 32px);text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><div class="brand-logo" aria-hidden="true"><span></span></div>רגוע וחזק</div>
+  <button class="icon-btn" data-act="openSettings" aria-label="הגדרות">
+    <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <section id="tab-today" class="tab" aria-label="היום"></section>
+  <section id="tab-calm" class="tab" aria-label="רגיעה"></section>
+  <section id="tab-incident" class="tab" aria-label="אירוע"></section>
+  <section id="tab-progress" class="tab" aria-label="התקדמות"></section>
+  <section id="tab-guide" class="tab" aria-label="מדריך"></section>
+  <noscript><div class="card">יש להפעיל JavaScript כדי להשתמש באפליקציה.</div></noscript>
+</main>
+
+<nav class="bottom" aria-label="ניווט ראשי">
+  <button data-act="tab" data-tab="today"><svg class="ic" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>היום</button>
+  <button data-act="tab" data-tab="calm"><svg class="ic" viewBox="0 0 24 24"><path d="M3 8h10a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h6"/></svg>רגיעה</button>
+  <button data-act="tab" data-tab="incident"><svg class="ic" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg>אירוע</button>
+  <button data-act="tab" data-tab="progress"><svg class="ic" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M6 18v-6M12 18V6M18 18v-9"/></svg>התקדמות</button>
+  <button data-act="tab" data-tab="guide"><svg class="ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>מדריך</button>
+</nav>
+
+<!-- exercise overlay -->
+<div id="exOverlay" class="overlay ex" hidden role="dialog" aria-modal="true" aria-labelledby="exTitle">
+  <div class="inner" id="exInner"></div>
+</div>
+
+<!-- settings overlay -->
+<div id="setOverlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle">
+  <div class="inner" id="setInner"></div>
+</div>
+
+<!-- celebration overlay -->
+<div id="celOverlay" class="overlay celebrate" hidden role="dialog" aria-modal="true">
+  <div class="inner" id="celInner"></div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script>
+'use strict';
+/* =========================================================
+   Utilities
+   ========================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayKey = () => keyOf(new Date());
+const parseKey = k => { const [y, m, d] = String(k).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+const midnight = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const dayDiff = (a, b) => Math.round((midnight(a) - midnight(b)) / 864e5);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmtTime = ts => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const fmtDate = ts => { const d = new Date(ts); return `${d.getDate()}.${d.getMonth() + 1}`; };
+const fmtFullDate = k => { const d = parseKey(k); return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; };
+const localInputValue = d => `${keyOf(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =========================================================
+   State & storage
+   ========================================================= */
+const KEY = 'ragua-vehazak-v1';
+function defaults() {
+  return {
+    v: 1,
+    settings: {
+      childName: '',
+      startDate: todayKey(),
+      rules: ['שומרים על הידיים לעצמנו', 'מדברים בכבוד, גם כשכועסים', 'כשמתעצבנים – עוצרים ונושמים'],
+      goals: [{ id: 'g1', text: 'שומר על ידיים לעצמו' }, { id: 'g2', text: 'משתמש בפינת הרגיעה' }],
+      reward: 'בחירת פעילות מיוחדת עם אבא או אמא',
+      starsNeeded: 15,
+      onboarded: false
+    },
+    days: {},        // 'YYYY-MM-DD' -> { checks:{id:true}, praises:[{ts,note}] }
+    stars: [],       // {goalId, ts}  (never removed)
+    celebrated: {},  // week -> true
+    moods: [],       // {ts, c}
+    incidents: [],   // {id, ts, trigger, target, actions[], duration, response[], used, note}
+    ui: { tab: 'today', chartMode: 'all' }
+  };
+}
+function normalize(raw) {
+  const d = defaults();
+  if (!raw || typeof raw !== 'object') return d;
+  const s = Object.assign({}, d, raw);
+  s.settings = Object.assign({}, d.settings, raw.settings || {});
+  if (!Array.isArray(s.settings.rules)) s.settings.rules = d.settings.rules;
+  while (s.settings.rules.length < 3) s.settings.rules.push('');
+  if (!Array.isArray(s.settings.goals) || !s.settings.goals.length) s.settings.goals = d.settings.goals;
+  s.settings.starsNeeded = clamp(parseInt(s.settings.starsNeeded, 10) || 15, 1, 200);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s.settings.startDate)) s.settings.startDate = todayKey();
+  ['stars', 'moods', 'incidents'].forEach(k => { if (!Array.isArray(s[k])) s[k] = []; });
+  ['days', 'celebrated'].forEach(k => { if (!s[k] || typeof s[k] !== 'object') s[k] = {}; });
+  s.ui = Object.assign({}, d.ui, raw.ui || {});
+  return s;
+}
+function load() {
+  try { const t = localStorage.getItem(KEY); if (t) return normalize(JSON.parse(t)); } catch (e) {}
+  return defaults();
+}
+let storageWarned = false;
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch (e) { if (!storageWarned) { storageWarned = true; toast('שימו לב: לא ניתן לשמור נתונים בדפדפן הזה'); } }
+}
+let S = load();
+const day = (k = todayKey()) => (S.days[k] = S.days[k] || { checks: {}, praises: [] });
+const childName = () => (S.settings.childName || '').trim();
+const himName = () => childName() ? 'את ' + childName() : 'אותו';
+
+/* =========================================================
+   Program structure
+   ========================================================= */
+const PHASES = [
+  { id: 'p1', from: 1, to: 1,  name: 'מיפוי',          tip: 'השבוע רק מתעדים ולא משנים. כל אירוע שנרשם בונה את קו הבסיס.' },
+  { id: 'p2', from: 2, to: 4,  name: 'ויסות גופני',    tip: 'פריקת אנרגיה יומית, נשימות, מדחום רגשות ופינת רגיעה.' },
+  { id: 'p3', from: 4, to: 7,  name: 'שליטה עצמית',    tip: 'משחקי עצירה, דחיית סיפוק ותרגול "עצור – נושם – חושב – בוחר".' },
+  { id: 'p4', from: 6, to: 9,  name: 'ניהול כעס',      tip: 'פרוטוקול תגובה רגוע: עוצרים, מגינים, ומדברים רק אחרי שנרגע.' },
+  { id: 'p5', from: 8, to: 12, name: 'שתלטנות וחברה',  tip: 'בחירות, אחריות אמיתית, תור למנהיג ומפגשי משחק עם חבר.' }
+];
+const weekRaw = (date = new Date()) => Math.floor(dayDiff(date, parseKey(S.settings.startDate)) / 7) + 1;
+const curWeek = () => clamp(weekRaw(), 1, 12);
+const wkOfTs = ts => Math.max(1, weekRaw(new Date(ts)));   // data before start counts as week 1 (mapping)
+const activePhases = w => PHASES.filter(p => w >= p.from && w <= p.to);
+
+const GAMES = [
+  { n: 'צבע-מילה', d: 'אומרים צבע והוא עושה תנועה שסיכמתם (אדום = קופץ, כחול = קופא, ירוק = מסתובב). באמצע מחליפים את החוקים!' },
+  { n: 'תופסת קפואה', d: 'רצים ורוקדים עם מוזיקה. כשהמוזיקה נעצרת – קופאים כמו פסל. מי שזז מחכה סיבוב אחד.' },
+  { n: 'ג׳נגה על זמן', d: 'כל אחד מוציא לבנה בתורו עם טיימר של 10 שניות. מתרגלים סבלנות, תור והפסד בכבוד.' },
+  { n: 'ראש-כתפיים הפוך', d: 'כשאומרים "ראש" נוגעים בכתפיים, וכשאומרים "כתפיים" נוגעים בראש. מאיצים בהדרגה.' },
+  { n: 'רמזור', d: 'ירוק – הולכים, צהוב – לאט מאוד, אדום – עוצרים במקום. ההורה מחליף מהר ולפעמים מנסה לבלבל.' },
+  { n: 'שמעון אומר', d: 'מבצעים רק כשנאמר "שמעון אומר". בסבב השני הוא מוביל – ומתרגל להוביל בהגינות.' },
+  { n: 'תיפוף ועצירה', d: 'מתופפים על השולחן לפי הקצב של ההורה, ועוצרים בדיוק ברגע שההורה עוצר.' },
+  { n: 'שחמט או דמקה', d: 'משחק אחד בלי למהר. לפני כל מהלך אומרים בשקט: "עצור, חושב, בוחר". מסיימים בלחיצת יד.' },
+  { n: 'אתגר דחיית סיפוק', d: 'פרס קטן עכשיו, או כפול אם מחכים 10 דקות. מאריכים את זמן ההמתנה בהדרגה.' },
+  { n: 'משחק תפקידים: משפט העצירה', d: 'מדמים מצב (אח לוקח משהו, מפסידים במשחק) ומתרגלים "עצור – נושם – חושב – בוחר". מתחלפים בתפקידים.' }
+];
+const gameOfDay = (d = new Date()) => GAMES[Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) % GAMES.length];
+
+const CHECKS = [
+  { id: 'morning', when: 'בוקר', icon: '🌅', title: '3 דקות נשימת בלון', sub: 'ושאלה: "איפה אתה במדחום?"' },
+  { id: 'move', when: 'אחר הצהריים', icon: '🏃', title: '30–60 דקות תנועה בחוץ', sub: 'ריצה, אופניים, כדור, טיפוס – פריקת אנרגיה.' },
+  { id: 'stop', when: 'אחר הצהריים', icon: '🛑', title: '10–15 דקות משחק עצירה', sub: '' },
+  { id: 'one', when: 'ערב', icon: '💙', title: '15 דקות אחד-על-אחד עם הורה', sub: 'רק הוא והורה, בלי אחים. הוא בוחר את הפעילות.' },
+  { id: 'bed', when: 'לפני השינה', icon: '🌙', title: '"מה הצלחת היום?" וסיפור', sub: 'מסיימים את היום עם הצלחה אחת לפחות.' }
+];
+
+const MOODS = {
+  red:    { name: 'אדום', label: 'עומד להתפוצץ', face: '🤯', msg: 'עצור! קודם הגוף. אף אחד לא נפגע – גם לא אתה. בחר כלי אחד עכשיו.', tools: ['stop', 'wall', 'box'], h: 100 },
+  orange: { name: 'כתום', label: 'כועס', face: '😠', msg: 'הכעס גדל. זה הרגע להוציא אותו בדרך מותרת, לפני שהוא מתפוצץ.', tools: ['wall', 'box', 'robot', 'stop'], h: 75 },
+  yellow: { name: 'צהוב', label: 'מתעצבן', face: '😒', msg: 'שמת לב שאתה מתחיל להתעצבן – זה כבר כוח! בוא נוריד את החום.', tools: ['balloon', 'candle', 'robot', 'wall'], h: 50 },
+  green:  { name: 'ירוק', label: 'רגוע', face: '😌', msg: 'מעולה, אתה רגוע. זה זמן טוב לתרגל – כך הגוף יזכור גם כשיהיה קשה.', tools: ['balloon', 'candle', 'box', 'robot'], h: 25 }
+};
+const MOOD_ORDER = ['red', 'orange', 'yellow', 'green'];
+const moodColor = c => `var(--${c})`;
+
+const TOOLS = {
+  candle:  { icon: '🕯️', name: 'נשימת נר', sub: 'נושפים לאט על הלהבה' },
+  balloon: { icon: '🎈', name: 'נשימת בלון', sub: 'הבטן מתנפחת ומתרוקנת' },
+  box:     { icon: '🟦', name: 'נשימת קובייה', sub: '4 – 4 – 4 – 4' },
+  robot:   { icon: '🤖', name: 'רובוט וספגטי', sub: 'מכווצים ומשחררים' },
+  wall:    { icon: '🧱', name: 'לדחוף את הקיר', sub: '10 שניות בכל הכוח' },
+  stop:    { icon: '✋', name: 'משפט העצירה', sub: 'עצור – נושם – חושב – בוחר' }
+};
+
+const VENT = [
+  ['🧱', 'לדחוף קיר'], ['📄', 'לקמט נייר'], ['🛏️', 'להכות כרית'],
+  ['🦶', 'לרקוע ברגליים'], ['📣', 'לומר "אני כועס!" בקול'], ['🖍️', 'לצייר את הכעס']
+];
+
+const INC = {
+  trigger: ['ללא טריגר ברור', 'מעבר בין פעילויות', 'הפסד', 'אח לקח לו משהו', 'עייפות / רעב', 'מסכים', 'אחר'],
+  target: ['אח / אחות', 'חבר', 'הורה', 'חפץ'],
+  actions: ['מכה', 'צעקה', 'שבירה', 'השתלטות'],
+  duration: ['פחות מדקה', '1–5 דקות', '5–15 דקות', '15–30 דקות', 'יותר מ-30 דקות'],
+  response: ['עצירה פיזית בשקט', 'הגנה על האח', 'הפרדה', 'הצעתי כלי הרגעה', 'חיכיתי שיירגע', 'שיחה אחרי שנרגע', 'תוצאה הגיונית', 'צעקתי / איבדתי סבלנות']
+};
+const LONG_DUR = ['15–30 דקות', 'יותר מ-30 דקות'];
+const isHit = i => (i.actions || []).includes('מכה');
+
+/* =========================================================
+   Navigation & rendering
+   ========================================================= */
+const RENDER = { today: renderToday, calm: renderCalm, incident: renderIncident, progress: renderProgress, guide: renderGuide };
+function showTab(t, scroll = true) {
+  if (!RENDER[t]) t = 'today';
+  S.ui.tab = t; save();
+  $$('.tab').forEach(el => el.classList.toggle('active', el.id === 'tab-' + t));
+  $$('nav.bottom button').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('active', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
+  RENDER[t]();
+  if (scroll) window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+const rerender = () => RENDER[S.ui.tab] && RENDER[S.ui.tab]();
+
+const CHECK_SVG = '<svg viewBox="0 0 24 24" class="ic" style="stroke-width:3.2"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+/* ---------- Tab 1: Today ---------- */
+function greeting() {
+  const h = new Date().getHours();
+  const g = h < 5 ? 'לילה טוב' : h < 12 ? 'בוקר טוב' : h < 17 ? 'צהריים טובים' : h < 21 ? 'ערב טוב' : 'לילה טוב';
+  return g + (childName() ? ` · היום של ${esc(childName())}` : '');
+}
+function weekStars(w) { return S.stars.filter(s => wkOfTs(s.ts) === w); }
+function renderToday() {
+  const raw = weekRaw(), w = clamp(raw, 1, 12);
+  const phases = activePhases(w);
+  const d = day();
+  const doneCount = CHECKS.filter(c => d.checks[c.id]).length;
+  const g = gameOfDay();
+  let heroNote;
+  if (raw < 1) heroNote = `התוכנית מתחילה ב-${fmtFullDate(S.settings.startDate)}. אפשר כבר להתחיל לתעד.`;
+  else if (raw > 12) heroNote = 'סיימתם 12 שבועות! 🎉 ממשיכים בהרגלים הטובים – הם כבר חלק מהבית.';
+  else heroNote = phases[phases.length - 1].tip;
+
+  const praises = d.praises || [];
+  const wStarsList = weekStars(Math.max(1, raw));
+  const need = S.settings.starsNeeded;
+  const total = wStarsList.length;
+
+  $('#tab-today').innerHTML = `
+  <section class="card hero">
+    <div class="eyebrow">${greeting()}</div>
+    <h1>שבוע ${w} <small>מתוך 12</small></h1>
+    <div>${phases.map(p => `<span class="phase-chip">${esc(p.name)}</span>`).join('')}</div>
+    <div class="weeks" aria-hidden="true">${Array.from({ length: 12 }, (_, i) => `<i class="${i + 1 < w || raw > 12 ? 'done' : i + 1 === w && raw >= 1 && raw <= 12 ? 'now' : ''}"></i>`).join('')}</div>
+    <p>${heroNote}</p>
+  </section>
+
+  <section class="card">
+    <div class="spread"><h2>📋 סדר היום</h2><span class="pill">${doneCount}/${CHECKS.length}</span></div>
+    <div class="progress" style="margin-bottom:14px"><span style="width:${doneCount / CHECKS.length * 100}%"></span></div>
+    ${CHECKS.map(c => `
+      <div class="check ${d.checks[c.id] ? 'done' : ''}" role="checkbox" tabindex="0" aria-checked="${!!d.checks[c.id]}" data-act="check" data-id="${c.id}">
+        <span class="box">${CHECK_SVG}</span>
+        <span class="cbody">
+          <span class="when">${c.icon} ${c.when}</span><br>
+          <span class="ctitle">${c.title}</span>
+          ${c.sub ? `<div class="sub">${c.sub}</div>` : ''}
+          ${c.id === 'stop' ? `<div class="game"><b>המשחק של היום: ${esc(g.n)}</b><br>${esc(g.d)}</div>` : ''}
+          ${c.id === 'morning' && !d.checks.morning ? `<button class="btn small" style="margin-top:8px" data-act="morningBreath">▶ התחילו 3 דקות נשימה</button>` : ''}
+        </span>
+      </div>`).join('')}
+  </section>
+
+  <section class="card">
+    <h2>👀 תפסתי ${esc(himName())} מתנהג יפה</h2>
+    <p class="sub">שבח ספציפי וחם, מיד כשרואים. היעד: 5 ביום.</p>
+    <input class="input" id="praiseNote" maxlength="120" placeholder="מה ראיתם? (לא חובה) למשל: ויתר לאחיו על התור">
+    <div style="height:10px"></div>
+    <button class="btn praise-btn" data-act="praise">⭐ תפסתי אותו! <span>(${praises.length}/5)</span></button>
+    <div class="praise-dots" aria-label="${praises.length} מתוך 5">${Array.from({ length: Math.max(5, praises.length) }, (_, i) => `<i class="${i < praises.length ? 'on' : ''}"></i>`).join('')}</div>
+    ${praises.length >= 5 ? `<p class="small" style="text-align:center;font-weight:700;color:var(--good)">הגעתם ליעד היומי! 🎉</p>` : ''}
+    ${praises.length ? `<ul class="clean note-list">${praises.map((p, i) => `<li><span><b>${fmtTime(p.ts)}</b> · ${p.note ? esc(p.note) : '<span class="muted">בלי הערה</span>'}</span><button class="x-btn" data-act="delPraise" data-i="${i}" aria-label="מחק">×</button></li>`).join('')}</ul>` : ''}
+  </section>
+
+  <section class="card">
+    <div class="spread"><h2>⭐ טבלת כוכבים</h2><span class="pill blue">${total}/${need}</span></div>
+    <p class="sub">יעדים שבחרתם יחד. כוכב שהורווח – נשאר. לא מורידים כוכבים.</p>
+    ${S.settings.goals.map(gl => {
+      const n = wStarsList.filter(s => s.goalId === gl.id).length;
+      return `<div class="goal">
+        <b>${esc(gl.text)}</b>
+        <div class="stars">${n ? Array.from({ length: n }, () => '<span class="s">⭐</span>').join('') : '<span class="empty">עוד אין כוכבים השבוע</span>'}</div>
+        <button class="btn small star-btn" data-act="star" data-id="${gl.id}">+ ⭐ הוסף כוכב</button>
+      </div>`;
+    }).join('')}
+    <div class="progress"><span style="width:${Math.min(100, total / need * 100)}%"></span></div>
+    <div class="reward"><span style="font-size:28px">🎁</span><span>${total >= need ? '<b>הפרס הורווח השבוע!</b> ' : `עוד <b>${need - total}</b> כוכבים לפרס: `}${esc(S.settings.reward)}</span></div>
+  </section>
+
+  <section class="card">
+    <h2>🏠 3 חוקי הבית</h2>
+    <ol class="bullets">${S.settings.rules.filter(r => r.trim()).map(r => `<li><b>${esc(r)}</b></li>`).join('')}</ol>
+  </section>`;
+}
+
+/* ---------- Tab 2: Calm ---------- */
+let selMood = null;
+function renderCalm() {
+  const todays = S.moods.filter(m => keyOf(new Date(m.ts)) === todayKey());
+  const m = selMood && MOODS[selMood];
+  $('#tab-calm').innerHTML = `
+  <section class="card">
+    <h2>🌡️ איך אני מרגיש עכשיו?</h2>
+    <div class="thermo-wrap">
+      <div class="moods">
+        ${MOOD_ORDER.map(c => `<button class="mood ${selMood === c ? 'sel' : ''}" data-c="${c}" data-act="mood" aria-pressed="${selMood === c}">
+          <span class="face">${MOODS[c].face}</span><span>${MOODS[c].name}<small>${MOODS[c].label}</small></span></button>`).join('')}
+      </div>
+      <div class="thermo" aria-hidden="true">
+        <div class="tube"><div class="fill" style="height:${m ? m.h : 0}%;background:${m ? moodColor(selMood) : 'transparent'}"></div></div>
+        <div class="bulb" style="background:${m ? moodColor(selMood) : 'var(--surface2)'}"></div>
+      </div>
+    </div>
+    ${todays.length ? `<div class="today-moods"><span class="muted" style="border:none;background:none;padding-inline:0">היום:</span>${todays.slice(-8).map(x => `<span><i class="dot" style="background:${moodColor(x.c)}"></i>${fmtTime(x.ts)}</span>`).join('')}</div>` : ''}
+  </section>
+
+  ${m ? `
+  <section class="card" id="moodTools">
+    <div class="mood-msg" style="background:color-mix(in srgb, ${moodColor(selMood)} 18%, var(--surface));border-color:${moodColor(selMood)}">${m.msg}</div>
+    <h3>הכלים שמתאימים עכשיו:</h3>
+    <div class="tools">${m.tools.map(t => toolBtn(t, selMood === 'red' && t === 'stop')).join('')}</div>
+  </section>` : ''}
+
+  <section class="card">
+    <h2>🧰 כל הכלים</h2>
+    <div class="tools">${['stop', 'balloon', 'candle', 'box', 'robot', 'wall'].map(t => toolBtn(t, t === 'stop')).join('')}</div>
+  </section>
+
+  <section class="card">
+    <h2>💥 דרכים מותרות להוציא כעס</h2>
+    <p class="sub">מותר לכעוס. אסור להכות. אפשר לבחור:</p>
+    <ul class="clean vent">${VENT.map(([i, t]) => `<li><span>${i}</span>${t}</li>`).join('')}</ul>
+  </section>`;
+}
+function toolBtn(t, wide) {
+  const x = TOOLS[t];
+  return `<button class="tool ${wide ? 'wide' : ''}" data-act="ex" data-ex="${t}"><span class="ti">${x.icon}</span><span>${x.name}<br><small>${x.sub}</small></span></button>`;
+}
+
+/* ---------- Tab 3: Incident ---------- */
+let draft = null;
+function freshDraft() { return { tsEdited: false, ts: localInputValue(new Date()), trigger: null, target: null, actions: [], duration: null, response: [], used: null, note: '' }; }
+function chipGroup(field, opts, multi) {
+  return `<div class="chips" data-group="${field}">${opts.map(o => {
+    const on = multi ? draft[field].includes(o) : draft[field] === o;
+    return `<button type="button" class="chip" data-act="chip" data-field="${field}" data-multi="${multi ? 1 : 0}" data-val="${esc(o)}" aria-pressed="${on}">${esc(o)}</button>`;
+  }).join('')}</div>`;
+}
+function renderIncident() {
+  if (!draft) draft = freshDraft();
+  if (!draft.tsEdited) draft.ts = localInputValue(new Date());
+  const recent = S.incidents.slice().sort((a, b) => b.ts - a.ts).slice(0, 15);
+  $('#tab-incident').innerHTML = `
+  <section class="card">
+    <h2>📝 רישום אירוע</h2>
+    <p class="sub">רישום מהיר, פחות מ-30 שניות. רק לבחור.</p>
+    <label class="lbl" for="incTs">מתי?</label>
+    <input class="input" type="datetime-local" id="incTs" value="${draft.ts}">
+    <label class="lbl">מה קרה לפני?</label>${chipGroup('trigger', INC.trigger, false)}
+    <label class="lbl">כלפי מי?</label>${chipGroup('target', INC.target, false)}
+    <label class="lbl">מה עשה? <span class="sub">(אפשר כמה)</span></label>${chipGroup('actions', INC.actions, true)}
+    <label class="lbl">כמה זמן נמשך?</label>${chipGroup('duration', INC.duration, false)}
+    <label class="lbl">איך הגבנו? <span class="sub">(אפשר כמה)</span></label>${chipGroup('response', INC.response, true)}
+    <label class="lbl">השתמש בכלי הרגעה?</label>
+    <div class="yn" data-group="used">
+      <button type="button" class="chip" data-act="chip" data-field="used" data-multi="0" data-val="yes" aria-pressed="${draft.used === 'yes'}">✅ כן</button>
+      <button type="button" class="chip" data-act="chip" data-field="used" data-multi="0" data-val="no" aria-pressed="${draft.used === 'no'}">לא</button>
+    </div>
+    <label class="lbl" for="incNote">הערה <span class="sub">(לא חובה)</span></label>
+    <input class="input" id="incNote" maxlength="200" value="${esc(draft.note)}" placeholder="משהו שחשוב לזכור">
+    <div style="height:16px"></div>
+    <button class="btn block big" data-act="saveIncident">שמירת האירוע</button>
+  </section>
+
+  <section class="card steps-card">${protocolHTML(true)}</section>
+
+  <section class="card">
+    <details>
+      <summary>אירועים אחרונים <span class="pill">${S.incidents.length}</span></summary>
+      ${recent.length ? recent.map(i => `
+        <div class="inc-item">
+          <div>
+            <b>${fmtDate(i.ts)} · ${fmtTime(i.ts)}</b> – ${esc((i.actions || []).join(', '))}${i.target ? ` כלפי ${esc(i.target)}` : ''}
+            <div class="sub">${i.trigger ? esc(i.trigger) + ' · ' : ''}${i.duration ? esc(i.duration) + ' · ' : ''}${i.used === 'yes' ? '✅ השתמש בכלי' : i.used === 'no' ? 'בלי כלי' : ''}</div>
+            ${i.note ? `<div class="sub">${esc(i.note)}</div>` : ''}
+          </div>
+          <button class="x-btn" data-act="delIncident" data-id="${i.id}" aria-label="מחיקת אירוע">🗑️</button>
+        </div>`).join('') : '<p class="sub">עוד לא נרשמו אירועים.</p>'}
+    </details>
+  </section>`;
+}
+function protocolHTML(withTitle) {
+  return `
+    ${withTitle ? '<h2>🧭 מה עושים עכשיו</h2>' : ''}
+    <h3><span class="num">1</span> ברגע ההתפרצות</h3>
+    <ul class="bullets">
+      <li><b>לעצור פיזית ובשקט:</b> "אני לא אתן לך להכות." קול נמוך, גוף רגוע.</li>
+      <li><b>קודם להגן על האח הקטן</b> – להרחיק אותו מהמקום.</li>
+      <li><b>מעט מילים.</b> בלי הטפות ובלי "למה עשית את זה?".</li>
+      <li><b>להציע כלי:</b> "בוא נדחוף את הקיר" או "נשימת בלון איתי".</li>
+      <li><b>לחכות שיירגע.</b> להישאר קרוב, בלי להתווכח.</li>
+    </ul>
+    <h3><span class="num">2</span> אחרי שנרגע – בפרטיות, לא מול האחים</h3>
+    <ul class="bullets">
+      <li><b>לתת שם לרגש:</b> "היית ממש כועס כשהוא לקח לך את הלגו."</li>
+      <li><b>"מותר לכעוס, אסור להכות."</b></li>
+      <li><b>לחשוב יחד מה במקום:</b> "מה תוכל לעשות בפעם הבאה?" – משפט העצירה או כלי מהרשימה.</li>
+      <li><b>תיקון מול הנפגע:</b> לא רק "סליחה" – לעזור לבנות מחדש, להביא קרח, לצייר ציור.</li>
+    </ul>
+    <h3><span class="num">3</span> ואז</h3>
+    <ul class="bullets">
+      <li><b>תוצאה הגיונית, קצרה וצמודה למעשה</b> – שבר? עוזר לתקן. היכה במשחק? המשחק נגמר להיום.</li>
+      <li><b>מחר מתחילים דף חדש.</b> לא מזכירים שוב ושוב.</li>
+    </ul>
+    <div class="callout">💙 וגם לכם: נשימה ארוכה. אתם עושים עבודה קשה וחשובה.</div>`;
+}
+
+/* ---------- Tab 4: Progress ---------- */
+let chartPick = { inc: null, tool: null };
+function weekStats() {
+  const W = Array.from({ length: 13 }, (_, w) => ({ w, all: 0, hits: 0, withUsed: 0, usedYes: 0, stars: 0, praises: 0 }));
+  S.incidents.forEach(i => {
+    const w = wkOfTs(i.ts); if (w > 12) return;
+    const x = W[w]; x.all++; if (isHit(i)) x.hits++;
+    if (i.used) { x.withUsed++; if (i.used === 'yes') x.usedYes++; }
+  });
+  S.stars.forEach(s => { const w = wkOfTs(s.ts); if (w <= 12) W[w].stars++; });
+  Object.entries(S.days).forEach(([k, d]) => { const w = Math.max(1, weekRaw(parseKey(k))); if (w <= 12) W[w].praises += (d.praises || []).length; });
+  return W.slice(1);
+}
+function niceMax(v) { if (v <= 4) return 4; const p = Math.pow(10, Math.floor(Math.log10(v))); const n = Math.ceil(v / p); return (n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+function barChart({ id, vals, max, cur, refs = [], fmt = v => v, pick }) {
+  const W = 340, H = 200, pl = 30, pr = 8, pt = 16, pb = 26;
+  const pw = W - pl - pr, ph = H - pt - pb, slot = pw / 12, bw = slot * .62;
+  const y = v => pt + ph - (v / max) * ph;
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="גרף לפי שבועות">`;
+  [0, max / 2, max].forEach(t => {
+    s += `<line x1="${pl}" x2="${W - pr}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/>`;
+    s += `<text x="${pl - 6}" y="${y(t) + 4}" font-size="10.5" text-anchor="end" fill="var(--muted)">${fmt(Math.round(t))}</text>`;
+  });
+  vals.forEach((v, i) => {
+    const x = pl + i * slot + (slot - bw) / 2, wk = i + 1, isCur = wk === cur, isPick = wk === pick;
+    if (v != null && v > 0) {
+      const h = Math.max(2, (v / max) * ph), top = pt + ph - h, r = Math.min(4, h / 2, bw / 2);
+      s += `<path d="M${x} ${pt + ph}V${top + r}Q${x} ${top} ${x + r} ${top}H${x + bw - r}Q${x + bw} ${top} ${x + bw} ${top + r}V${pt + ph}Z" fill="var(--accent)" opacity="${isCur || isPick ? 1 : .62}"/>`;
+      if (isCur || isPick) s += `<text x="${x + bw / 2}" y="${top - 4}" font-size="11" font-weight="700" text-anchor="middle" fill="var(--text)">${fmt(v)}</text>`;
+    } else if (v === 0) {
+      s += `<rect x="${x}" y="${pt + ph - 2}" width="${bw}" height="2" rx="1" fill="var(--accent)" opacity=".5"/>`;
+    }
+    s += `<text x="${x + bw / 2}" y="${H - 9}" font-size="10.5" text-anchor="middle" fill="${isCur ? 'var(--text)' : 'var(--muted)'}" font-weight="${isCur ? 800 : 400}">${wk}</text>`;
+    s += `<rect x="${pl + i * slot}" y="${pt}" width="${slot}" height="${ph + pb}" fill="transparent" data-act="bar" data-chart="${id}" data-w="${wk}" style="cursor:pointer"/>`;
+  });
+  refs.forEach(r => {
+    s += `<line x1="${pl}" x2="${W - pr}" y1="${y(r.v)}" y2="${y(r.v)}" stroke="${r.color}" stroke-width="2" ${r.dash ? 'stroke-dasharray="5 4"' : ''} pointer-events="none"/>`;
+  });
+  return s + '</svg>';
+}
+function hbars(entries) {
+  const max = Math.max(1, ...entries.map(e => e[1]));
+  return `<ul class="clean hbars">${entries.map(([k, v]) => `<li><div class="lab"><span>${esc(k)}</span><b>${v}</b></div><div class="track"><span style="width:${v / max * 100}%"></span></div></li>`).join('')}</ul>`;
+}
+function countBy(list, fn) { const m = {}; list.forEach(x => { const k = fn(x); if (k) m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); }
+function hourBucket(ts) { const h = new Date(ts).getHours(); return h >= 6 && h < 12 ? 'בוקר (6–12)' : h >= 12 && h < 15 ? 'צהריים (12–15)' : h >= 15 && h < 18 ? 'אחר הצהריים (15–18)' : h >= 18 && h < 21 ? 'ערב (18–21)' : 'לילה (21–6)'; }
+
+function renderProgress() {
+  const stats = weekStats();
+  const raw = weekRaw(), cw = clamp(raw, 1, 12);
+  const mode = S.ui.chartMode === 'hits' ? 'hits' : 'all';
+  const val = x => mode === 'hits' ? x.hits : x.all;
+  const base = val(stats[0]);
+  const target = base * 0.3;
+  const vals = stats.map((x, i) => i + 1 <= cw ? val(x) : null);
+  const max = niceMax(Math.max(base, ...vals.filter(v => v != null), 1));
+  const thisW = stats[cw - 1];
+  const change = base > 0 && cw > 1 ? Math.round((val(thisW) - base) / base * 100) : null;
+  const toolPct = x => x.withUsed ? Math.round(x.usedYes / x.withUsed * 100) : null;
+  const toolVals = stats.map((x, i) => i + 1 <= cw ? toolPct(x) : null);
+  const totalInc = S.incidents.length;
+
+  // professional-help signals
+  const now = new Date();
+  const last7 = S.incidents.filter(i => { const dd = dayDiff(now, new Date(i.ts)); return dd >= 0 && dd < 7; });
+  const daysWithInc = new Set(last7.map(i => keyOf(new Date(i.ts)))).size;
+  const long14 = S.incidents.filter(i => dayDiff(now, new Date(i.ts)) < 14 && LONG_DUR.includes(i.duration)).length;
+  let noDecline = false;
+  if (raw > 8 && stats[0].all > 0) {
+    const recent = [stats[cw - 2], stats[cw - 3]].filter(Boolean);
+    const avg = recent.reduce((a, x) => a + x.all, 0) / recent.length;
+    noDecline = avg >= stats[0].all * 0.85;
+  }
+  const proReasons = [];
+  if (noDecline) proReasons.push('עברו יותר מ-8 שבועות ועדיין אין ירידה ברורה במספר האירועים.');
+  if (daysWithInc >= 6) proReasons.push(`ב-${daysWithInc} מתוך 7 הימים האחרונים היו אירועים – כמעט כל יום.`);
+  if (long14 >= 2) proReasons.push('היו כמה התפרצויות ארוכות (מעל 15–30 דקות) בשבועיים האחרונים.');
+
+  let enc = 'ירידה הדרגתית, עם עליות קטנות בדרך, היא מהלך תקין לגמרי. שבוע קשה לא מוחק את ההתקדמות – מה שקובע הוא המגמה לאורך זמן.';
+  if (change != null && change <= -70) enc = `וואו! ירידה של ${-change}% לעומת שבוע 1 – הגעתם ליעד. 🎉 ` + enc;
+  else if (change != null && change < 0) enc = `ירידה של ${-change}% לעומת שבוע 1. אתם בדרך הנכונה. ` + enc;
+
+  const pickInfo = (id, w) => {
+    if (!w) return 'הקישו על עמודה כדי לראות פרטים.';
+    const x = stats[w - 1];
+    if (id === 'inc') return `שבוע ${w}: ${x.all} אירועים, מתוכם ${x.hits} עם מכות`;
+    const p = toolPct(x);
+    return p == null ? `שבוע ${w}: אין אירועים עם תיעוד כלי הרגעה` : `שבוע ${w}: השתמש בכלי ב-${x.usedYes} מתוך ${x.withUsed} אירועים (${p}%)`;
+  };
+  const wkIncidents = S.incidents;
+
+  $('#tab-progress').innerHTML = `
+  <div class="kpis">
+    <div class="kpi"><b>${val(thisW)}</b><span>${mode === 'hits' ? 'אירועי מכות' : 'אירועים'} השבוע</span>${change != null ? `<em class="${change <= 0 ? 'good-t' : 'bad-t'}">${change <= 0 ? 'ירידה' : 'עלייה'} של ${Math.abs(change)}% מול שבוע 1</em>` : '<em class="muted">שבוע ' + cw + '</em>'}</div>
+    <div class="kpi"><b>${toolPct(thisW) == null ? '–' : toolPct(thisW) + '%'}</b><span>שימוש בכלי הרגעה</span><em class="muted">השבוע</em></div>
+    <div class="kpi"><b>${thisW.praises}</b><span>"תפסתי אותו"</span><em class="muted">השבוע</em></div>
+  </div>
+
+  ${proReasons.length ? `
+  <section class="card pro">
+    <h2>🤝 כדאי לפנות לאיש מקצוע</h2>
+    <ul class="bullets">${proReasons.map(r => `<li>${r}</li>`).join('')}</ul>
+    <p>זה לא כישלון – זו הורות אחראית. אפשר לפנות לשפ״ח (השירות הפסיכולוגי החינוכי) דרך בית הספר, או לרופא הילדים בקופת החולים לקבלת הפניה.</p>
+  </section>` : ''}
+
+  <section class="card">
+    <div class="spread" style="flex-wrap:wrap"><h2>📊 אירועים לשבוע</h2>
+      <div class="seg" role="group" aria-label="סוג אירועים">
+        <button data-act="chartMode" data-mode="all" aria-pressed="${mode === 'all'}">הכל</button>
+        <button data-act="chartMode" data-mode="hits" aria-pressed="${mode === 'hits'}">רק מכות</button>
+      </div>
+    </div>
+    ${totalInc ? `
+      ${barChart({ id: 'inc', vals, max, cur: cw, pick: chartPick.inc, refs: base > 0 ? [{ v: base, color: 'var(--muted)', dash: true }, { v: target, color: 'var(--good)' }] : [] })}
+      <div class="legend"><span><i class="bar"></i>${mode === 'hits' ? 'אירועי מכות' : 'כל האירועים'}</span>${base > 0 ? `<span><i></i>בסיס שבוע 1: ${base}</span><span><i class="tgt"></i>יעד (ירידה של 70%): ${Math.round(target * 10) / 10}</span>` : ''}</div>
+      <div class="chart-info">${pickInfo('inc', chartPick.inc)}</div>
+      ${base === 0 ? '<p class="sub">קו הבסיס והיעד יופיעו כשיהיו אירועים רשומים בשבוע 1.</p>' : ''}
+    ` : `<div class="empty-state"><div class="big">🗒️</div>עוד אין אירועים רשומים.<br>בשבוע הראשון מתעדים כל אירוע – כך נוצר קו הבסיס.</div>`}
+  </section>
+
+  <section class="card">
+    <h2>🧘 שימוש בכלי הרגעה</h2>
+    <p class="sub">אחוז האירועים שבהם השתמש בכלי, לפי שבוע.</p>
+    ${totalInc ? `${barChart({ id: 'tool', vals: toolVals, max: 100, cur: cw, pick: chartPick.tool, fmt: v => v + '%' })}
+      <div class="chart-info">${pickInfo('tool', chartPick.tool)}</div>` : '<p class="sub">יופיע אחרי רישום אירועים.</p>'}
+  </section>
+
+  <section class="card">
+    <h2>🔍 ניתוח טריגרים</h2>
+    ${totalInc ? `
+      <h3>מה קרה לפני</h3>${hbars(countBy(wkIncidents, i => i.trigger).slice(0, 5))}
+      <h3>שעות מועדות</h3>${hbars(countBy(wkIncidents, i => hourBucket(i.ts)))}
+      <h3>מול מי</h3>${hbars(countBy(wkIncidents, i => i.target))}
+    ` : '<p class="sub">אחרי כמה רישומים תראו כאן מתי, למה ומול מי האירועים קורים – וכך אפשר להיערך מראש.</p>'}
+  </section>
+
+  <section class="card">
+    <h2>📅 סיכום שבועי</h2>
+    <table class="wk">
+      <thead><tr><th>שבוע</th><th>אירועים</th><th>מכות</th><th>כלי</th><th>⭐</th><th>👀</th></tr></thead>
+      <tbody>${stats.slice(0, cw).map(x => `<tr class="${x.w === cw ? 'cur' : ''}"><td>${x.w}</td><td>${x.all}</td><td>${x.hits}</td><td>${toolPct(x) == null ? '–' : toolPct(x) + '%'}</td><td>${x.stars}</td><td>${x.praises}</td></tr>`).join('')}</tbody>
+    </table>
+    <p class="sub small">⭐ כוכבים · 👀 "תפסתי אותו מתנהג יפה"</p>
+  </section>
+
+  <section class="card encourage">
+    <h2>🌱 מילה טובה</h2>
+    <p>${enc}</p>
+  </section>`;
+}
+
+/* ---------- Tab 5: Guide ---------- */
+function items(list) { return list.map(([t, d]) => `<div class="item"><b>${t}</b>${d}</div>`).join(''); }
+function renderGuide() {
+  const raw = weekRaw(), w = clamp(raw, 1, 12);
+  const cur = new Set(activePhases(w).map(p => p.id));
+  const body = {
+    p1: `<p><b>השבוע רק מתעדים – לא משנים.</b> רושמים כל אירוע בלשונית "אירוע". הנתונים של השבוע הזה הם קו הבסיס שממנו נמדוד את ההתקדמות.</p>
+      <h3>מה בודקים:</h3>${items([
+        ['😴 שינה', 'כמה שעות הוא ישן? ילד בן 10 צריך בערך 9–11 שעות. עייפות היא דלק לכעס.'],
+        ['🍎 ארוחות', 'האם התפרצויות קורות כשהוא רעב? ארוחה או חטיף קבועים בשעות המועדות.'],
+        ['📱 מסכים', 'כמה זמן ביום, ומה קורה כשמכבים? המעבר ממסך הוא טריגר נפוץ.'],
+        ['🏃 תנועה', 'כמה פריקת אנרגיה יש לו ביום? ילד חסר מנוחה צריך הרבה.']
+      ])}`,
+    p2: items([
+      ['🏃 פריקת אנרגיה יומית', '30–60 דקות תנועה בחוץ: ריצה, אופניים, טיפוס, כדורגל. גוף עייף = פחות פיצוצים.'],
+      ['🎈 תרגילי נשימה', 'נשימת בלון, נר וקובייה. מתרגלים כשרגועים – כדי שיעבדו כשכועסים.'],
+      ['🌡️ מדחום רגשות', 'כמה פעמים ביום שואלים "איפה אתה במדחום?". לומדים לזהות צהוב לפני שמגיעים לאדום.'],
+      ['🛋️ פינת רגיעה – לא פינת עונש', 'מקום נעים שהוא בוחר ומעצב: כרית, שמיכה, כדור לחץ, דפים וצבעים. הולכים אליה כדי להירגע – לא שולחים אליה כעונש.']
+    ]),
+    p3: items([
+      ['🎨 צבע-מילה', 'אומרים צבע והוא מבצע תנועה שסוכמה. מחליפים חוקים באמצע – מאמן עצירה וגמישות.'],
+      ['🧊 תופסת קפואה', 'כשהמוזיקה נעצרת קופאים. מאמן עצירה של הגוף ברגע.'],
+      ['🧱 ג׳נגה על זמן', 'מוציאים לבנה בתורו עם טיימר. סבלנות, תור והפסד בכבוד.'],
+      ['🙃 ראש-כתפיים הפוך', 'אומרים "ראש" – נוגעים בכתפיים. מאמן עצירה של תגובה אוטומטית.'],
+      ['♟️ שחמט ודמקה', 'חושבים לפני שמזיזים. ההורה מדגים הפסד יפה: "אוף, הפסדתי. בפעם הבאה." ומשבחים כל הפסד רגוע.'],
+      ['⏳ אתגר דחיית סיפוק', 'פרס קטן עכשיו או כפול אחרי המתנה. מאריכים בהדרגה.'],
+      ['🧩 פרויקט איטי', 'לגו גדול או פאזל 500 חלקים שבונים לאורך כמה ימים. מאמן התמדה וסבלנות.'],
+      ['🎭 משחק תפקידים', 'מדמים מצב קשה ומתרגלים בקול: "עצור – נושם – חושב – בוחר". מתחלפים בתפקידים.']
+    ]),
+    p4: `<div class="steps-card">${protocolHTML(false)}</div>`,
+    p5: items([
+      ['✌️ בחירה בין שתיים', 'במקום פקודה: "אתה רוצה להתקלח עכשיו או אחרי הארוחה?" – שליטה אמיתית, בתוך הגבולות שלכם.'],
+      ['🔑 תפקיד אחריות אמיתי', 'משהו שבאמת חשוב לבית: אחראי על המיחזור, עוזר בתיקונים, מטפל בצמחים. לא עבודה שחורה.'],
+      ['💙 זמן אחד-על-אחד', '15 דקות ביום שבהן הוא מוביל. בלי טלפון, בלי אחים, בלי ביקורת.'],
+      ['👑 תור למנהיג', 'סבב שבו כל אחד בתורו מחליט (איזה משחק, מה לארוחה). לומדים להוביל וגם להיות מובל.'],
+      ['🤝 משא ומתן', '"מה אתה רוצה? מה הוא רוצה? מה הפתרון ששניכם מרוויחים?" ומשבחים כל פשרה.'],
+      ['⚽ משחקי צוות', 'משחקי קופסה שיתופיים ואתגרים משפחתיים שבהם כולם מנצחים או מפסידים יחד.'],
+      ['💭 שאלות אמפתיה', '"איך לדעתך הרגיש אחיך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.'],
+      ['🧑‍🤝‍🧑 מפגש משחק עם חבר אחד', 'חבר אחד, שעה–שעתיים, פעילות מתוכננת מראש והורה בסביבה. מסיימים כשעוד טוב.']
+    ])
+  };
+  const weeksLabel = p => p.from === p.to ? `שבוע ${p.from}` : `שבועות ${p.from}–${p.to}`;
+  const rules = S.settings.rules.filter(r => r.trim());
+  $('#tab-guide').innerHTML = `
+  <section class="card">
+    <h2>📖 מדריך להורה</h2>
+    <p class="sub">השלב הנוכחי פתוח ומודגש. השלבים חופפים מעט – זה מכוון.</p>
+  </section>
+  ${PHASES.map(p => `
+    <section class="card phase-card ${cur.has(p.id) ? 'current' : ''}">
+      <details ${cur.has(p.id) ? 'open' : ''}>
+        <summary><span><span class="wk">${weeksLabel(p)}</span>${esc(p.name)}${cur.has(p.id) ? '<span class="now-badge">השלב הנוכחי</span>' : ''}</span></summary>
+        <div class="body">${body[p.id]}</div>
+      </details>
+    </section>`).join('')}
+
+  <section class="card phase-card">
+    <details>
+      <summary><span><span class="wk">פרק מיוחד</span>👑 הבכור מתוך 7</span></summary>
+      <div class="body">${items([
+        ['🗓️ זמן אישי קבוע', 'זמן קבוע (עדיף יומי) שהוא רק שלו – בלי אחים. כתוב ביומן, ולא מבטלים.'],
+        ['🙅 בכור ולא שמרטף', 'עזרה – כן. אחריות של הורה על האחים – לא.'],
+        ['🎖️ זכויות של גדול', 'לצד האחריות – זכויות: שעת שינה מאוחרת יותר, יותר בחירה, פעילות שרק גדולים עושים.'],
+        ['🔒 מקום נעול לחפצים שלו', 'ארגז או מגירה עם מנעול שהאחים לא נוגעים בהם. פחות "לקחו לי!".'],
+        ['⚖️ לא להשוות', 'לא "תראה איך אחותך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.'],
+        ['🛡️ הגנה על האחים והפרדה', 'מזהים מצבים מועדים (מעברים, ערב, מסכים) ומפרידים מראש: חדרים שונים, פעילות נפרדת.'],
+        ['🧭 תפקיד מנהיגות שהוא בוחר', 'הוא בוחר מרשימה: מדריך משחק לקטנים, אחראי על המוזיקה בנסיעה... מנהיגות חיובית במקום שתלטנות.']
+      ])}</div>
+    </details>
+  </section>
+
+  <section class="card phase-card">
+    <details>
+      <summary><span><span class="wk">תמיד</span>✨ 5 כללי יסוד</span></summary>
+      <div class="body">${items([
+        ['1. קודם אתה רגוע', 'ילד נרגע ליד מבוגר רגוע. נושמים, מנמיכים קול, ורק אז מגיבים.'],
+        ['2. ביטחון לפני חינוך', 'ברגע ההתפרצות רק עוצרים ומגינים. מלמדים אחר כך.'],
+        ['3. 5 שבחים ביום', 'שבח ספציפי על התנהגות: "ראיתי שוויתרת לאחיך על התור – זה היה בוגר."'],
+        ['4. 3 חוקי בית בלבד', `מעט חוקים, ברורים, שכולם מכירים${rules.length ? ': ' + rules.map(esc).join(' · ') : '.'}`],
+        ['5. להאריך את הנשימה', 'שינוי לוקח שבועות. יש עליות וירידות – מה שקובע הוא המגמה.']
+      ])}</div>
+    </details>
+  </section>
+
+  <section class="card phase-card">
+    <details>
+      <summary><span><span class="wk">חשוב לדעת</span>🤝 מתי לפנות לאיש מקצוע</span></summary>
+      <div class="body">
+        <ul class="bullets">
+          <li>אין שיפור אחרי 6–8 שבועות.</li>
+          <li>פגיעה בעצמו או בבעלי חיים.</li>
+          <li>התפרצויות ארוכות מ-20–30 דקות, או כמעט כל יום.</li>
+          <li>קשיים במסגרת החינוכית (בית ספר, חוגים).</li>
+          <li>חשד לבעיית קשב וריכוז.</li>
+        </ul>
+        <div class="callout">אפשר לפנות לשפ״ח (השירות הפסיכולוגי החינוכי) דרך בית הספר, או לרופא הילדים בקופת החולים. פנייה לעזרה היא צעד של הורות אחראית.</div>
+      </div>
+    </details>
+  </section>`;
+}
+
+/* =========================================================
+   Exercises (breathing etc.)
+   ========================================================= */
+const EXS = {
+  balloon: { title: '🎈 נשימת בלון', cycles: 6, steps: [
+    { t: 'שואפים מהאף… הבטן מתנפחת כמו בלון', s: 4, sc: 1 },
+    { t: 'נושפים לאט מהפה… הבלון מתרוקן', s: 6, sc: .45 }] },
+  candle: { title: '🕯️ נשימת נר', cycles: 6, steps: [
+    { t: 'מריחים פרח… שואפים לאט מהאף', s: 4, sc: 1 },
+    { t: 'נושפים על הנר בעדינות – שהלהבה תזוז ולא תכבה', s: 6, sc: .45 }] },
+  box: { title: '🟦 נשימת קובייה', cycles: 4, steps: [
+    { t: 'שואפים לאט מהאף…', s: 4, sc: 1 },
+    { t: 'מחזיקים את האוויר…', s: 4, sc: 1 },
+    { t: 'נושפים לאט מהפה…', s: 4, sc: .45 },
+    { t: 'מחכים בשקט…', s: 4, sc: .45 }] },
+  robot: { title: '🤖 רובוט וספגטי', cycles: 3, steps: [
+    { t: 'רובוט! 🤖 מכווצים את כל הגוף – אגרופים, כתפיים, פנים', s: 5, sc: .6, cls: 'tense' },
+    { t: 'ספגטי! 🍝 משחררים הכל – רך ורפוי', s: 5, sc: 1 }] },
+  wall: { title: '🧱 לדחוף את הקיר', cycles: 1, steps: [
+    { t: 'עומדים מול קיר, ידיים ישרות – ודוחפים בכל הכוח! 💪', s: 10, sc: 1, cls: 'push' },
+    { t: 'עוזבים… ונושמים עמוק', s: 4, sc: .55 }] },
+  stop: { title: '✋ משפט העצירה', cycles: 2, words: true, steps: [
+    { t: 'עצור ✋', s: 3 }, { t: 'נושם 🌬️', s: 3 }, { t: 'חושב 🤔', s: 3 }, { t: 'בוחר ✅', s: 3 }] }
+};
+let EX = null;
+function exTotalRemain() {
+  const st = EX.def.steps;
+  let r = EX.remain;
+  for (let i = EX.step + 1; i < st.length; i++) r += st[i].s;
+  const per = st.reduce((a, x) => a + x.s, 0);
+  return r + (EX.cycles - EX.cycle - 1) * per;
+}
+function startEx(id, opts = {}) {
+  const def = EXS[id]; if (!def) return;
+  stopEx(true);
+  EX = { id, def, step: 0, cycle: 0, cycles: opts.cycles || def.cycles, remain: def.steps[0].s, paused: false, onDone: opts.onDone };
+  const inner = $('#exInner');
+  inner.innerHTML = `
+    <div class="sheet-head" style="width:100%"><span></span><button class="icon-btn" data-act="exClose" aria-label="סגירה">✕</button></div>
+    <h2 id="exTitle">${def.title}</h2>
+    ${def.words
+      ? `<div class="stopwords">${def.steps.map((s, i) => `<div data-i="${i}">${s.t}</div>`).join('')}</div>`
+      : `<div class="stage"><div class="ring"></div><div class="circle" id="exCircle"><span class="num" id="exNum"></span></div></div>
+         <p class="ex-text" id="exText"></p>`}
+    <p class="meta" id="exMeta"></p>
+    <div class="ex-actions">
+      <button class="btn ghost" data-act="exPause" id="exPauseBtn">⏸ השהיה</button>
+      <button class="btn" data-act="exClose">סיום</button>
+    </div>`;
+  $('#exOverlay').hidden = false;
+  document.body.style.overflow = 'hidden';
+  const c = $('#exCircle');
+  if (c) { c.style.transitionDuration = '0s'; c.style.transform = 'scale(.45)'; void c.offsetWidth; }
+  applyStep();
+  EX.timer = setInterval(tickEx, 1000);
+}
+function applyStep() {
+  const st = EX.def.steps[EX.step];
+  const c = $('#exCircle');
+  if (c) {
+    c.className = 'circle' + (st.cls ? ' ' + st.cls : '');
+    c.style.transitionDuration = st.s + 's';
+    c.style.transform = `scale(${st.sc})`;
+    $('#exText').textContent = st.t;
+  } else {
+    $$('.stopwords div').forEach(d => d.classList.toggle('on', +d.dataset.i === EX.step));
+  }
+  vibrate(st.cls === 'tense' ? [40, 40, 40] : 25);
+  updateExNums();
+}
+function updateExNums() {
+  const n = $('#exNum'); if (n) n.textContent = EX.remain;
+  const tr = exTotalRemain();
+  $('#exMeta').textContent = `סבב ${EX.cycle + 1} מתוך ${EX.cycles} · נשארו ${Math.floor(tr / 60)}:${pad(tr % 60)}`;
+}
+function tickEx() {
+  if (!EX || EX.paused) return;
+  EX.remain--;
+  if (EX.remain <= 0) {
+    EX.step++;
+    if (EX.step >= EX.def.steps.length) { EX.step = 0; EX.cycle++; }
+    if (EX.cycle >= EX.cycles) return finishEx();
+    EX.remain = EX.def.steps[EX.step].s;
+    applyStep();
+  } else updateExNums();
+}
+function pauseEx() {
+  if (!EX) return;
+  EX.paused = !EX.paused;
+  const c = $('#exCircle');
+  if (c) {
+    if (EX.paused) { const t = getComputedStyle(c).transform; c.style.transitionDuration = '0s'; c.style.transform = t; }
+    else { c.style.transitionDuration = EX.remain + 's'; c.style.transform = `scale(${EX.def.steps[EX.step].sc})`; }
+  }
+  $('#exPauseBtn').textContent = EX.paused ? '▶ המשך' : '⏸ השהיה';
+}
+function finishEx() {
+  clearInterval(EX.timer);
+  const cb = EX.onDone; EX = null;
+  vibrate([60, 60, 120]);
+  $('#exInner').innerHTML = `
+    <div class="sheet-head" style="width:100%"><span></span><button class="icon-btn" data-act="exClose" aria-label="סגירה">✕</button></div>
+    <div style="margin:auto 0;text-align:center">
+      <div class="done-face">🌟</div>
+      <h2>כל הכבוד!</h2>
+      <p class="ex-text">הגוף שלך יודע להירגע. איך אתה מרגיש עכשיו?</p>
+      <button class="btn big block" data-act="exClose" data-goto="calm">חזרה למדחום</button>
+    </div>`;
+  if (cb) cb();
+}
+function stopEx(silent) {
+  if (EX) { clearInterval(EX.timer); EX = null; }
+  if (!silent) { $('#exOverlay').hidden = true; document.body.style.overflow = ''; }
+}
+
+/* =========================================================
+   Settings, import/export
+   ========================================================= */
+function openSettings(welcome) {
+  const st = S.settings;
+  const g = [0, 1, 2].map(i => (st.goals[i] && st.goals[i].text) || '');
+  $('#setInner').innerHTML = `
+    <div class="sheet-head"><h2 id="setTitle">${welcome ? 'ברוכים הבאים 👋' : '⚙️ הגדרות'}</h2>
+      ${welcome ? '' : '<button class="icon-btn" data-act="closeSettings" aria-label="סגירה">✕</button>'}</div>
+    ${welcome ? '<div class="card encourage"><p><b>רגוע וחזק</b> מלווה אתכם 12 שבועות, יום אחרי יום. כמה פרטים קצרים ומתחילים. אפשר לשנות הכל אחר כך.</p></div>' : ''}
+    <div class="card">
+      <label class="lbl" for="sName">שם הילד</label>
+      <input class="input" id="sName" maxlength="30" value="${esc(st.childName)}" placeholder="למשל: יוסי">
+      <label class="lbl" for="sStart">תאריך התחלת התוכנית</label>
+      <input class="input" type="date" id="sStart" value="${esc(st.startDate)}">
+    </div>
+    <div class="card">
+      <h2>🏠 3 חוקי הבית</h2>
+      ${[0, 1, 2].map(i => `<input class="input" id="sRule${i}" maxlength="60" value="${esc(st.rules[i] || '')}" placeholder="חוק ${i + 1}" style="margin-bottom:8px">`).join('')}
+    </div>
+    <div class="card">
+      <h2>⭐ טבלת הכוכבים</h2>
+      <p class="sub">2–3 יעדים שבוחרים יחד עם הילד. היעד השלישי לא חובה.</p>
+      ${[0, 1, 2].map(i => `<input class="input" id="sGoal${i}" maxlength="50" value="${esc(g[i])}" placeholder="יעד ${i + 1}${i === 2 ? ' (לא חובה)' : ''}" style="margin-bottom:8px">`).join('')}
+      <label class="lbl" for="sReward">הפרס</label>
+      <input class="input" id="sReward" maxlength="80" value="${esc(st.reward)}">
+      <label class="lbl" for="sNeed">כמה כוכבים בשבוע צריך לפרס?</label>
+      <input class="input" type="number" inputmode="numeric" min="1" max="200" id="sNeed" value="${st.starsNeeded}">
+    </div>
+    <button class="btn block big" data-act="saveSettings">${welcome ? 'מתחילים!' : 'שמירה'}</button>
+    ${welcome ? '' : `
+    <div class="card" style="margin-top:16px">
+      <h2>💾 גיבוי נתונים</h2>
+      <p class="sub">הנתונים נשמרים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם.</p>
+      <div class="grid2">
+        <button class="btn ghost" data-act="export">⬇️ ייצוא</button>
+        <button class="btn ghost" data-act="import">⬆️ ייבוא</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🗑️ איפוס</h2>
+      <p class="sub">מוחק את כל הנתונים מהטלפון. אי אפשר לבטל.</p>
+      <button class="btn danger block" data-act="reset">איפוס כל הנתונים</button>
+    </div>`}`;
+  $('#setOverlay').hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('#setOverlay').scrollTop = 0;
+}
+function closeSettings() { $('#setOverlay').hidden = true; document.body.style.overflow = ''; }
+function saveSettings() {
+  const st = S.settings;
+  st.childName = $('#sName').value.trim();
+  const sd = $('#sStart').value; if (/^\d{4}-\d{2}-\d{2}$/.test(sd)) st.startDate = sd;
+  st.rules = [0, 1, 2].map(i => $('#sRule' + i).value.trim());
+  const goals = [];
+  [0, 1, 2].forEach(i => { const t = $('#sGoal' + i).value.trim(); if (t) goals.push({ id: 'g' + (i + 1), text: t }); });
+  if (goals.length < 2) { toast('כדאי להגדיר לפחות 2 יעדים לכוכבים'); return; }
+  st.goals = goals;
+  st.reward = $('#sReward').value.trim() || 'פרס שבחרנו יחד';
+  st.starsNeeded = clamp(parseInt($('#sNeed').value, 10) || 15, 1, 200);
+  st.onboarded = true;
+  save(); closeSettings(); rerender(); toast('נשמר ✓');
+}
+function exportData() {
+  const json = JSON.stringify(S, null, 2);
+  const name = `ragua-vehazak-${todayKey()}.json`;
+  try {
+    const file = new File([json], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      navigator.share({ files: [file], title: 'גיבוי רגוע וחזק' }).catch(() => downloadBlob(json, name));
+      return;
+    }
+  } catch (e) {}
+  downloadBlob(json, name);
+}
+function downloadBlob(json, name) {
+  try {
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast('קובץ הגיבוי נשמר');
+  } catch (e) { toast('הייצוא נכשל'); }
+}
+function importData(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const data = JSON.parse(r.result);
+      if (!data || typeof data !== 'object' || !data.settings) throw new Error('bad');
+      if (!confirm('הייבוא יחליף את כל הנתונים הנוכחיים בטלפון. להמשיך?')) return;
+      S = normalize(data); S.settings.onboarded = true; save();
+      closeSettings(); showTab(S.ui.tab); toast('הנתונים יובאו בהצלחה ✓');
+    } catch (e) { toast('הקובץ לא תקין'); }
+  };
+  r.readAsText(file);
+}
+
+/* =========================================================
+   Celebration & toast
+   ========================================================= */
+function celebrate(w) {
+  const name = childName();
+  $('#celInner').innerHTML = `
+    <div class="trophy">🏆</div>
+    <h2 style="font-size:30px;margin:10px 0">כל הכבוד${name ? ' ' + esc(name) : ''}!</h2>
+    <p style="font-size:19px">הגעתם ל-${S.settings.starsNeeded} כוכבים השבוע!</p>
+    <div class="reward" style="justify-content:center;font-size:19px;margin:16px 0"><span style="font-size:32px">🎁</span><b>${esc(S.settings.reward)}</b></div>
+    <button class="btn big block" data-act="celClose">יש! 🎉</button>`;
+  $('#celOverlay').hidden = false;
+  vibrate([80, 60, 80, 60, 200]);
+  if (reduceMotion()) return;
+  const colors = ['#3bb273', '#f2c230', '#f08a24', '#e04848', '#3a83b5', '#21958a', '#b77fe0'];
+  for (let i = 0; i < 90; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = colors[i % colors.length];
+    c.style.animationDuration = 2.2 + Math.random() * 2 + 's';
+    c.style.animationDelay = Math.random() * .6 + 's';
+    c.style.width = 6 + Math.random() * 8 + 'px';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 5000);
+  }
+}
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* =========================================================
+   Actions (event delegation)
+   ========================================================= */
+const ACT = {
+  tab: el => showTab(el.dataset.tab),
+  check(el) {
+    const d = day(), id = el.dataset.id;
+    d.checks[id] = !d.checks[id]; save(); vibrate(15);
+    renderToday();
+    if (d.checks[id] && CHECKS.every(c => d.checks[c.id])) toast('כל סדר היום הושלם! 🌟');
+  },
+  morningBreath(el, e) {
+    e.stopPropagation();
+    startEx('balloon', { cycles: 18, onDone: () => { day().checks.morning = true; save(); renderToday(); } });
+  },
+  praise() {
+    const note = ($('#praiseNote').value || '').trim();
+    const d = day(); d.praises.push({ ts: Date.now(), note }); save(); vibrate(30);
+    renderToday();
+    toast(d.praises.length === 5 ? 'יעד יומי הושג! 5 שבחים 🎉' : 'נרשם! שבח ספציפי עושה פלאים ⭐');
+  },
+  delPraise(el) {
+    const d = day(); const i = +el.dataset.i;
+    if (d.praises[i] && confirm('למחוק את הרישום?')) { d.praises.splice(i, 1); save(); renderToday(); }
+  },
+  star(el) {
+    const w = Math.max(1, weekRaw());
+    S.stars.push({ goalId: el.dataset.id, ts: Date.now() }); vibrate(30);
+    const total = weekStars(w).length;
+    if (total >= S.settings.starsNeeded && !S.celebrated[w]) { S.celebrated[w] = true; save(); renderToday(); celebrate(w); }
+    else { save(); renderToday(); toast('⭐ כוכב נוסף!'); }
+  },
+  mood(el) {
+    selMood = el.dataset.c;
+    S.moods.push({ ts: Date.now(), c: selMood }); save(); vibrate(20);
+    renderCalm();
+    const t = $('#moodTools'); if (t) setTimeout(() => t.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' }), 80);
+  },
+  ex: el => startEx(el.dataset.ex),
+  exPause: pauseEx,
+  exClose(el) { stopEx(); if (el.dataset.goto) showTab(el.dataset.goto); },
+  chip(el) {
+    const f = el.dataset.field, v = el.dataset.val, multi = el.dataset.multi === '1';
+    if (multi) { const a = draft[f]; const i = a.indexOf(v); i >= 0 ? a.splice(i, 1) : a.push(v); }
+    else draft[f] = draft[f] === v ? null : v;
+    const group = el.closest('[data-group]');
+    $$('.chip', group).forEach(c => c.setAttribute('aria-pressed', multi ? draft[f].includes(c.dataset.val) : draft[f] === c.dataset.val));
+    vibrate(10);
+  },
+  saveIncident() {
+    if (!draft.actions.length) { toast('בחרו לפחות "מה עשה"'); $('[data-group=actions]').scrollIntoView({ block: 'center' }); return; }
+    const tsVal = $('#incTs').value;
+    const ts = tsVal ? new Date(tsVal).getTime() : Date.now();
+    S.incidents.push({ id: uid(), ts: isNaN(ts) ? Date.now() : ts, trigger: draft.trigger, target: draft.target, actions: draft.actions.slice(), duration: draft.duration, response: draft.response.slice(), used: draft.used, note: ($('#incNote').value || '').trim() });
+    save(); draft = freshDraft(); renderIncident();
+    window.scrollTo({ top: 0 });
+    toast('נרשם. נשימה עמוקה – גם לכם 💙');
+  },
+  delIncident(el) {
+    if (!confirm('למחוק את האירוע?')) return;
+    S.incidents = S.incidents.filter(i => i.id !== el.dataset.id); save(); renderIncident();
+    $('#tab-incident details').open = true;
+  },
+  chartMode(el) { S.ui.chartMode = el.dataset.mode; save(); renderProgress(); },
+  bar(el) { const c = el.dataset.chart, w = +el.dataset.w; chartPick[c] = chartPick[c] === w ? null : w; renderProgress(); },
+  openSettings: () => openSettings(false),
+  closeSettings,
+  saveSettings,
+  export: exportData,
+  import: () => $('#importFile').click(),
+  reset() {
+    if (!confirm('למחוק את כל הנתונים? אי אפשר לבטל.')) return;
+    if (!confirm('בטוחים? מומלץ קודם לייצא גיבוי.')) return;
+    S = defaults(); save(); closeSettings(); draft = null; selMood = null; showTab('today'); openSettings(true);
+  },
+  celClose: () => { $('#celOverlay').hidden = true; }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || !ACT[el.dataset.act]) return;
+  ACT[el.dataset.act](el, e);
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=checkbox][data-act]')) { e.preventDefault(); e.target.click(); }
+  if (e.key === 'Enter' && e.target.id === 'praiseNote') { e.preventDefault(); ACT.praise(); }
+  if (e.key === 'Escape') { if (!$('#exOverlay').hidden) stopEx(); else if (!$('#setOverlay').hidden && S.settings.onboarded) closeSettings(); }
+});
+document.addEventListener('input', e => {
+  if (!draft) return;
+  if (e.target.id === 'incTs') { draft.ts = e.target.value; draft.tsEdited = true; }
+  if (e.target.id === 'incNote') draft.note = e.target.value;
+});
+$('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; });
+
+// a new day resets the checklist – refresh when the app comes back to the foreground
+let lastDay = todayKey();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && todayKey() !== lastDay) { lastDay = todayKey(); rerender(); }
+});
+
+/* =========================================================
+   Install support: embedded manifest + icons
+   ========================================================= */
+function makeIcon(size) {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const x = c.getContext('2d');
+    x.fillStyle = '#21958a'; x.fillRect(0, 0, size, size);
+    x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = size * .035;
+    x.beginPath(); x.arc(size / 2, size / 2, size * .3, 0, Math.PI * 2); x.stroke();
+    x.strokeStyle = '#fff'; x.lineWidth = size * .06;
+    x.beginPath(); x.arc(size / 2, size / 2, size * .19, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(size / 2, size / 2, size * .07, 0, Math.PI * 2); x.fill();
+    return c.toDataURL('image/png');
+  } catch (e) { return ''; }
+}
+function setupInstall() {
+  const i180 = makeIcon(180), i192 = makeIcon(192), i512 = makeIcon(512);
+  if (i180) { $('#appleIcon').href = i180; $('#favIcon').href = i192; }
+  const base = location.href.split('#')[0].split('?')[0];
+  const manifest = {
+    name: 'רגוע וחזק', short_name: 'רגוע וחזק', lang: 'he', dir: 'rtl',
+    description: 'ליווי יומיומי להורים בתוכנית בת 12 שבועות',
+    start_url: base, scope: base.replace(/[^/]*$/, ''), id: base,
+    display: 'standalone', orientation: 'portrait',
+    background_color: '#eaf6f4', theme_color: '#21958a',
+    icons: i192 ? [
+      { src: i192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: i512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: i512, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ] : []
+  };
+  $('#manifestLink').href = 'data:application/manifest+json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(manifest))));
+  // Optional offline cache when served over https next to sw.js; silently ignored otherwise.
+  if (location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+/* =========================================================
+   Init
+   ========================================================= */
+setupInstall();
+showTab(S.ui.tab || 'today', false);
+if (!S.settings.onboarded) openSettings(true);
+</script>
+</body>
+</html>
