@@ -781,3 +781,112 @@ One weak spot: the dictionary test calls `openInfo()` directly (white-box) to re
 - **The morning entry is 113 words**, slightly over the spec's own 55–110 guideline. It is identical to the client-reviewed spec text, so this is a content note for the designer, not an implementation bug.
 - **`infoInline()` always opens the parent ("today") version.** On the guide tab, the sheet's "כל הכלים והמושגים במדריך" link therefore closes the sheet and jumps within the same tab. This is harmless.
 - **The spec's open questions 1–5 were implemented as the designer recommended:** concept sharing, the fourth "סדר היום" group, no ⓘ in the red state, "בוא ננסה" vs "נסו עכשיו", and the §5.4 entry points. The §5.4 "עוד על זה" links on the guide phase items were **not** added, which the spec marks as optional.
+
+---
+
+# Round 5: personalization by age and family position + R4-1 fix (commit `7b089f1`)
+
+- **Scope:**
+  - `git diff 4dc90e5 7b089f1 -- index.html tests/e2e.js`, checked against `docs/personalization-spec.md` and the lead's rulings (chips; "שעה של משחק בתנועה" for 4–6; box 3-3-3-3 for 4–6 and not suggested in red/orange; no twins; no tool renames for 13–14, tone only; mini-reward at every age, pre-enabled for 4–6).
+  - The engineer's deviation: migrated installs keep the exact release content until the profile is saved once (`profileSet`).
+- **Method:**
+  1. Audited the 6 changed tests and the 18 new ones (section 23).
+  2. Did adversarial exploration: full text dumps of every tab and every sheet (child and parent) for 9 profiles, form edge cases, import edge cases.
+  3. Checked 320 px light and dark.
+  4. Ran the full suite twice.
+- **What I changed:** added 3 tests (section 24). `index.html` was not edited.
+- **Screenshots and dumps:** `/tmp/qa-shots/r2/r5-*.png` and `/tmp/qa-shots/r2/dump-*.txt`.
+
+## Verdict: **ship**
+
+The feature is solid:
+- Every band and role variant I checked is correct and consistent across the tiles, sheets, dictionary, guide, protocol, incident options and exercise timings.
+- All the lead's rulings are honoured.
+- The migration really does keep the old build's text.
+- R4-1 is fixed (#145 and #146 now pass).
+
+I found three new bugs, two Minor and one Cosmetic. None affects a normal install or onboarding flow, and they can follow.
+
+## Suite result
+
+| Run | Tests | Pass | Fail |
+|---|---|---|---|
+| Engineer's suite at `7b089f1` (reported, and confirmed twice by the lead) | 164 | 164 | 0 |
+| With my 3 new tests (section 24), run 1 | **167** | **164** | **3** (#165–#167: R5-1 to R5-3) |
+| With my 3 new tests, run 2 | 167 | 164 | 3 (identical PASS/FAIL list) |
+
+## Test audit
+
+**The 6 changed tests are legitimate, not weakened:**
+- **#13 (onboarding)** now also asserts that saving without the profile is refused, and checks the saved profile. It is stronger.
+- **#75–77 (storage throws or is blocked; corrupt storage)** only add `answerProfile()`, because onboarding can't finish without the profile now. Their assertions are unchanged.
+- **#133 (dictionary)** now expects 30 entries in `INFO` with 27 shown. That is correct: this fixture is a migrated install, which keeps the release dictionary. The 3 new games are allowed to be "missing" only there; when a profile is set, they are covered by the new dictionary test in section 23.
+- **#140 (content vs spec)** now also parses the 3 new games from `personalization-spec.md` §2.3, so the new Hebrew is held to the spec too. It is stronger.
+
+**The 18 new tests (section 23) give real coverage:**
+- 8 profiles cover the age edges 4/6/7/9/10/12/13/14 and every role (only child; eldest of 2, 3 and 7; middle of 7; youngest of 2 and 6). For each one, they check the game pool and 14 days of rotation, the exercise timings, the morning title, button and real duration, sleep text, role chapter, large-family card, protocol, incident options, and that old history stays readable.
+- The ages 4–14 × 30-day pool check against the spec table.
+- 4–6 tiles, red/orange suggestions, the 36 s box exercise and the 2-minute sheets.
+- 13–14: tone only, no renames (ruling 5).
+- The s0 and s1 overrides.
+- Onboarding validation and star defaults with dirty flags.
+- The "להחיל" hint and the mini-reward (once a day, no full celebration, weekly count untouched).
+- Hostile import values.
+- Mid-program change: the running exercise keeps its timings, the draft drops values no longer offered, history is kept.
+- The age-sorted dictionary.
+
+**Does the migration-diff test really compare against the old build? Yes.** It runs `git show acbea8a:index.html` into a temp file and loads that file. There are no `index.html` changes between `acbea8a` and `4dc90e5`, so this is the true previous build. It compares the innerText of all 5 tabs (with every `details` open), Calm in the red state, and 4 sheets (morning, balloon/calm, one, praise) with the new build for the same old state. They must be equal, apart from the prompt.
+- **Gaps:** it doesn't compare exercise step timings or other days' games. I checked both by code: `exDef()` and `gamesFor()` have legacy guards, and `LEGACY_GAMES` keeps the 10-game rotation.
+- **Assessment of the deviation:** it is the safer choice and I agree with it. Without it, a migrated 10/7/1 install would silently gain "קליעה עם עצירה" in its rotation and the new texts for 10–12. One exception is R5-1.
+
+## Exploration results (no defect)
+
+| Area | Result |
+|---|---|
+| **Band and role variants** | I dumped all text for 4/1/1, 5/2/2, 6/2/1, 8/3/2, 10/7/4, 11/2/2, 13/1/1, 14/2/1 and 13/6/6, covering every tab (details open), all 30 entries in both sheet versions, and `exDef` for all 6 tools. Minutes are always consistent ("2 דקות" ×4 sites for 4–6, "3 דקות" elsewhere). The breathing timings in the text match `EXS_BAND`: 3/4 s, robot 4 s, wall 6 s, stop words 4 s, box "עד 3 / 3 סבבים". An only child gets no sibling references besides the intended "כשאין אחים" / "בלי אחים בבית", and no "7" or "שבעה" leaks into other family sizes. The guide's sleep, screens, energy, puzzle, choice, school/"גן" and via-"הגן" variants are right for each band. |
+| **Rulings** | 13–14 have no "נשימת בטן" or "כיווץ ושחרור" anywhere (tone only). 4–6 get "שעה של משחק בתנועה". 4–6 red/orange suggestions have no box, while the box stays in the full grid at 3-3-3-3 × 3 (36 s). |
+| **Form** | Shrinking N below the position clears it with "המקום שלו השתנה". N = 1 hides the chips. Growing N keeps the position, and the caption switches to "ילד אמצעי". Rapid chip taps keep the last value, and keyboard Enter/Space keep focus on the re-rendered chip. Validation toasts appear in the order age → count → position. The exception is R5-2. |
+| **Stars** | The 4–6 defaults (8, mini-reward on, goals and reward) fill only untouched fields. "להחיל" fills the stepper only. The mini-reward toast fires once per day and never touches `celebrated` or the weekly count. |
+| **Mid-program change** | The running exercise keeps its timings. The incident draft drops the sibling target, history is untouched, and old "אח / אחות" incidents stay in the list and in "מול מי". |
+| **Today prompt** | It appears for migrated installs only. "לעדכון" opens settings with focus on the age chips. ✕ dismisses it for good, and saving clears it. |
+| **Layout** | 320 px light and dark: onboarding with 12 count chips and 12 position chips, settings with the hint, the Today prompt, the mini line and the role chapter. No horizontal scroll and no console errors. The exception is R5-3. |
+| **R4-1** | Fixed. Focus lands on the dictionary entry after "כל הכלים והמושגים במדריך" and "חזרה למדריך", and on the tile after closing an exercise started from the sheet (#145 and #146 pass). |
+
+## New bugs
+
+#### R5-1. A profile without the `profileSet` flag is half-applied, and the parents are never asked
+- **Severity:** Minor (only reachable by importing a hand-edited or partial backup)
+- **Test:** #165
+- **Repro:** Import a backup whose settings have `childAge: 5, siblingsCount: 3, birthOrder: 3` but no `profileSet` key.
+- **Expected:** Either the profile is applied (`profileSet: true`), or the release content is kept with the one-time prompt (`profileReview: true`).
+- **Actual:** `profileSet` and `profileReview` are both false, so the install is "legacy" forever with no prompt. Content is mixed:
+  - The checklist and button say "2 דקות", but the breathing runs **2:50** at the release timings (4/6 s × 17 cycles).
+  - The role chapter says "🌱 הצעיר מתוך 3", while every other screen shows the 10-year-old/eldest-of-7 release text.
+  - Settings show the 5/3/3 chips as already chosen.
+- **Code:**
+  - `normalize()` (1590–1597) only forces `review = true` when a field is missing. A complete profile without the flag ends up with `set = false, review = false`.
+  - Several reads aren't legacy-guarded:
+    - `morningMin()` (1412) and `startMorning()` cycles (2658), both use `profile().band`;
+    - `roleChapter()` (1452, used at 2245);
+    - `incOpts()` (1442).
+- **Fix:** In `normalize`, treat a complete, valid profile as set (or set `review = true`), and route those reads through the same `legacy` check as `vary()`.
+
+#### R5-2. After tapping "1" child and then "3", "הבכור" is silently preselected
+- **Severity:** Minor
+- **Test:** #166
+- **Repro:** In onboarding (or settings), choose an age, then children **1**, then children **3**.
+- **Expected:** No position is selected, the parent must choose, and saving asks "בחרו את המקום שלו במשפחה". Spec §6.2 rules out a silent preselected value.
+- **Actual:** The N = 1 step set `pos = 1`. Growing to 3 keeps it, so "הבכור" is pressed and saving succeeds as eldest without the parent ever choosing.
+- **Code:** `ACT.pfChip` (3113) keeps `f.pos` when N grows. It should clear `pos` when the previous N was 1 (the position was implicit), and keep it only when the parent picked it.
+
+#### R5-3. The "להחיל" button breaks inside the word at 320 px
+- **Severity:** Cosmetic
+- **Test:** #167
+- **Repro:** At 320 px, open settings for a 10-year-old and tap age 5. The star hint shows "להח / יל" on two lines (screenshot `r5-320-dark-settings-hint.png`).
+- **Code:** `.need-hint` (429): the button can shrink in the flex row, and the global `overflow-wrap:anywhere` splits the word.
+- **Fix:** `flex:0 0 auto; white-space:nowrap` on the button.
+
+## Content notes for the designer (spec text, not implementation bugs)
+
+- **Middle child of 3** (exactly one older and one younger sibling): the role chapter keeps the plural "בין הגדולים לקטנים" and "מול הגדולים הוא הקטן, ומול הקטנים הוא הגדול". The spec has no singular variant for `older = 1` / `younger = 1`.
+- **s1 (exactly one sibling):** the praise example "ראיתי שוויתרת **לאחיך** על התור" and "איך לדעתך הרגיש **אחיך**" assume a brother. The other s1 texts use "האח או האחות". Consider aligning them.

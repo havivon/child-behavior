@@ -2838,6 +2838,41 @@ test('guide dictionary (profile set): suitable games first, the others under "ל
     ['🎨 צבע-מילה', '🧱 ג׳נגה על זמן', '♟️ שחמט ודמקה', '⏳ אתגר דחיית סיפוק', '🧩 פרויקט איטי', '🎭 משחק תפקידים', '🎯 קליעה עם עצירה'], 'p3 lists only games that fit 13');
 });
 
+/* ================================================================== *
+ * 24. Round-5 QA: personalization edge cases
+ * ================================================================== */
+test('import: a backup with a complete profile but no profileSet flag is either personalized or prompts – never a mix', 'personalization §1.2 / §1.3 ("all personalised code reads through profile()")', async t => {
+  const page = await t.open();
+  const b = makeState(); Object.assign(b.settings, { childAge: 5, siblingsCount: 3, birthOrder: 3 });   // e.g. a hand-edited backup
+  await page.click('.topbar [data-act=openSettings]');
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(b)));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  const s = (await getState(page)).settings;
+  assert(s.profileSet === true || s.profileReview === true, `profile ${s.childAge}/${s.siblingsCount}/${s.birthOrder} is half-applied (role chapter yes, timings no) and the parents are never asked (profileSet ${s.profileSet}, profileReview ${s.profileReview})`);
+  const title = await txt(page, '#tab-today .check[data-id=morning] .ctitle');
+  await page.click('#tab-today [data-act=morningBreath]');
+  const meta = await txt(page, '#exMeta');
+  const min = +title.match(/(\d) דקות/)[1];
+  assert(min === 2 ? meta.includes('1:59') : meta.includes('3:00'), `checklist says "${title}" but the breathing runs ${meta}`);
+});
+test('profile form: after choosing 1 child and then 3, the position must be chosen again (no silent "הבכור")', 'personalization §6.2 ("no preselected value") / §6.3', async t => {
+  const page = await t.open({ state: null });
+  await page.click('#pfBlock [data-field=age][data-val="8"]');
+  await page.click('#pfBlock [data-field=n][data-val="1"]');
+  await page.click('#pfBlock [data-field=n][data-val="3"]');           // e.g. a mis-tap on "1"
+  eq(await page.locator('#pfBlock [data-field=pos][aria-pressed=true]').count(), 0, 'a position the parents never chose is preselected');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert(await visible(page, '#setOverlay') && (await toastText(page)).includes('המקום שלו'), 'saving must ask for the position');
+});
+test('layout 320px: the "להחיל" star-suggestion button never breaks inside the word', 'personalization §4.2 / design', async t => {
+  const page = await t.open({ width: 320, state: pState(10, 3, 1) });
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#pfBlock [data-field=age][data-val="5"]');
+  const r = await page.evaluate(() => { const b = document.querySelector('#needHint [data-act=applyNeed]'); const range = document.createRange(); range.selectNodeContents(b); const lines = new Set([...range.getClientRects()].map(x => Math.round(x.top))).size; return { lines, text: b.textContent.trim() }; });
+  eq(r, { lines: 1, text: 'להחיל' }, '"להחיל" wraps inside the word');
+});
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */
