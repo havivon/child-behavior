@@ -109,11 +109,13 @@ async function open(t, opts = {}) {
     locale: 'he-IL', timezoneId: opts.tz || TZ, colorScheme: opts.scheme || 'light', acceptDownloads: true
   });
   t.ctxs.push(ctx);
-  // Hermetic network: stub the Google Fonts stylesheet, abort everything else that is remote.
+  // Hermetic network: every remote request is recorded in t.remote. The app embeds its font, so nothing
+  // remote is expected; a Google Fonts stylesheet would still get an empty stub (unless offline) so that
+  // results never depend on the network.
   await ctx.route(/^https?:\/\//, route => {
     const u = route.request().url();
-    if (!opts.offline && u.startsWith('https://fonts.googleapis.com/')) return route.fulfill({ status: 200, contentType: 'text/css', body: '/* stub */' });
     t.remote.push(u);
+    if (!opts.offline && u.startsWith('https://fonts.googleapis.com/')) return route.fulfill({ status: 200, contentType: 'text/css', body: '/* stub */' });
     return route.abort();
   });
   const state = opts.state === undefined ? makeState() : opts.state;
@@ -125,11 +127,11 @@ async function open(t, opts = {}) {
   if (opts.init) await ctx.addInitScript(opts.init);
   const page = await ctx.newPage();
   page.errors = [];
-  page.dialogs = [];
-  page.dialogAnswer = true;
+  page.dialogs = [];   // titles + bodies of the in-app confirm sheets answered with answer()
   page.on('console', m => { if (m.type() === 'error' && !(opts.offline && /Failed to load resource|ERR_/.test(m.text()))) page.errors.push('console.error: ' + m.text()); });
   page.on('pageerror', e => page.errors.push('pageerror: ' + e.message));
-  page.on('dialog', d => { page.dialogs.push(d.message()); page.dialogAnswer ? d.accept() : d.dismiss(); });
+  // native alert()/confirm() must never appear (they were replaced by the in-app confirm sheet)
+  page.on('dialog', d => { page.errors.push('native dialog shown: ' + d.message()); d.dismiss().catch(() => {}); });
   t.pages.push(page);
   if (opts.clock !== false) {
     const time = opts.time || NOW;
@@ -150,6 +152,19 @@ async function setSettings(page, fields) {
   await page.click('#setOverlay [data-act=saveSettings]');
 }
 const fileFrom = (name, content) => ({ name, mimeType: 'application/json', buffer: Buffer.from(content) });
+/** answer the in-app confirm sheet (#dlg): ok=true → confirm button, false → cancel */
+async function answer(page, ok) {
+  await page.waitForSelector('#dlg:not([hidden])');
+  page.dialogs.push((await page.textContent('#dlgTitle')) + ' | ' + (await page.textContent('#dlgBody')));
+  await page.click(ok ? '#dlgOk' : '#dlgCancel');
+  await page.waitForSelector('#dlg', { state: 'hidden' });
+}
+/** tap "add star" like a person would: the app ignores a repeat tap on the same star button within 800 ms
+ *  (double-tap guard, QA #10), and the suite's clock is paused, so advance it a little before every tap */
+async function addStar(page, id) {
+  await page.clock.runFor(1000);
+  await page.click(`#tab-today [data-act=star][data-id=${id}]`);
+}
 
 /* In-page overflow probe: returns the scroll width and any element sticking out of the viewport. */
 function overflowProbe() {
@@ -306,11 +321,21 @@ test('settings: validation (min 2 goals, bad/empty date kept, star target clampe
   let s = await getState(page);
   eq(s.settings.startDate, before.settings.startDate, 'empty date keeps previous start date');
   eq(s.settings.starsNeeded, 200, 'star target clamped to max 200');
-  await setSettings(page, { sNeed: -4 });
-  eq((await getState(page)).settings.starsNeeded, 1, '-4 clamps to 1');
-  await setSettings(page, { sNeed: 0 });
-  s = await getState(page);
-  eq(s.settings.starsNeeded, 1, 'entering 0 (below min=1) should clamp to 1, not silently become 15');
+  // a target below 1 is rejected with a validation message (team-lead ruling) – never silently replaced by 15
+  for (const bad of ['0', '-4', '']) {
+    await page.click('.topbar [data-act=openSettings]');
+    await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+    await page.fill('#sName', 'לא יישמר');
+    await page.fill('#sNeed', bad);
+    await page.click('#setOverlay [data-act=saveSettings]');
+    assert(await visible(page, '#setOverlay'), `target "${bad}": settings stay open`);
+    assert((await toastText(page)).includes('לפחות 1'), `target "${bad}": validation message, got "${await toastText(page)}"`);
+    s = await getState(page);
+    eq([s.settings.starsNeeded, s.settings.childName], [200, 'שם חדש'], `target "${bad}": nothing saved (not 15, not 1)`);
+    await page.click('#setOverlay [data-act=closeSettings]');
+  }
+  await setSettings(page, { sNeed: 1 });
+  eq((await getState(page)).settings.starsNeeded, 1, '1 is the minimum accepted target');
 });
 test('settings: Escape / ✕ close without saving', 'הגדרות', async t => {
   const page = await t.open();
@@ -347,8 +372,11 @@ test('today: "שבוע X מתוך 12" + phase name(s) for weeks 1..12 (via setti
 });
 test('today: before the start date and after week 12', 'היום: "שבוע X מתוך 12" (edge cases)', async t => {
   const page = await t.open({ state: makeState({ settings: { startDate: addDaysKey(TODAY, 3) } }) });
+  const h1 = (await txt(page, '.hero h1')).replace(/\s+/g, ' ');
+  assert(h1.includes('התוכנית מתחילה בעוד 3 ימים') && !h1.includes('שבוע'), 'before start: countdown instead of a week number, got: ' + h1);
+  eq(await page.locator('.hero .phase-chip').count(), 0, 'no phase chip before start');
   const note = await txt(page, '.hero p');
-  assert(note.includes('התוכנית מתחילה ב-15.10.2026'), 'before start: shows start date note, got: ' + note);
+  assert(note.includes('15.10.2026'), 'before start: shows the start date, got: ' + note);
   eq(await page.locator('.weeks i.now').count(), 0, 'no "current" pip before start');
   await setSettings(page, { sStart: addDaysKey(TODAY, -84) }); // day 85 = week 13
   assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 12 מתוך 12'), 'after program: capped at 12');
@@ -386,16 +414,21 @@ test('checklist: 5 items, toggle (click + keyboard), counter, persistence across
   for (const k of ['נשימת בלון', '30–60 דקות תנועה', '10–15 דקות משחק עצירה', '15 דקות אחד-על-אחד', 'מה הצלחת היום']) assert(titles.includes(k), 'item text: ' + k);
   assert((await txt(page, '#tab-today .check[data-id=morning]')).includes('איפה אתה במדחום'), 'morning includes thermometer question');
   assert((await txt(page, '#tab-today .check[data-id=stop] .game')).includes('המשחק של היום'), 'stop game shows game of the day');
-  await page.click('#tab-today .check[data-id=move]');
-  eq(await page.getAttribute('#tab-today .check[data-id=move]', 'aria-checked'), 'true', 'checked after click');
+  // the toggle is a real <button role=checkbox class=check-hit> inside each row (design P1-4: no nested controls)
+  await page.click('#tab-today .check-hit[data-id=move]');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=move]', 'aria-checked'), 'true', 'checked after click');
   assert((await txt(page, '#tab-today .card:nth-of-type(2) .pill')).includes('1/5'), 'counter 1/5');
-  await page.focus('#tab-today .check[data-id=one]');
+  await page.focus('#tab-today .check-hit[data-id=one]');
   await page.keyboard.press('Space');
-  eq(await page.getAttribute('#tab-today .check[data-id=one]', 'aria-checked'), 'true', 'Space toggles focused item');
-  await page.click('#tab-today .check[data-id=move]');
-  eq(await page.getAttribute('#tab-today .check[data-id=move]', 'aria-checked'), 'false', 'second click unchecks');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=one]', 'aria-checked'), 'true', 'Space toggles focused item');
+  await page.keyboard.press('Enter');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=one]', 'aria-checked'), 'false', 'Enter toggles focused item');
+  await page.keyboard.press('Space');
+  await page.click('#tab-today .check-hit[data-id=move]');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=move]', 'aria-checked'), 'false', 'second click unchecks');
+  eq(await page.locator('#tab-today .check-hit button, #tab-today [role=checkbox] [data-act]').count(), 0, 'no interactive control nested inside a checkbox');
   await page.reload();
-  eq(await page.getAttribute('#tab-today .check[data-id=one]', 'aria-checked'), 'true', 'persisted across reload');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=one]', 'aria-checked'), 'true', 'persisted across reload');
   eq((await getState(page)).days[TODAY].checks, { move: false, one: true }, 'stored under today key');
   for (const id of ['morning', 'move', 'stop', 'bed']) await page.click(`#tab-today .check[data-id=${id}] .box`);
   assert((await toastText(page)).includes('כל סדר היום הושלם'), 'all-done toast');
@@ -432,7 +465,7 @@ test('checklist: morning breathing button runs 3 minutes and completes the item'
   const page = await t.open();
   await page.click('#tab-today [data-act=morningBreath]');
   assert(await visible(page, '#exOverlay'), 'exercise overlay opens');
-  eq(await page.getAttribute('#tab-today .check[data-id=morning]', 'aria-checked'), 'false', 'tapping the button does not toggle the item itself');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=morning]', 'aria-checked'), 'false', 'tapping the button does not toggle the item itself');
   assert((await txt(page, '#exTitle')).includes('נשימת בלון'), 'balloon breathing');
   assert((await txt(page, '#exMeta')).includes('3:00'), 'total 3:00 shown, got ' + await txt(page, '#exMeta'));
   await page.clock.runFor(179e3);
@@ -440,7 +473,7 @@ test('checklist: morning breathing button runs 3 minutes and completes the item'
   await page.clock.runFor(1000);
   assert(await page.locator('#exInner .done-face').count() === 1, 'finished at 3:00');
   await page.click('#exInner .sheet-head [data-act=exClose]');
-  eq(await page.getAttribute('#tab-today .check[data-id=morning]', 'aria-checked'), 'true', 'morning item completed');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=morning]', 'aria-checked'), 'true', 'morning item completed');
   eq(await page.locator('#tab-today [data-act=morningBreath]').count(), 0, 'button hidden when done');
   eq((await getState(page)).days[TODAY].checks.morning, true, 'persisted');
 });
@@ -449,7 +482,7 @@ test('checklist: closing the morning breathing early does NOT complete the item'
   await page.click('#tab-today [data-act=morningBreath]');
   await page.clock.runFor(30e3);
   await page.click('#exOverlay .ex-actions [data-act=exClose]');
-  eq(await page.getAttribute('#tab-today .check[data-id=morning]', 'aria-checked'), 'false', 'not completed');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=morning]', 'aria-checked'), 'false', 'not completed');
 });
 
 /* ================================================================== *
@@ -470,12 +503,13 @@ test('praise: daily counter with target 5, note saved, Enter key, delete', 'הי
   assert((await txt(page, '#tab-today .praise-btn')).includes('(5/5)'), '5/5');
   assert((await txt(page, '#tab-today')).includes('הגעתם ליעד היומי'), 'daily target message');
   eq(await page.locator('#tab-today .praise-dots i.on').count(), 5, '5 dots on');
-  page.dialogAnswer = false;
   await page.click('#tab-today [data-act=delPraise][data-i="0"]');
+  await answer(page, false);
   assert((await txt(page, '#tab-today .praise-btn')).includes('(5/5)'), 'cancelled delete keeps it');
-  page.dialogAnswer = true;
   await page.click('#tab-today [data-act=delPraise][data-i="0"]');
+  await answer(page, true);
   assert((await txt(page, '#tab-today .praise-btn')).includes('(4/5)'), 'deleted');
+  assert(page.dialogs[0].includes('למחוק את הרישום'), 'confirm sheet asks: ' + page.dialogs[0]);
   assert(!(await txt(page, '#tab-today .note-list')).includes('עזר לאחותו'), 'the right entry was deleted');
   await page.reload();
   eq((await getState(page)).days[TODAY].praises.length, 4, 'persisted');
@@ -503,11 +537,11 @@ test('stars: add star, no way to remove one', 'היום: "לחיצה מוסיפ�
 });
 test('stars: celebration fires exactly once when weekly target is reached; resets next week', 'היום: "כשמגיעים ליעד הכוכבים – אנימציה ופרס שהוגדר מראש"', async t => {
   const page = await t.open({ state: makeState({ settings: { starsNeeded: 3, reward: 'סרט בקולנוע' } }) });
-  await page.click('#tab-today [data-act=star][data-id=g1]');
-  await page.click('#tab-today [data-act=star][data-id=g2]');
+  await addStar(page, 'g1');
+  await addStar(page, 'g2');
   assert(!(await visible(page, '#celOverlay')), 'no celebration at 2/3');
-  assert((await txt(page, '#tab-today .reward')).includes('עוד 1'), '1 more star to reward');
-  await page.click('#tab-today [data-act=star][data-id=g1]');
+  assert((await txt(page, '#tab-today .reward')).includes('עוד כוכב אחד'), '1 more star to reward (singular wording)');
+  await addStar(page, 'g1');
   assert(await visible(page, '#celOverlay'), 'celebration at 3/3');
   const cel = await txt(page, '#celInner');
   assert(cel.includes('סרט בקולנוע') && cel.includes('דני') && cel.includes('3 כוכבים'), 'celebration shows name, target and reward: ' + cel);
@@ -515,10 +549,10 @@ test('stars: celebration fires exactly once when weekly target is reached; reset
   await page.click('#celOverlay [data-act=celClose]');
   assert(!(await visible(page, '#celOverlay')), 'closes');
   assert((await txt(page, '#tab-today .reward')).includes('הפרס הורווח השבוע'), 'reward earned banner');
-  await page.click('#tab-today [data-act=star][data-id=g2]');
+  await addStar(page, 'g2');
   assert(!(await visible(page, '#celOverlay')), 'no second celebration (4/3)');
   await page.reload();
-  await page.click('#tab-today [data-act=star][data-id=g2]');
+  await addStar(page, 'g2');
   assert(!(await visible(page, '#celOverlay')), 'no second celebration after reload');
   eq((await getState(page)).stars.length, 5, '5 stars stored');
   // next program week
@@ -526,21 +560,28 @@ test('stars: celebration fires exactly once when weekly target is reached; reset
   await page.reload();
   assert((await txt(page, '#tab-today .pill.blue')).includes('0/3'), 'weekly stars reset in week 2');
   eq(await page.locator('#tab-today .goal .stars .s').count(), 0, 'no stars shown in new week');
-  for (let i = 0; i < 2; i++) await page.click('#tab-today [data-act=star][data-id=g1]');
+  for (let i = 0; i < 2; i++) await addStar(page, 'g1');
   assert(!(await visible(page, '#celOverlay')), 'not yet');
-  await page.click('#tab-today [data-act=star][data-id=g1]');
+  await addStar(page, 'g1');
   assert(await visible(page, '#celOverlay'), 'celebrates again in the new week');
 });
 test('stars: celebration respects a target raised after it was already celebrated', 'היום: "כשמגיעים ליעד הכוכבים"', async t => {
   const page = await t.open({ state: makeState({ settings: { starsNeeded: 2 } }) });
-  await page.click('#tab-today [data-act=star][data-id=g1]');
-  await page.click('#tab-today [data-act=star][data-id=g1]');
+  await addStar(page, 'g1');
+  await addStar(page, 'g1');
   assert(await visible(page, '#celOverlay'), 'celebrated at 2');
   await page.click('#celOverlay [data-act=celClose]');
   await setSettings(page, { sNeed: 4 });
-  await page.click('#tab-today [data-act=star][data-id=g1]');
-  await page.click('#tab-today [data-act=star][data-id=g1]');
+  await addStar(page, 'g1');
+  assert(!(await visible(page, '#celOverlay')), 'not at 3/4');
+  await addStar(page, 'g1');
   assert(await visible(page, '#celOverlay'), 'reaching the new target (4) this week should celebrate and show the reward');
+  assert((await txt(page, '#celInner')).includes('4 כוכבים'), 'celebration names the new target');
+  await page.click('#celOverlay [data-act=celClose]');
+  eq((await getState(page)).celebrated, { 1: 4 }, 'celebrated[week] stores the target that was celebrated');
+  await setSettings(page, { sNeed: 3 }); // lowering the target after a celebration does not celebrate again
+  await addStar(page, 'g2');
+  assert(!(await visible(page, '#celOverlay')), 'no new celebration for a lower target');
 });
 test('stars: editing goals in settings never moves earned stars to another goal', 'היום: "לא ניתן להוריד כוכב"; הגדרות: יעדי הכוכבים', async t => {
   const page = await t.open({ state: makeState({ settings: { goals: [{ id: 'g1', text: 'A' }, { id: 'g2', text: 'B' }, { id: 'g3', text: 'C' }] }, stars: [{ goalId: 'g1', ts: NOW - 3000 }, { goalId: 'g1', ts: NOW - 2000 }, { goalId: 'g3', ts: NOW - 1000 }] }) });
@@ -651,14 +692,16 @@ async function recordExercise(page, maxSec) {
   const segs = [];
   let st = await exState(page);
   const initialMeta = st.meta;
-  let cur = { key: st.key, cycle: st.meta.match(/סבב (\d+)/)[1], len: 0, nums: [st.num], dur: st.dur, scale: st.scale, cls: st.cls };
+  // single-cycle exercises show only "נשארו m:ss" (design P2-17), so a missing "סבב n" means cycle 1
+  const cycleOf = meta => (meta.match(/סבב (\d+)/) || [0, '1'])[1];
+  let cur = { key: st.key, cycle: cycleOf(st.meta), len: 0, nums: [st.num], dur: st.dur, scale: st.scale, cls: st.cls };
   let t = 0;
   while (t < maxSec) {
     await page.clock.runFor(1000); t++;
     st = await exState(page);
     cur.len++;
     if (st.done) { segs.push(cur); return { segs, total: t, initialMeta }; }
-    const cyc = st.meta.match(/סבב (\d+)/)[1];
+    const cyc = cycleOf(st.meta);
     if (st.key !== cur.key || cyc !== cur.cycle) { segs.push(cur); cur = { key: st.key, cycle: cyc, len: 0, nums: [st.num], dur: st.dur, scale: st.scale, cls: st.cls }; }
     else cur.nums.push(st.num);
   }
@@ -680,7 +723,8 @@ for (const ex of ['candle', 'balloon', 'box', 'robot', 'wall', 'stop']) {
     // the initially announced remaining time equals the real duration
     const m = rec.initialMeta.match(/(\d+):(\d\d)/);
     eq(+m[1] * 60 + +m[2], rec.total, 'announced total time vs actual duration');
-    const cycles = +rec.initialMeta.match(/מתוך (\d+)/)[1];
+    const cycles = +(rec.initialMeta.match(/מתוך (\d+)/) || [0, 1])[1];
+    if (cycles === 1) assert(!/סבב/.test(rec.initialMeta), 'single-cycle meta has no "סבב 1 מתוך 1": ' + rec.initialMeta);
     if (exp.cycles) eq(cycles, exp.cycles, 'cycles');
     const stepsPerCycle = rec.segs.length / cycles;
     assert(Number.isInteger(stepsPerCycle), `segments ${rec.segs.length} not divisible by cycles ${cycles}`);
@@ -778,36 +822,38 @@ test('incident: required field validation, auto date/time, save, recent list, de
   await go(page, 'incident');
   eq(await page.inputValue('#incTs'), TODAY + 'T10:00', 'date/time pre-filled with now');
   await page.click('#tab-incident [data-act=saveIncident]');
-  assert((await toastText(page)).includes('מה עשה'), 'validation toast for missing action');
+  assert((await toastText(page)).includes('מה הוא עשה'), 'validation toast for missing action');
   eq((await getState(page)).incidents.length, 0, 'nothing saved');
   await page.clock.runFor(5 * 60e3); // the form was opened 5 min ago; save time should be 'now'
   await page.click('#tab-incident [data-field=trigger][data-val="מעבר בין פעילויות"]');
   await page.click('#tab-incident [data-field=target][data-val="חבר"]');
   await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
   await page.click('#tab-incident [data-field=actions][data-val="צעקה"]');
-  await page.click('#tab-incident [data-field=duration][data-val="5–15 דקות"]');
-  await page.click('#tab-incident [data-field=response][data-val="הפרדה"]');
-  await page.click('#tab-incident [data-field=response][data-val="הצעתי כלי הרגעה"]');
+  await page.click('#tab-incident [data-field=duration][data-val="5–10 דקות"]');
+  await page.click('#tab-incident [data-field=response][data-val="הפרדנו"]');
+  await page.click('#tab-incident [data-field=response][data-val="הצענו כלי הרגעה"]');
   await page.click('#tab-incident [data-field=used][data-val=yes]');
   await page.fill('#incNote', 'בהפסקה');
   await page.click('#tab-incident [data-act=saveIncident]');
   const s = await getState(page);
   eq(s.incidents.length, 1, 'saved');
   const i = s.incidents[0];
-  eq([i.trigger, i.target, i.actions, i.duration, i.response, i.used, i.note], ['מעבר בין פעילויות', 'חבר', ['מכה', 'צעקה'], '5–15 דקות', ['הפרדה', 'הצעתי כלי הרגעה'], 'yes', 'בהפסקה'], 'all fields stored');
-  near(i.ts, NOW, 6 * 60e3, 'auto timestamp ~now');
+  eq([i.trigger, i.target, i.actions, i.duration, i.response, i.used, i.note], ['מעבר בין פעילויות', 'חבר', ['מכה', 'צעקה'], '5–10 דקות', ['הפרדנו', 'הצענו כלי הרגעה'], 'yes', 'בהפסקה'], 'all fields stored');
+  eq(i.ts, NOW + 5 * 60e3, 'automatic timestamp = the moment of saving (not when the form was opened)');
   eq(await page.locator('#tab-incident .chip[aria-pressed=true]').count(), 0, 'form reset after save');
   eq(await page.inputValue('#incNote'), '', 'note reset');
   await page.click('#tab-incident details summary');
   const item = await txt(page, '#tab-incident .inc-item');
-  assert(item.includes('12.10') && item.includes('מכה, צעקה') && item.includes('חבר') && item.includes('השתמש בכלי') && item.includes('בהפסקה'), 'recent list row: ' + item);
+  // design P2-23: relative day label ("היום" / "אתמול" / d.m)
+  assert(item.includes('היום · 10:05') && item.includes('מכה, צעקה') && item.includes('חבר') && item.includes('השתמש בכלי') && item.includes('בהפסקה'), 'recent list row: ' + item);
   assert((await txt(page, '#tab-incident details summary .pill')) === '1', 'count pill');
-  page.dialogAnswer = false;
   await page.click('#tab-incident [data-act=delIncident]');
+  await answer(page, false);
   eq((await getState(page)).incidents.length, 1, 'cancel keeps');
-  page.dialogAnswer = true;
   await page.click('#tab-incident [data-act=delIncident]');
+  await answer(page, true);
   eq((await getState(page)).incidents.length, 0, 'deleted');
+  assert(page.dialogs[0].includes('למחוק את האירוע'), 'confirm sheet asks: ' + page.dialogs[0]);
   assert((await txt(page, '#tab-incident details')).includes('עוד לא נרשמו'), 'empty state');
 });
 test('incident: date/time can be edited before saving', 'רישום אירוע: "תאריך ושעה אוטומטיים" (editable)', async t => {
@@ -879,10 +925,13 @@ test('progress: weekly table (incidents, hits, tool %, stars, praise)', 'התק�
   const rows = await page.locator('#tab-progress table.wk tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(c => c.textContent.trim())));
   eq(rows, [['1', '10', '6', '20%', '3', '2'], ['2', '7', '3', '60%', '5', '4'], ['3', '4', '1', '100%', '0', '0'], ['4', '2', '0', '50%', '1', '1']], 'weekly summary rows');
   eq(await page.locator('#tab-progress table.wk tr.cur td').first().innerText(), '4', 'current week highlighted');
-  const kpi = await page.locator('#tab-progress .kpi').allInnerTexts();
-  assert(kpi[0].includes('2') && kpi[0].includes('ירידה של 80%'), 'KPI incidents this week + change: ' + kpi[0]);
-  assert(kpi[1].includes('50%'), 'KPI tool use: ' + kpi[1]);
-  assert(kpi[2].includes('1'), 'KPI praise: ' + kpi[2]);
+  // ruling 6: the current (partial) week only shows its count; the change compares the last completed week (3) with week 1
+  const kpi = (await page.locator('#tab-progress .kpi').allInnerTexts()).map(k => k.replace(/\s+/g, ' '));
+  eq(kpi.length, 4, 'four KPIs once a completed week can be compared');
+  assert(kpi[0].includes('2') && kpi[0].includes('השבוע עד עכשיו'), 'KPI incidents this week so far: ' + kpi[0]);
+  assert(kpi[1].includes('↓') && kpi[1].includes('60%') && kpi[1].includes('שבוע 3') && kpi[1].includes('שבוע 1'), 'KPI change week 3 vs week 1 (4 vs 10 = −60%): ' + kpi[1]);
+  assert(kpi[2].includes('50%'), 'KPI tool use: ' + kpi[2]);
+  assert(kpi[3].includes('1'), 'KPI praise: ' + kpi[3]);
 });
 test('progress: bar chart values, baseline (week 1) and −70% target lines, "all/hits" toggle', 'התקדמות: "גרף עמודות … קו בסיס של שבוע 1 וקו יעד של מינוס 70%"', async t => {
   const page = await t.open({ state: progressFixture() });
@@ -903,11 +952,13 @@ test('progress: bar chart values, baseline (week 1) and −70% target lines, "al
   assert(base && tgt, 'baseline and target lines exist');
   near(base.y, H - 10 * unit, 0.6, 'baseline at week-1 value (10)');
   near(tgt.y, H - 3 * unit, 0.6, 'target line at 30% of baseline (3)');
-  assert(r.legend.includes('בסיס שבוע 1: 10') && r.legend.includes('יעד (ירידה של 70%): 3'), 'legend: ' + r.legend);
+  assert(r.legend.includes('בסיס (שבוע 1): 10') && r.legend.includes('יעד: עד 3 בשבוע (ירידה של 70%)'), 'legend: ' + r.legend);
   await page.click('#tab-progress [data-act=chartMode][data-mode=hits]');
   eq(await page.getAttribute('#tab-progress [data-mode=hits]', 'aria-pressed'), 'true', 'hits pressed');
   r = await read();
-  assert(r.legend.includes('בסיס שבוע 1: 6') && r.legend.includes('1.8'), 'hits legend: ' + r.legend);
+  // target line at 30% of 6 = 1.8; as a whole number of hits per week that means "up to 1"
+  assert(r.legend.includes('בסיס (שבוע 1): 6') && r.legend.includes('עד 1 בשבוע'), 'hits legend: ' + r.legend);
+  near(r.refs.find(x => !x.dash).y, r.bars[0].bottom - 1.8 * (r.bars[0].bottom - r.bars[0].top) / 6, 0.6, 'hits target line at 1.8');
   eq(r.bars.length, 3, 'hits mode: weeks with hits (6,3,1) have bars, week 4 has 0');
   near((r.bars[0].bottom - r.bars[1].top) / (r.bars[0].bottom - r.bars[0].top), 0.5, 0.02, 'hits week 2 = half of week 1');
   await page.reload();
@@ -935,7 +986,11 @@ test('progress: trigger / hour / target analysis', 'התקדמות: "ניתוח 
   eq(lists.length, 3, 'three analyses');
   eq(lists[0][0], ['הפסד', 12], 'top trigger');
   eq(lists[0][1], ['מעבר בין פעילויות', 7], 'second trigger');
-  eq(lists[1][0], ['ערב (18–21)', 7], 'top hour bucket');
+  // design P2-28: hour buckets are listed in chronological order (not by count)
+  const order = ['בוקר (6–12)', 'צהריים (12–15)', 'אחר הצהריים (15–18)', 'ערב (18–21)', 'לילה (21–6)'];
+  const hours = lists[1].map(([k]) => k);
+  eq(hours, order.filter(k => hours.includes(k)), 'hour buckets in chronological order');
+  eq(lists[1].find(([k]) => k === 'ערב (18–21)'), ['ערב (18–21)', 7], 'evening bucket = 7 (the most)');
   assert(lists[1].some(([k, v]) => k.startsWith('אחר הצהריים') && v === 5), 'afternoon bucket = 5');
   eq(lists[2][0], ['אח / אחות', 12], 'top target');
 });
@@ -1066,7 +1121,7 @@ test('guide: all spec sections and key content present', 'מדריך: שלבים
     'weeks 6–9': ['ניהול כעס', 'ברגע ההתפרצות', 'אחרי שנרגע'],
     'weeks 8–12': ['בחירה בין שתיים', 'תפקיד אחריות', 'אחד-על-אחד', 'תור למנהיג', 'משא ומתן', 'משחקי צוות', 'שאלות אמפתיה', 'חבר אחד'],
     'firstborn of 7': ['הבכור מתוך 7', 'זמן אישי קבוע', 'בכור ולא שמרטף', 'זכויות של גדול', 'מקום נעול', 'לא להשוות', 'הפרדה', 'תפקיד מנהיגות'],
-    '5 rules': ['5 כללי יסוד', 'קודם אתה רגוע', 'ביטחון לפני חינוך', '5 שבחים ביום', '3 חוקי בית', 'להאריך את הנשימה'],
+    '5 rules': ['5 כללי יסוד', 'קודם אתם רגועים', 'ביטחון לפני חינוך', '5 שבחים ביום', '3 חוקי בית', 'להאריך את הנשימה'],
     'seek help': ['מתי לפנות לאיש מקצוע', '6–8 שבועות', 'בעלי חיים', '20–30 דקות', 'כמעט כל יום', 'במסגרת החינוכית', 'קשב', 'שפ״ח', 'קופת החולים']
   };
   const missing = [];
@@ -1092,13 +1147,12 @@ test('data: import of a valid backup replaces all data (round trip)', 'עיצו�
   const page = await t.open();
   const backup = richState(6); backup.settings.childName = 'רותי'; backup.ui.tab = 'progress';
   await page.click('.topbar [data-act=openSettings]');
-  page.dialogAnswer = false;
   await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(backup)));
-  for (let i = 0; i < 50 && !page.dialogs.length; i++) await new Promise(r => setTimeout(r, 20));
+  await answer(page, false);
   eq(page.dialogs.length, 1, 'confirmation dialog shown');
   eq((await getState(page)).settings.childName, 'דני', 'cancel in confirm keeps current data');
-  page.dialogAnswer = true;
   await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(backup)));
+  await answer(page, true);
   await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
   assert(page.dialogs.some(d => d.includes('הייבוא יחליף')), 'confirmation asked');
   assert((await toastText(page)).includes('יובאו בהצלחה'), 'success toast');
@@ -1117,12 +1171,14 @@ test('data: malformed import files are rejected and the app keeps working', 'ע�
     await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
     await page.setInputFiles('#importFile', fileFrom('bad.json', f));
     await page.waitForFunction(() => document.querySelector('#toast').textContent !== '');
-    assert((await toastText(page)).includes('הקובץ לא תקין'), `"${f}" → toast, got ${await toastText(page)}`);
+    assert((await toastText(page)).includes('לא נראה כמו קובץ גיבוי'), `"${f}" → toast, got ${await toastText(page)}`);
+    assert(await page.locator('#dlg').isHidden(), `"${f}": no confirmation for an invalid file`);
     eq(await getState(page), before, `"${f}" must not change data`);
     await page.click('#setOverlay [data-act=closeSettings]');
   }
   for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) await go(page, tab);
   eq(page.dialogs.length, 0, 'no confirm dialog for invalid files');
+  eq(await page.evaluate(k => localStorage.getItem(k + '-prev'), KEY), null, 'rejected files never touch the backup slot');
 });
 const hostile = {
   'non-string child name': { settings: { childName: 12345 } },
@@ -1139,6 +1195,7 @@ test('data: structurally hostile import is rejected or sanitized; app never brea
     const page = await t.open({ state: richState(3) });
     await page.click('.topbar [data-act=openSettings]');
     await page.setInputFiles('#importFile', fileFrom('h.json', JSON.stringify(data)));
+    await answer(page, true);
     await page.waitForFunction(() => document.querySelector('#toast').textContent !== '');
     for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) { await page.evaluate(() => document.querySelector('#setOverlay').hidden = true); await go(page, tab).catch(() => {}); }
     await page.reload();
@@ -1159,6 +1216,7 @@ test('security: hostile import (ids / mood color) must not execute script', 'XSS
   });
   await page.click('.topbar [data-act=openSettings]');
   await page.setInputFiles('#importFile', fileFrom('x.json', JSON.stringify(data)));
+  await answer(page, true);
   await page.waitForFunction(() => document.querySelector('#toast').textContent !== '');
   for (const tab of ['today', 'calm', 'incident']) await go(page, tab);
   await page.evaluate(() => { document.querySelector('#tab-incident details').open = true; });
@@ -1169,11 +1227,13 @@ test('security: hostile import (ids / mood color) must not execute script', 'XSS
 test('data: reset clears everything after double confirmation; cancel keeps data', 'הגדרות: "איפוס"', async t => {
   const page = await t.open({ state: richState(3) });
   await page.click('.topbar [data-act=openSettings]');
-  page.dialogAnswer = false;
   await page.click('#setOverlay [data-act=reset]');
+  await answer(page, false);
   assert((await getState(page)).incidents.length > 0, 'cancel keeps data');
-  page.dialogAnswer = true;
   await page.click('#setOverlay [data-act=reset]');
+  await answer(page, true);
+  assert((await getState(page)).incidents.length > 0, 'still kept after the first confirmation');
+  await answer(page, true);
   eq(page.dialogs.length, 3, 'two confirmations for reset (1 cancelled + 2)');
   const s = await getState(page);
   eq([s.incidents.length, s.stars.length, Object.keys(s.days).length, s.moods.length, s.settings.childName, s.settings.onboarded], [0, 0, 0, 0, '', false], 'all data cleared');
@@ -1189,8 +1249,8 @@ test('data: localStorage methods throwing → app renders and works in memory', 
   await page.click('#tab-today .praise-btn');
   await page.click('#tab-today .praise-btn');
   assert((await txt(page, '#tab-today .praise-btn')).includes('(2/5)'), 'praise works');
-  await page.click('#tab-today .check[data-id=move]');
-  eq(await page.getAttribute('#tab-today .check[data-id=move]', 'aria-checked'), 'true', 'checklist works');
+  await page.click('#tab-today .check-hit[data-id=move]');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=move]', 'aria-checked'), 'true', 'checklist works');
   for (const tab of ['calm', 'incident', 'progress', 'guide', 'today']) await go(page, tab);
   const warned = await page.evaluate(() => typeof storageWarned !== 'undefined' && storageWarned);
   assert(warned, 'user is warned that data cannot be saved');
@@ -1223,8 +1283,7 @@ test('data: works offline (all remote requests fail)', 'דרישות טכניו�
   for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) { await go(page, tab); assert((await page.locator(`#tab-${tab}`).innerHTML()).length > 200, tab + ' renders'); }
   const font = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
   assert(/Arial|sans-serif/.test(font), 'has local font fallbacks: ' + font);
-  const remoteNonFont = t.remote.filter(u => !/fonts\.(googleapis|gstatic)\.com/.test(u));
-  eq(remoteNonFont, [], 'no remote dependencies besides fonts');
+  eq(t.remote, [], 'no remote requests at all (the font is embedded)');
 });
 
 /* ================================================================== *
