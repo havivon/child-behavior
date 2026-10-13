@@ -2873,6 +2873,221 @@ test('layout 320px: the "להחיל" star-suggestion button never breaks inside 
   eq(r, { lines: 1, text: 'להחיל' }, '"להחיל" wraps inside the word');
 });
 
+/* ================================================================== *
+ * 25. Round-5 fixes: the legacy gate, no implicit position, singular sibling wording
+ * ================================================================== */
+/** the visible text of every tab, the red-mood suggestions and four sheets (the one-time prompt removed) */
+async function appTexts(page) {
+  const out = {};
+  for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) {
+    await page.evaluate(tb => { showTab(tb); document.querySelectorAll('.nudge').forEach(n => n.remove()); document.querySelectorAll('main details').forEach(d => { d.open = true; }); }, tab);
+    out[tab] = await page.innerText('#tab-' + tab);
+  }
+  await page.evaluate(() => { showTab('calm'); ACT.mood({ dataset: { c: 'red' } }); document.querySelectorAll('main details').forEach(d => { d.open = true; }); });
+  out.calmRed = await page.innerText('#tab-calm');
+  for (const [id, ctx] of [['morning', 'today'], ['balloon', 'calm'], ['one', 'today'], ['praise', 'today'], ['freeze', 'guide']]) { await page.evaluate(([i, c]) => { openInfo(i, c); document.querySelectorAll('#infoSheet details').forEach(d => { d.open = true; }); }, [id, ctx]); out['sheet-' + id] = await page.innerText('#infoSheet'); }
+  return out;
+}
+test('R5-1: a stored or imported profile with all three fields but no profileSet flag is applied fully', 'round-5 ruling R5-1 / personalization §1.2', async t => {
+  // stored data (e.g. written by a build that had no flag): 5 years, youngest of 3
+  const st = makeState(); Object.assign(st.settings, { childAge: 5, siblingsCount: 3, birthOrder: 3 });
+  const page = await t.open({ state: st });
+  const s = (await getState(page)).settings;
+  eq([s.childAge, s.siblingsCount, s.birthOrder, s.profileSet, s.profileReview], [5, 3, 3, true, false], 'counted as a saved profile');
+  eq(await page.locator('.nudge').count(), 0, 'no prompt for a complete profile');
+  eq(await page.evaluate(() => [profile().legacy, morningMin(), exDef('balloon').steps.map(x => x.s), moodTools('red').includes('box'), toolOf('box').sub, gamesFor(profile()).every(g => fitsAge(g.id, profile()))]),
+    [false, 2, [3, 4], false, '3 – 3 – 3 – 3', true], 'every personalized function sees the profile');
+  assert((await txt(page, '#tab-today .check[data-id=morning] .ctitle')).includes('2 דקות נשימת בלון'), 'checklist: 2 minutes');
+  await page.click('#tab-today [data-act=morningBreath]');
+  const rec = await recordExercise(page, 200);
+  eq([rec.total, rec.initialMeta.includes('1:59')], [119, true], 'the morning exercise really runs 2 minutes (17 × 7 s)');
+  await page.click('#exOverlay [data-act=exClose]');
+  await page.waitForFunction(() => document.querySelector('#exOverlay').hidden);
+  await go(page, 'guide');
+  eq((await txt(page, '#roleChapter summary')).replace(/\s+/g, ' ').replace('פרק מיוחד ', '').trim(), '🌱 הצעיר מתוך 3', 'role chapter');
+  assert((await txt(page, '#tab-guide')).includes('בגיל 5 ' + SLEEP(5)), 'sleep text for 5');
+  // the same through import, from a release-era install: 6 years, eldest of 2
+  const p2 = await t.open();
+  const b = makeState(); Object.assign(b.settings, { childAge: 6, siblingsCount: 2, birthOrder: 1 });
+  await p2.click('.topbar [data-act=openSettings]');
+  await p2.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(b)));
+  await answer(p2, true);
+  await p2.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  const s2 = (await getState(p2)).settings;
+  eq([s2.childAge, s2.siblingsCount, s2.birthOrder, s2.profileSet, s2.profileReview], [6, 2, 1, true, false], 'imported profile counted as saved');
+  eq(await p2.locator('.nudge').count(), 0, 'no prompt after the import');
+  eq(await p2.evaluate(() => [morningMin(), roleChapter(profile()).title, incOpts(profile()).target.includes('אח / אחות'), checksFor(profile()).find(c => c.id === 'one').sub]),
+    [2, '👑 הבכור מתוך 2', true, 'רק הוא והורה, בלי האח או האחות. הוא בוחר את הפעילות.'], 'personalized after the import');
+  // an explicit profileSet:false is still a legacy install (the parents have not confirmed the values)
+  eq(await page.evaluate(() => { const x = normalize({ settings: { onboarded: true, childAge: 5, siblingsCount: 3, birthOrder: 3, profileSet: false, profileReview: true } }).settings; return [x.profileSet, x.profileReview]; }), [false, true], 'explicit false stays legacy');
+});
+test('R5-1: data missing a profile field gets the 10 / 7 / 1 migration and the prompt', 'round-5 ruling R5-1 / personalization §1.2, §6.4', async t => {
+  const page = await t.open();
+  const r = await page.evaluate(() => {
+    const n = o => { const x = normalize({ settings: Object.assign({ onboarded: true }, o) }).settings; return [x.profileSet, x.profileReview]; };
+    return {
+      noAge: n({ siblingsCount: 3, birthOrder: 3 }), noN: n({ childAge: 5, birthOrder: 1 }), noPos: n({ childAge: 5, siblingsCount: 3 }),
+      badAge: n({ childAge: 2, siblingsCount: 3, birthOrder: 3 }), posOver: n({ childAge: 5, siblingsCount: 3, birthOrder: 4 }), none: n({}),
+      notOnboarded: normalize({ settings: { onboarded: false, childAge: 5, siblingsCount: 3, birthOrder: 3 } }).settings.profileSet
+    };
+  });
+  for (const k of ['noAge', 'noN', 'noPos', 'badAge', 'posOver', 'none']) eq(r[k], [false, true], `${k}: legacy + prompt`);
+  eq(r.notOnboarded, false, 'before onboarding the profile is asked in the welcome form');
+  // a stored install without the age: release content, the prompt on Today
+  const st = makeState(); Object.assign(st.settings, { siblingsCount: 3, birthOrder: 3 });
+  const p2 = await t.open({ state: st });
+  assert(await p2.locator('.nudge').isVisible(), 'the prompt is shown');
+  eq(await p2.evaluate(() => [profile().age, profile().n, profile().pos, profile().legacy, morningMin(), roleChapter(profile()).title]), [10, 7, 1, true, 3, '👑 הבכור מתוך 7'], 'legacy 10 / 7 / 1');
+});
+test('R5-1: the legacy gate – with any stored values, every personalized function returns the release behaviour', 'round-5 ruling R5-1 / personalization §1.2, §1.3', async t => {
+  const rel = path.join(os.tmpdir(), 'ragua-release-acbea8a.html');
+  fs.writeFileSync(rel, require('child_process').execSync('git show acbea8a:index.html', { cwd: path.resolve(__dirname, '..') }));
+  const base = richState(6); base.days[TODAY].checks = {};
+  const legacyState = (age, n, pos) => { const st = JSON.parse(JSON.stringify(base)); Object.assign(st.settings, { childAge: age, siblingsCount: n, birthOrder: pos, profileSet: false, profileReview: true }); return st; };
+  const releaseTexts = await appTexts(await t.open({ state: legacyState(5, 3, 3), url: 'file://' + rel }));
+  const snap = () => {
+    const p = profile();
+    return {
+      profile: [p.age, p.band, p.n, p.pos, p.role, p.sib, p.large, p.legacy],
+      morningMin: morningMin(),
+      checks: JSON.stringify(checksFor(p)) === JSON.stringify(CHECKS),
+      checkAria: CHECKS.every(c => checkAria(c.id, p) === CHECK_ARIA[c.id]),
+      info: Object.keys(INFO).filter(id => info(id) !== INFO[id]),
+      exDef: Object.keys(EXS).filter(id => exDef(id) !== EXS[id]),
+      toolOf: Object.keys(TOOLS).filter(k => toolOf(k) !== TOOLS[k]),
+      moodTools: Object.keys(MOODS).filter(c => moodTools(c) !== MOODS[c].tools),
+      incOpts: incOpts(p) === INC,
+      games: gamesFor(p).map(g => g.id).join() === LEGACY_GAMES.map(g => g.id).join() && LEGACY_GAMES.length === 10,
+      gameOfDay: Array.from({ length: 21 }, (_, d) => gameOfDay(new Date(Date.now() + d * 864e5)).id).every(id => LEGACY_GAMES.some(g => g.id === id)),
+      role: JSON.stringify(roleChapter(p)),
+      guide: JSON.stringify(guideRows(p))
+    };
+  };
+  const snaps = [];
+  for (const [age, n, pos] of [[5, 3, 3], [13, 1, 1], [8, 2, 2], [12, 6, 4]]) {
+    const page = await t.open({ state: legacyState(age, n, pos) });
+    const s = (await getState(page)).settings;
+    eq([s.childAge, s.siblingsCount, s.birthOrder, s.profileSet], [age, n, pos, false], 'the stored values are kept (they prefill the form)');
+    const r = await page.evaluate(snap);
+    eq(r.profile, [10, '10-12', 7, 1, 'eldest', 's2', true, true], `${age}/${n}/${pos}: profile() is the release persona`);
+    eq([r.morningMin, r.checks, r.checkAria, r.info, r.exDef, r.toolOf, r.moodTools, r.incOpts, r.games, r.gameOfDay], [3, true, true, [], [], [], [], true, true, true], `${age}/${n}/${pos}: release definitions`);
+    eq(JSON.parse(r.role).title, '👑 הבכור מתוך 7', `${age}/${n}/${pos}: role chapter`);
+    snaps.push(r);
+    // every screen and sheet reads exactly like the release build
+    const texts = await appTexts(page);
+    for (const k of Object.keys(releaseTexts)) eq(texts[k], releaseTexts[k], `${age}/${n}/${pos}: "${k}" differs from the release build`);
+    // the morning exercise really runs 3 minutes (18 × (4 + 6) s)
+    await closeSheet(page);
+    await go(page, 'today');
+    await page.click('#tab-today [data-act=morningBreath]');
+    const rec = await recordExercise(page, 200);
+    eq([rec.total, rec.initialMeta.includes('3:00'), rec.segs.slice(0, 2).map(x => x.len)], [180, true, [4, 6]], `${age}/${n}/${pos}: morning exercise`);
+  }
+  for (const r of snaps.slice(1)) eq([r.role, r.guide], [snaps[0].role, snaps[0].guide], 'role chapter and guide rows do not depend on the stored values');
+});
+test('R5-2: changing the number of children clears a position the parents did not choose (settings)', 'round-5 ruling R5-2 / personalization §6.2', async t => {
+  const pressed = page => page.locator('#pfBlock [data-field=pos][aria-pressed=true]').evaluateAll(els => els.map(e => +e.dataset.val));
+  // an only child: the implicit position 1 never carries over
+  const one = await t.open({ state: pState(9, 1, 1) });
+  await one.click('.topbar [data-act=openSettings]');
+  await one.click('#pfBlock [data-field=n][data-val="3"]');
+  eq(await pressed(one), [], 'only child → 3 children: no position');
+  await one.click('#setOverlay [data-act=saveSettings]');
+  assert(await visible(one, '#setOverlay') && (await toastText(one)).includes('המקום שלו'), 'saving asks for the position');
+  // an explicitly chosen position that is still valid is kept; one that no longer fits is cleared
+  const mid = await t.open({ state: pState(9, 5, 2) });
+  await mid.click('.topbar [data-act=openSettings]');
+  eq(await pressed(mid), [2], 'saved position shown');
+  await mid.click('#pfBlock [data-field=n][data-val="3"]');
+  eq(await pressed(mid), [2], 'still valid → kept');
+  await mid.click('#pfBlock [data-field=n][data-val="1"]');
+  await mid.click('#pfBlock [data-field=n][data-val="4"]');
+  eq(await pressed(mid), [], 'after "1" the position is implicit and is cleared');
+  const big = await t.open({ state: pState(9, 6, 5) });
+  await big.click('.topbar [data-act=openSettings]');
+  await big.click('#pfBlock [data-field=n][data-val="3"]');
+  eq(await pressed(big), [], 'position 5 of 3 → cleared');
+  // a legacy install: 10 / 7 / 1 was never chosen by the parents
+  const old = await t.open();
+  await old.click('.topbar [data-act=openSettings]');
+  await old.click('#pfBlock [data-field=n][data-val="3"]');
+  eq(await pressed(old), [], 'legacy "הבכור" is not carried over');
+});
+test('wording: a middle child with exactly one older or one younger sibling gets the singular on that side', 'round-5 wording 1 / personalization §5.1, §5.5', async t => {
+  const page = await t.open({ state: pState(9, 3, 2) });
+  const r = await page.evaluate(() => {
+    const out = {};
+    for (const [n, pos] of [[3, 2], [4, 2], [4, 3], [5, 3]]) {
+      Object.assign(S.settings, { siblingsCount: n, birthOrder: pos });
+      const l = roleChapter(profile()).list.map(x => x[1]);
+      out[`${pos}/${n}`] = { i1: l[0], i2: l[1], i3: l[2], i5: l[4], freeze: info('freeze').tip };
+    }
+    return out;
+  });
+  const OLD1 = 'האח הגדול או האחות הגדולה', YNG1 = 'האח הקטן או האחות הקטנה';
+  eq(r['2/3'], {
+    i1: `ילד אמצעי נבלע בקלות בין ${OLD1} לבין ${YNG1}. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.`,
+    i2: `הוא לא רק "האמצעי": תחביב, תפקיד או פינה שמזוהים רק איתו – לא עם ${OLD1} ולא עם ${YNG1}.`,
+    i3: 'מול האח הגדול או האחות הגדולה הוא הקטן, ומול האח הקטן או האחות הקטנה הוא הגדול. בודקים מה קרה, ולא מניחים מראש מי אשם.',
+    i5: 'ארגז או מגירה משלו, שהאח הגדול או האחות הגדולה לא לוקחים והאח הקטן או האחות הקטנה לא מפרקים.',
+    freeze: 'שתפו גם את האח הקטן או האחות הקטנה, ותנו לו להיות זה שמפעיל את המוזיקה.'
+  }, 'middle 2 of 3: both sides singular');
+  eq(r['2/4'], {
+    i1: `ילד אמצעי נבלע בקלות בין ${OLD1} לבין הקטנים. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.`,
+    i2: `הוא לא רק "האמצעי": תחביב, תפקיד או פינה שמזוהים רק איתו – לא עם ${OLD1} ולא עם הקטנים.`,
+    i3: 'מול האח הגדול או האחות הגדולה הוא הקטן, ומול הקטנים הוא הגדול. בודקים מה קרה, ולא מניחים מראש מי אשם.',
+    i5: 'ארגז או מגירה משלו, שהאח הגדול או האחות הגדולה לא לוקחים והקטנים לא מפרקים.',
+    freeze: 'שתפו גם את האחים הקטנים, ותנו לו להיות זה שמפעיל את המוזיקה.'
+  }, 'middle 2 of 4: older side singular, younger side plural');
+  eq(r['3/4'], {
+    i1: `ילד אמצעי נבלע בקלות בין הגדולים לבין ${YNG1}. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.`,
+    i2: `הוא לא רק "האמצעי": תחביב, תפקיד או פינה שמזוהים רק איתו – לא עם הגדולים ולא עם ${YNG1}.`,
+    i3: 'מול הגדולים הוא הקטן, ומול האח הקטן או האחות הקטנה הוא הגדול. בודקים מה קרה, ולא מניחים מראש מי אשם.',
+    i5: 'ארגז או מגירה משלו, שהגדולים לא לוקחים והאח הקטן או האחות הקטנה לא מפרקים.',
+    freeze: 'שתפו גם את האח הקטן או האחות הקטנה, ותנו לו להיות זה שמפעיל את המוזיקה.'
+  }, 'middle 3 of 4: older side plural, younger side singular');
+  eq(r['3/5'], {
+    i1: 'ילד אמצעי נבלע בקלות בין הגדולים לקטנים. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.',
+    i2: 'לא "הגדולים" ולא "הקטנים": תחביב, תפקיד או פינה שמזוהים רק איתו.',
+    i3: 'מול הגדולים הוא הקטן, ומול הקטנים הוא הגדול. בודקים מה קרה, ולא מניחים מראש מי אשם.',
+    i5: 'ארגז או מגירה משלו, שהגדולים לא לוקחים והקטנים לא מפרקים.',
+    freeze: 'שתפו גם את האחים הקטנים, ותנו לו להיות זה שמפעיל את המוזיקה.'
+  }, 'middle 3 of 5: both sides plural (spec base text)');
+  // rendered: the guide chapter and the freeze sheet for 2 of 3
+  const p2 = await t.open({ state: pState(9, 3, 2) });
+  await go(p2, 'guide');
+  await p2.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+  const ch = await vtxt(p2, '#roleChapter');
+  assert(ch.includes(r['2/3'].i3) && ch.includes(r['2/3'].i5), 'the guide shows the singular items');
+  assert(!/הגדולים|הקטנים/.test(ch), 'no plural left in the 2-of-3 chapter: ' + ch);
+  await p2.evaluate(() => openInfo('freeze', 'guide')); await sheetOpen(p2);
+  assert((await vtxt(p2, '#infoBody')).includes('שתפו גם את האח הקטן או האחות הקטנה'), 'freeze sheet tip');
+});
+test('wording: with exactly one sibling the examples say "האח או האחות", never "אחיך" / "אחותך"', 'round-5 wording 2 / personalization §5.1, §5.3–§5.5', async t => {
+  const BRO = /אחיך|אחותך/;
+  for (const [pos, item5] of [[1, 'לא "תראה איך האח או האחות שלך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.'], [2, 'לא "בגיל שלך האח או האחות שלך כבר..." ולא "אתה הקטן, תוותר" ברגע של כעס.']]) {
+    const page = await t.open({ state: pState(9, 2, pos) });
+    eq((await vtxt(page, '#tab-today .card.has-info > .sub')).trim(), 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאח או לאחות שלך על התור". היעד: 5 ביום.', 'Today praise example');
+    await page.click('#tab-today .card.has-info > .info-btn'); await sheetOpen(page);
+    const sheet = await vtxt(page, '#infoBody');
+    assert(sheet.includes('"ראיתי שוויתרת לאח או לאחות שלך על התור – זה היה בוגר"') && sheet.includes('"…וזה עזר לאח או לאחות שלך."'), 'praise sheet examples: ' + sheet);
+    await closeSheet(page);
+    await go(page, 'guide');
+    await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+    const gd = await vtxt(page, '#tab-guide');
+    assert(gd.includes('שבח ספציפי על התנהגות: "ראיתי שוויתרת לאח או לאחות שלך על התור – זה היה בוגר."'), 'guide: rule #3');
+    assert(gd.includes('"איך לדעתך הרגיש האח או האחות שלך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.'), 'guide: empathy question');
+    eq(await page.evaluate(() => roleChapter(profile()).list[4][1]), item5, `${pos === 1 ? 'eldest' : 'youngest'} of 2: "לא להשוות"`);
+    assert((await vtxt(page, '#roleChapter')).includes(item5), 'rendered in the guide');
+    // nowhere in the app or in any sheet
+    const all = Object.values(await appTexts(page)).join('\n') + await page.evaluate(() => JSON.stringify(Object.keys(INFO).map(info), (k, v) => typeof v === 'function' ? undefined : v));
+    assert(!BRO.test(all), 'a gendered sibling example is left: ' + (all.match(new RegExp('.{0,40}(' + BRO.source + ').{0,20}')) || [])[0]);
+  }
+  // the 2+-sibling wording is unchanged (s2 base text)
+  const s2 = await t.open({ state: pState(9, 3, 1) });
+  assert((await vtxt(s2, '#tab-today .card.has-info > .sub')).includes('ראיתי שוויתרת לאחיך על התור'), 's2 keeps the base example');
+});
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */

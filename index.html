@@ -428,6 +428,8 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
 .pf-moved{color:var(--warn);font-weight:700}
 .need-hint{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);margin-top:var(--sp-2);font-size:var(--fs-sm);color:var(--muted)}
 .need-hint[hidden]{display:none}
+.need-hint > span{flex:1;min-width:0}
+.need-hint .btn{flex:0 0 auto;white-space:nowrap}
 .switch-row{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);min-height:52px;margin-top:var(--sp-4);font-weight:700;cursor:pointer}
 .switch{appearance:none;-webkit-appearance:none;flex:0 0 auto;width:52px;height:32px;border-radius:var(--r-pill);background:var(--line-strong);position:relative;cursor:pointer;transition:background .2s;margin:0}
 .switch::after{content:"";position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:#fff;transition:right .2s}
@@ -1195,15 +1197,18 @@ const BANDS = ['4-6', '7-9', '10-12', '13-14'];
 const bandLabel = b => b.replace('-', '–');
 /* The single read of the profile. `legacy`: an install (or backup) from before personalization whose parents
    haven't saved the new fields yet – it keeps showing exactly the release-1.0 content (10 / eldest of 7). */
+const isLegacy = () => S.settings.profileSet !== true;
+/* The single legacy gate: a legacy install always gets the release persona (10 years, eldest of 7), so every
+   personalised function – timings, minutes, role chapter, incident options… – returns the release behaviour. */
 function profile() {
-  const st = S.settings;
-  const age = Number.isInteger(st.childAge) ? st.childAge : 10;
-  const n = Number.isInteger(st.siblingsCount) ? st.siblingsCount : 7;
-  const pos = n === 1 ? 1 : clamp(Number.isInteger(st.birthOrder) ? st.birthOrder : 1, 1, n);
+  const st = S.settings, legacy = isLegacy();
+  const age = !legacy && Number.isInteger(st.childAge) ? st.childAge : 10;
+  const n = !legacy && Number.isInteger(st.siblingsCount) ? st.siblingsCount : 7;
+  const pos = n === 1 ? 1 : clamp(!legacy && Number.isInteger(st.birthOrder) ? st.birthOrder : 1, 1, n);
   const band = age <= 6 ? '4-6' : age <= 9 ? '7-9' : age <= 12 ? '10-12' : '13-14';
   const role = n === 1 ? 'only' : pos === 1 ? 'eldest' : pos === n ? 'youngest' : 'middle';
   const sibs = n - 1;
-  return { age, band, n, pos, role, sibs, sib: sibs === 0 ? 's0' : sibs === 1 ? 's1' : 's2', large: n >= 5, older: pos - 1, younger: n - pos, legacy: st.profileSet !== true };
+  return { age, band, n, pos, role, sibs, sib: sibs === 0 ? 's0' : sibs === 1 ? 's1' : 's2', large: n >= 5, older: pos - 1, younger: n - pos, legacy };
 }
 const pick = (map, key) => (map && Object.prototype.hasOwnProperty.call(map, key)) ? map[key] : map.default;
 /* variant lookup for the current profile: legacy installs always get the default (release) text */
@@ -1356,12 +1361,17 @@ const INFO_SIB = {
       how: { 1: 'מכבים טלפונים ומעסיקים את האח או האחות – הורה שני או בייביסיטר יכולים לעזור.' }
     },
     repair: { why: 'תיקון מלמד אחריות בלי בושה: "טעיתי, ואני יכול לתקן". הוא גם עוזר לאח שנפגע להרגיש שרואים אותו, ומחזיר את השקט ביניהם.', how: { 0: 'מחכים שיירגע, ומדברים בפרטיות – לא מול האח או האחות.' } },
-    praise: { tip: 'מול האח או האחות, שבח בלחישה או אגודל למעלה עובד מצוין – בלי להביך אותו.' }
+    praise: {
+      what: 'שבח שמתאר בדיוק מה הילד עשה, מיד כשזה קורה. למשל: "ראיתי שוויתרת לאח או לאחות שלך על התור – זה היה בוגר", במקום "כל הכבוד".',
+      how: { 2: 'מוסיפים מילה חמה או את ההשפעה: "…וזה עזר לאח או לאחות שלך."' },
+      tip: 'מול האח או האחות, שבח בלחישה או אגודל למעלה עובד מצוין – בלי להביך אותו.'
+    }
   },
   /* two or more siblings: the base text, except where it depends on the family size or his position */
   s2: {
     one: { why: p => (p.large ? `בבית עם ${p.n} ילדים קשה לקבל תשומת לב חיובית. ` : 'כשיש בבית עוד ילדים, קשה לקבל מספיק תשומת לב חיובית. ') + ONE_WHY_TAIL },
-    freeze: { tip: p => p.role === 'youngest' ? 'שתפו גם את האחים הגדולים, ותנו לו להיות זה שמפעיל את המוזיקה.' : INFO.freeze.tip }
+    freeze: { tip: p => p.role === 'youngest' ? 'שתפו גם את האחים הגדולים, ותנו לו להיות זה שמפעיל את המוזיקה.'
+      : p.younger === 1 ? 'שתפו גם את האח הקטן או האחות הקטנה, ותנו לו להיות זה שמפעיל את המוזיקה.' : INFO.freeze.tip }
   }
 };
 function mergeInfo(e, o, p) {
@@ -1451,22 +1461,25 @@ function incOpts(p) {
 /* ---------- family-position chapter and the large-family card (guide) ---------- */
 function roleChapter(p) {
   const s1 = p.sib === 's1';
+  // a middle child with exactly one older (pos 2) or one younger (pos N−1) sibling: that side in the singular
+  const O = p.older === 1 ? 'האח הגדול או האחות הגדולה' : 'הגדולים', Y = p.younger === 1 ? 'האח הקטן או האחות הקטנה' : 'הקטנים';
+  const oneSide = p.older === 1 || p.younger === 1;
   const T = {
     eldest: [`👑 הבכור מתוך ${p.n}`, [
       ['🗓️ זמן אישי קבוע', s1 ? 'זמן קבוע (עדיף יומי) שהוא רק שלו – בלי האח או האחות. כתוב ביומן, ולא מבטלים.' : 'זמן קבוע (עדיף יומי) שהוא רק שלו – בלי אחים. כתוב ביומן, ולא מבטלים.'],
       ['🙅 בכור ולא שמרטף', s1 ? 'עזרה – כן. אחריות של הורה על האח או האחות – לא.' : 'עזרה – כן. אחריות של הורה על האחים – לא.'],
       ['🎖️ זכויות של גדול', 'לצד האחריות – זכויות: שעת שינה מאוחרת יותר, יותר בחירה, פעילות שרק גדולים עושים.'],
       ['🔒 מקום נעול לחפצים שלו', s1 ? 'ארגז או מגירה עם מנעול, שרק הוא פותח. פחות "לקחו לי!".' : 'ארגז או מגירה עם מנעול שהאחים לא נוגעים בהם. פחות "לקחו לי!".'],
-      ['⚖️ לא להשוות', 'לא "תראה איך אחותך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.'],
+      ['⚖️ לא להשוות', s1 ? 'לא "תראה איך האח או האחות שלך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.' : 'לא "תראה איך אחותך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.'],
       [s1 ? '🛡️ הגנה והפרדה' : '🛡️ הגנה על האחים והפרדה', 'מזהים מצבים מועדים (מעברים, ערב, מסכים) ומפרידים מראש: חדרים שונים, פעילות נפרדת.'],
       ['🧭 תפקיד מנהיגות שהוא בוחר', s1 ? 'הוא בוחר מרשימה: מדריך משחק לאח הקטן, אחראי על המוזיקה בנסיעה... מנהיגות חיובית במקום שתלטנות.' : 'הוא בוחר מרשימה: מדריך משחק לקטנים, אחראי על המוזיקה בנסיעה... מנהיגות חיובית במקום שתלטנות.']
     ]],
     middle: [`🧩 הילד האמצעי (מקום ${p.pos} מתוך ${p.n})`, [
-      ['🗓️ זמן אישי קבוע', 'ילד אמצעי נבלע בקלות בין הגדולים לקטנים. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.'],
-      ['🪪 משהו שהוא רק שלו', 'לא "הגדולים" ולא "הקטנים": תחביב, תפקיד או פינה שמזוהים רק איתו.'],
-      ['⚖️ שיפוט הוגן', 'מול הגדולים הוא הקטן, ומול הקטנים הוא הגדול. בודקים מה קרה, ולא מניחים מראש מי אשם.'],
+      ['🗓️ זמן אישי קבוע', oneSide ? `ילד אמצעי נבלע בקלות בין ${O} לבין ${Y}. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.` : 'ילד אמצעי נבלע בקלות בין הגדולים לקטנים. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.'],
+      ['🪪 משהו שהוא רק שלו', oneSide ? `הוא לא רק "האמצעי": תחביב, תפקיד או פינה שמזוהים רק איתו – לא עם ${O} ולא עם ${Y}.` : 'לא "הגדולים" ולא "הקטנים": תחביב, תפקיד או פינה שמזוהים רק איתו.'],
+      ['⚖️ שיפוט הוגן', `מול ${O} הוא הקטן, ומול ${Y} הוא הגדול. בודקים מה קרה, ולא מניחים מראש מי אשם.`],
       ['🙅 לא להשוות', 'לא "תראה איך אחיך הגדול..." ולא "אתה כבר גדול, תוותר לקטן" ברגע של כעס.'],
-      ['🔒 מקום לחפצים שלו', 'ארגז או מגירה משלו, שהגדולים לא לוקחים והקטנים לא מפרקים.'],
+      ['🔒 מקום לחפצים שלו', `ארגז או מגירה משלו, ש${O} לא לוקחים ו${Y} לא מפרקים.`],
       ['🛡️ הגנה והפרדה', 'מזהים מצבים מועדים (מעברים, ערב, מסכים) ומפרידים מראש: חדרים שונים, פעילות נפרדת.'],
       ['🧭 תפקיד שהוא בוחר', 'הוא בוחר מרשימה: מארגן משחק משפחתי, אחראי על המוזיקה בנסיעה… גם הוא מוביל לפעמים.']
     ]],
@@ -1475,7 +1488,7 @@ function roleChapter(p) {
       ['🌱 לתת לו לעשות לבד', 'לא "התינוק של הבית": משימות ואחריות שמתאימות לגילו, ושבח על כל צעד של עצמאות.'],
       ['⚖️ לא מגינים עליו אוטומטית', s1 ? 'גם הצעיר יכול להכאיב. בודקים מה קרה, ולא מניחים מראש שהאח הגדול או האחות הגדולה אשמים.' : 'גם הצעיר יכול להכאיב. בודקים מה קרה, ולא מניחים מראש שהגדולים אשמים.'],
       ['📢 שיהיה לו קול', s1 ? 'בבית עם אח או אחות גדולים קשה להישמע. מקשיבים עד הסוף, ומדי פעם נותנים לו את המילה הראשונה בשיחה משפחתית.' : 'בבית עם ילדים גדולים קשה להישמע. מקשיבים עד הסוף, ומדי פעם נותנים לו את המילה הראשונה בשיחה משפחתית.'],
-      ['🙅 לא להשוות', 'לא "בגיל שלך אחותך כבר..." ולא "אתה הקטן, תוותר" ברגע של כעס.'],
+      ['🙅 לא להשוות', s1 ? 'לא "בגיל שלך האח או האחות שלך כבר..." ולא "אתה הקטן, תוותר" ברגע של כעס.' : 'לא "בגיל שלך אחותך כבר..." ולא "אתה הקטן, תוותר" ברגע של כעס.'],
       ['🚧 החינוך – אצל ההורים', s1 ? 'האח הגדול או האחות הגדולה לא מתגרים בו ולא "מחנכים" אותו. גבולות ותוצאות – רק מכם.' : 'האחים הגדולים לא מתגרים בו ולא "מחנכים" אותו. גבולות ותוצאות – רק מכם.'],
       ['🧭 תפקיד אמיתי', 'תפקיד שבו הוא מוביל: מחלק את הקינוח, בוחר משחק משפחתי, אחראי על האכלת חיית המחמד.']
     ]],
@@ -1587,7 +1600,8 @@ function normalize(raw) {
   let pos = toInt(rs.birthOrder); if (pos === null || pos < 1) pos = null;
   if (kids === 1) pos = 1;
   if (kids !== null && pos !== null && pos > kids) pos = null;      // inconsistent → ask again
-  let review = rs.profileReview === true, set = rs.profileSet === true;
+  // a complete, valid profile without the flag (e.g. a hand-edited backup) counts as set: it is applied fully
+  let review = rs.profileReview === true, set = rs.profileSet === true || (rs.profileSet === undefined && age !== null && kids !== null && pos !== null);
   if (st.onboarded && (age === null || kids === null || pos === null)) {
     if (age === null) age = 10;
     if (kids === null) kids = 7;
@@ -1796,7 +1810,7 @@ function renderToday() {
   <section class="card has-info">
     <h2>👀 תפסתי ${esc(himName())} מתנהג יפה</h2>
     ${infoBtn('praise', 'today', 'מה זה שבח ספציפי?')}
-    <p class="sub">${vary(pf, { s0: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שחיכית בסבלנות לתור שלך". היעד: 5 ביום.', default: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאחיך על התור". היעד: 5 ביום.' }, pf.sib)}</p>
+    <p class="sub">${vary(pf, { s0: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שחיכית בסבלנות לתור שלך". היעד: 5 ביום.', s1: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאח או לאחות שלך על התור". היעד: 5 ביום.', default: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאחיך על התור". היעד: 5 ביום.' }, pf.sib)}</p>
     <label class="sr-only" for="praiseNote">מה ראיתם?</label>
     <input class="input mt3" id="praiseNote" maxlength="120" value="${esc(praiseDraft)}" placeholder="מה ראיתם? (לא חובה)" enterkeyhint="done">
     <button type="button" class="btn praise-btn mt3" data-act="praise"><b class="pname">⭐ תפסתי ${childName() ? 'את ' + esc(childName()) : 'אותו'}!</b> <span class="cnt">(${esc(praises.length)}/5)</span></button>
@@ -2234,9 +2248,9 @@ function guideRows(p) {
     one: `15 דקות ביום שבהן הוא מוביל. בלי טלפון, ${vary(p, { s1: 'בלי האח או האחות', s0: 'בלי מטלות', default: 'בלי אחים' }, p.sib)}, בלי ביקורת.${oneIdeas}`,
     team: vary(p, { '4-6': 'משחקים שיתופיים פשוטים: בונים מגדל ביחד, פאזל משותף – כולם מנצחים או מפסידים יחד.', default: 'משחקי קופסה שיתופיים ואתגרים משפחתיים שבהם כולם מנצחים או מפסידים יחד.' }, p.band),
     empathy: !p.legacy && p.band === '4-6' ? '"איך הוא הרגיש, לדעתך? שמח? עצוב? כועס?" – בזמן רגוע, ובעזרת ציורים של פרצופים.'
-      : vary(p, { s0: '"איך לדעתך הרגיש החבר שלך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.', default: '"איך לדעתך הרגיש אחיך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.' }, p.sib),
+      : vary(p, { s0: '"איך לדעתך הרגיש החבר שלך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.', s1: '"איך לדעתך הרגיש האח או האחות שלך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.', default: '"איך לדעתך הרגיש אחיך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.' }, p.sib),
     friend: vary(p, { '4-6': ['🧑‍🤝‍🧑 מפגש משחק עם חבר אחד', 'חבר אחד, כשעה, בבית. פעילות מוכנה מראש והורה ממש קרוב. מסיימים כשעוד טוב.'], '13-14': ['🧑‍🤝‍🧑 מפגש עם חבר', 'חבר אחד או שניים סביב פעילות שהוא בוחר – ספורט, משחק, בישול. הורה בבית אבל לא מעל הראש, ושעת סיום ידועה מראש.'], default: ['🧑‍🤝‍🧑 מפגש משחק עם חבר אחד', 'חבר אחד, שעה–שעתיים, פעילות מתוכננת מראש והורה בסביבה. מסיימים כשעוד טוב.'] }, p.band),
-    praise3: vary(p, { s0: 'שבח ספציפי על התנהגות: "ראיתי שחיכית בסבלנות לתור שלך – זה היה בוגר."', default: 'שבח ספציפי על התנהגות: "ראיתי שוויתרת לאחיך על התור – זה היה בוגר."' }, p.sib),
+    praise3: vary(p, { s0: 'שבח ספציפי על התנהגות: "ראיתי שחיכית בסבלנות לתור שלך – זה היה בוגר."', s1: 'שבח ספציפי על התנהגות: "ראיתי שוויתרת לאח או לאחות שלך על התור – זה היה בוגר."', default: 'שבח ספציפי על התנהגות: "ראיתי שוויתרת לאחיך על התור – זה היה בוגר."' }, p.sib),
     school: vary(p, { '4-6': 'קשיים במסגרת החינוכית (גן, חוגים).', default: 'קשיים במסגרת החינוכית (בית ספר, חוגים).' }, p.band),
     via: vary(p, { '4-6': 'דרך הגן או בית הספר', default: 'דרך בית הספר' }, p.band)
   };
@@ -2710,8 +2724,9 @@ function applyStarDefaults() {
 function syncMiniFields() { const on = $('#sMiniOn'); if (on) $('#miniFields').hidden = !on.checked; }
 function openSettings(welcome) {
   const st = S.settings;
-  pfForm = welcome && !st.onboarded ? { age: null, n: null, pos: null, moved: false, welcome: true }
-    : { age: st.childAge, n: st.siblingsCount, pos: st.siblingsCount === 1 ? 1 : st.birthOrder, moved: false, welcome: !!welcome };
+  // posPicked: the position was chosen by the parents (a saved profile, or a tap); only then may it survive a count change
+  pfForm = welcome && !st.onboarded ? { age: null, n: null, pos: null, moved: false, posPicked: false, welcome: true }
+    : { age: st.childAge, n: st.siblingsCount, pos: st.siblingsCount === 1 ? 1 : st.birthOrder, moved: false, posPicked: !isLegacy() && st.siblingsCount > 1, welcome: !!welcome };
   const undo = welcome ? null : undoInfo();
   const rulesHTML = [0, 1, 2].map(i => `<input class="input" id="sRule${i}" maxlength="60" value="${esc(st.rules[i] || '')}" placeholder="חוק ${i + 1}" aria-label="חוק ${i + 1}" style="margin-bottom:8px">`).join('');
   const goalsHTML = [0, 1, 2].map(i => { const g = st.goals[i]; return `<input class="input" id="sGoal${i}" data-goal-id="${esc(g ? g.id : '')}" maxlength="50" value="${esc(g ? g.text : '')}" placeholder="יעד ${i + 1}${i === 2 ? ' (לא חובה)' : ''}" aria-label="יעד ${i + 1}${i === 2 ? ' (לא חובה)' : ''}" style="margin-bottom:8px">`; }).join('');
@@ -3111,14 +3126,13 @@ const ACT = {
   miniStep(el) { const i = $('#sMiniEvery'), v = parseInt(i.value, 10); i.value = clamp((Number.isFinite(v) ? v : 3) + Number(el.dataset.d), 1, 10); i.dataset.dirty = '1'; },
   applyNeed() { const b = STAR_BAND[pfBand(pfForm.age)]; $('#sNeed').value = b.need; updateNeedHint(); refocus('#sNeed'); },
   pfChip(el) {
-    const f = pfForm, field = el.dataset.field, v = +el.dataset.val;
+    const f = pfForm, field = el.dataset.field, v = +el.dataset.val, prevN = f.n;
     f[field] = v;
     if (field === 'n') {
-      if (v === 1) { f.pos = 1; f.moved = false; }
-      else if (f.pos && f.pos > v) { f.pos = null; f.moved = true; }   // the old position no longer exists
-      else if (f.pos === 1 && f.n !== 1) f.moved = false;
+      if (v === 1) { f.pos = 1; f.posPicked = false; f.moved = false; }          // implicit: never carried over
+      else if (f.pos && (!f.posPicked || f.pos > v)) { f.moved = f.posPicked || prevN > 1; f.pos = null; f.posPicked = false; }
     }
-    if (field === 'pos') f.moved = false;
+    if (field === 'pos') { f.moved = false; f.posPicked = true; }
     renderProfileFields(`#pfBlock [data-field=${field}][data-val="${v}"]`);
     if (field === 'age') { applyStarDefaults(); updateNeedHint(); }
   },
