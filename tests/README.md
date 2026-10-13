@@ -28,3 +28,4 @@ The script prints one `PASS`/`FAIL` line per test. A failing test also prints th
 When written, the suite had 86 tests: 70 passed and 16 failed (real app bugs, described in `docs/qa-report.md`).
 After the release fixes it has 109 tests (86 original, some updated to assert the new intended behaviour, plus 23 new ones in section 16), and all of them pass.
 The round-2 QA audit added 5 regression tests (section 17), so the suite now has **114 tests: 109 pass and 5 fail**. The 5 failures are new app bugs from the release round, described in `docs/qa-report.md` under "Round 2 regression audit". The audit also fixed a harness flake: reloads now use `reload(page)` and the seed guard is kept in localStorage.
+Round 3: the engineer fixed R2-1 to R2-7 and added 8 tests (122/122). QA added 3 adversarial tests (section 19), so the suite now has **125 tests: 123 pass and 2 fail**. The 2 failures are new Minor bugs (R3-1, R3-2 in `docs/qa-report.md`).

@@ -585,3 +585,112 @@ These are unchanged from round 1:
 - `sw.js` over https.
 - Real-device haptics through the new `AndroidBridge.vibrate`.
 - The real Android back button through `__androidBack`, which can only be simulated here.
+
+---
+
+# Round 3: focused re-verification (fix commit `37977a5`)
+
+- **Scope:** the round-2 fixes (`git diff 2ea7cc4 37977a5`: `index.html` +123/−26, `tests/e2e.js` +160) and my test additions (WIP `d95878d`, tests only; `index.html` is unchanged since `37977a5`).
+- **Method:**
+  1. Audited the 3 tests the engineer changed and the 8 they added.
+  2. Re-ran my R2-1 to R2-7 repros by hand, plus adversarial variants.
+  3. Did a regression sweep at 320 and 390 px, light and dark (and reduced motion).
+  4. Ran the full suite twice.
+- **Screenshots:** `/tmp/qa-shots/r2/r3-*.png`.
+
+## Verdict: **ship**
+
+All seven round-2 bugs are fixed, including R2-1 (double tap wiping all data), which I attacked with every variant in the brief. None of them can wipe data.
+
+I found two new bugs, both **Minor** edge cases (R3-1, R3-2 below). Neither blocks the release. I recommend fixing R3-1 soon, because it breaks an explicit on-screen promise.
+
+## Suite result
+
+| Run | Tests | Pass | Fail |
+|---|---|---|---|
+| Engineer's suite at `37977a5` (as reported) | 122 | 122 | 0 |
+| After my 3 round-3 tests (section 19), run 1 | **125** | **123** | **2** (#124, #125, i.e. R3-1 and R3-2) |
+| After my 3 round-3 tests, run 2 | 125 | 123 | 2 (identical PASS/FAIL list) |
+
+The suite is deterministic.
+
+## Test audit
+
+**Changed tests:**
+- **#87** (confirm sheet: focus, Escape, scrim) now waits 700 ms before tapping the scrim. This is legitimate: a tap during the 400 ms arming window is now ignored by design. Every other assertion is unchanged, and the immediate tap is now covered separately by the new "a new sheet ignores taps for its first 400 ms" test.
+- **#110 and #111** (my double-tap tests) now wait 700 ms after the sheet opens before double tapping. This is legitimate, and it actually makes the tests **stronger**:
+  - Without the wait, both taps would land inside the arming window and be ignored, so the tests would pass on the arming alone.
+  - With the wait, the first tap really confirms step 1, and the test proves that the immediate second tap neither confirms step 2 (#110) nor clicks through to the screen behind (#111). That is exactly my original R2-1 scenario: confirm step 1 after a normal reading delay, then the follow-up tap must not confirm step 2.
+  - The immediate double tap, with no reading delay, is also asserted. It is in the engineer's arming test for the delete sheet, and I added it for the reset sheet in #123.
+
+**The 8 new tests:**
+- arming window;
+- swallowing the tap after a sheet closes;
+- reset step 2 laid out differently;
+- undo/redo swap;
+- 7-day expiry and no undo slot for an empty state;
+- the 7-day pre-start star window;
+- midnight while typing;
+- keyboard-operable weekly-table rows.
+
+None is tautological, and each asserts the observable behaviour (state in storage, focus, what is on screen), not implementation details. **No weakened checks.** Coverage gaps were the adversarial taps and keys, and two undo/reward edges. I added these as #123 to #125.
+
+## R2-1 to R2-7: manual re-verification
+
+| # | Bug | Result | What I ran by hand |
+|---|---|---|---|
+| R2-1 | Double tap passes both reset steps | **Fixed** | All of these leave the data intact: a double tap immediately, after 700 ms and after 1.5 s; 3–5 taps with gaps of 100/100, 150×3, 200/250, 380/60 and 100/350/100 ms; Enter auto-repeat (30 presses, 40 ms apart) on the step-1 confirm; Enter spam from the default focus; Escape during step-1 arming; Android back during step-2 arming; reduced motion (the guards stay at 400 ms). After step 1 is confirmed with the keyboard, focus moves to "ביטול" of step 2, so Enter can never pass both steps. |
+| R2-2 | Click-through after a confirm | **Fixed** | A second tap on the nav within 400 ms is swallowed; a later tap works. |
+| R2-3 | Old program stars in the pre-start bucket | **Fixed** (residual: R3-2) | My original repro (20 old stars, start moved to next week) now shows 6/15, i.e. only the last 7 days. |
+| R2-4 | Midnight re-render drops focus | **Fixed** | Typing in the praise note and the incident note continues across midnight. The re-render happens once the field is left, and drafts are kept. |
+| R2-5 | Undo can't be undone; undo after an onboarding restore | **Fixed** (residual: R3-1) | A → import B → add b1 → undo → add a1 → redo → add b2 → undo: every state and every entry survives each swap. A restore during onboarding creates no undo slot. |
+| R2-6 | Praise counter wraps | **Fixed** | "(3/5)" stays on one line at 320 and 390 px. A long name is clamped to 2 lines with "…" at 320 px, and the button's accessible name keeps the full name. |
+| R2-7 | Table rows mouse-only | **Fixed** | `tabindex=0`, a focus ring, Enter and Space select the week, and focus stays on the row after the re-render. |
+
+## Regression sweep
+
+- **Screens checked:** all 5 tabs plus settings, the step-2 reset sheet, an exercise, its completion screen, the celebration and onboarding, using long realistic Hebrew strings.
+- **Configurations:** 320 px dark, 390 px light, and 390 px dark with reduced motion.
+- **Result:** no horizontal scroll and no console errors. The suite's layout tests also pass at 320/360/375/390/414 px, light and dark.
+- **Step-2 sheet:** visually distinct. Confirm is on the right, danger red; "ביטול" sits where step 1's confirm was.
+
+## New bugs (round 3)
+
+#### R3-1. Data set aside by an undo is deleted silently when the 7-day window ends, despite the sheet's promise
+- **Severity:** Minor (data loss in an edge case; contradicts on-screen copy)
+- **Test:** #124
+- **Repro:**
+  1. Import a backup on day 0.
+  2. On day 2, log an incident.
+  3. On day 6, tap "החזרת הנתונים שלפני הייבוא האחרון". The sheet says: "הנתונים שבטלפון עכשיו, כולל כל מה שנוסף מאז, לא יימחקו: הם יישמרו במקומם, ואפשר יהיה להחזיר אותם באותו כפתור". Confirm.
+  4. On day 8, open settings.
+- **Expected:** The set-aside data (the backup plus the day-2 incident) is still recoverable, or the user is clearly warned before it goes.
+- **Actual:** The undo button is gone and `-prev` is deleted, so the day-2 incident is lost. The settings note also says "שום דבר לא נמחק – הנתונים מתחלפים".
+- **Related, same cause:** a new import made while in the "undone" state overwrites the slot. In my run, after A → B (+b1, b2) → undo → import C, B with b1 and b2 was gone without a warning.
+- **Code:**
+  - `undoInfo()` (1733–1737) expires the slot 7 days after the *original import* (`meta.at`) even after a swap, and clears it as a side effect of opening settings.
+  - `commitState` (1742) overwrites the slot on import regardless of `meta.undone`.
+- **Fix hint:**
+  - Restart the 7-day window on each swap (or don't expire while `undone` is true).
+  - Warn in the import sheet when the slot holds data that would be discarded.
+  - Or soften the copy.
+
+#### R3-2. Restarting the program re-awards stars that were already rewarded
+- **Severity:** Minor
+- **Test:** #125
+- **Repro:**
+  1. In program week 5, earn 15/15 stars this week; the celebration fires.
+  2. In ⚙️, move the start date to next week.
+  3. Add one star.
+- **Expected:** The pill shows the pre-start week, and no second reward for the same stars.
+- **Actual:** The pill shows 16/15 "הפרס הורווח!" and the celebration fires again.
+- **Cause:**
+  - `saveSettings` clears `S.celebrated` when the start date changes (1687).
+  - The new 7-day pre-start window (`weekStars(0)`, 813) still contains this week's already-rewarded stars.
+- **Fix hint:** Count pre-start stars only from the moment the start date was set, or carry the "celebrated" target into week 0 when the date moves.
+
+## Notes (no defect)
+
+- **Arming depends on CSS animations.** The guards are timed by CSS animations (`.modal.arm::before`, `#tapShield`), and `dlgArmed()` reads the computed visibility of `::before`. If an environment ever stopped running CSS animations entirely, the cover would stay visible and no sheet could be confirmed; cancel, Escape and back would still work. Chromium and Android WebView run them, including with reduced motion (verified), so this is a theoretical risk only. Worth a comment in the code.
+- **A deliberate tap on step 2's confirm ≥ 400 ms after step 1 does reset.** That tap must land on the *other* side of the sheet, on a red button labelled "כן, למחוק הכול", so it is a deliberate action, not an accidental double tap. This is working as intended.
+- **The pre-start star window is rolling.** Stars earned during a long pre-start period drop off 7 days later; regular weeks reset weekly anyway. This is acceptable.
