@@ -138,7 +138,7 @@ async function open(t, opts = {}) {
     await page.clock.install({ time: time - 10000 });
     await page.clock.pauseAt(time);
   }
-  if (opts.goto !== false) { await page.goto(APP); await page.waitForSelector('main .tab.active', { state: 'attached' }); }
+  if (opts.goto !== false) { await page.goto(opts.url || APP); await page.waitForSelector('main .tab.active', { state: 'attached' }); }
   return page;
 }
 const getState = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
@@ -169,6 +169,13 @@ async function reload(page) {
   }
 }
 const fileFrom = (name, content) => ({ name, mimeType: 'application/json', buffer: Buffer.from(content) });
+/** answer the profile questions of the onboarding / settings form (age, children, position) by tapping the chips.
+ *  Onboarding requires them (client request: "the program is defined by the age and the position"). */
+async function answerProfile(page, age = 10, n = 7, pos = 1) {
+  await page.click(`#pfBlock [data-field=age][data-val="${age}"]`);
+  await page.click(`#pfBlock [data-field=n][data-val="${n}"]`);
+  if (n > 1) await page.click(`#pfBlock [data-field=pos][data-val="${pos}"]`);
+}
 /** answer the in-app confirm sheet (#dlg): ok=true → confirm button, false → cancel */
 async function answer(page, ok) {
   await page.waitForSelector('#dlg:not([hidden])');
@@ -299,10 +306,15 @@ test('onboarding: first run shows welcome settings; cannot be dismissed; save st
   eq(await page.inputValue('#sStart'), TODAY, 'start date defaults to today');
   await page.fill('#sName', '  יוסי  ');
   await page.fill('#sStart', startForWeek(3));
+  // personalization: age and family position are required before the program can start
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert(await visible(page, '#setOverlay') && (await toastText(page)).includes('בן כמה הוא'), 'save without the age is refused');
+  await answerProfile(page);
   await page.click('#setOverlay [data-act=saveSettings]');
   assert(!(await visible(page, '#setOverlay')), 'overlay closes after save');
   const s = await getState(page);
   eq([s.settings.onboarded, s.settings.childName, s.settings.startDate], [true, 'יוסי', startForWeek(3)], 'saved settings (name trimmed)');
+  eq([s.settings.childAge, s.settings.siblingsCount, s.settings.birthOrder, s.settings.profileReview], [10, 7, 1, false], 'saved profile, no prompt');
   assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 3 מתוך 12'), 'hero week after onboarding');
   assert((await txt(page, '.hero .eyebrow')).includes('יוסי'), 'child name in greeting');
   await reload(page);
@@ -1267,6 +1279,7 @@ test('data: localStorage methods throwing → app renders and works in memory', 
   const page = await t.open({ state: null, init: () => { const thr = () => { throw new DOMException('denied', 'SecurityError'); }; Storage.prototype.setItem = thr; Storage.prototype.getItem = thr; Storage.prototype.removeItem = thr; } });
   assert(await visible(page, '#setOverlay'), 'onboarding shown');
   await page.fill('#sName', 'נועם');
+  await answerProfile(page);
   await page.click('#setOverlay [data-act=saveSettings]');
   assert(!(await visible(page, '#setOverlay')), 'settings work in memory');
   assert((await txt(page, '.hero .eyebrow')).includes('נועם'), 'name shown');
@@ -1283,6 +1296,7 @@ test('data: window.localStorage getter throwing (storage blocked) → app still 
   const page = await t.open({ state: null, init: () => { Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('blocked', 'SecurityError'); } }); } });
   assert(await page.evaluate(() => { try { return !window.localStorage; } catch (e) { return true; } }), 'precondition: localStorage access throws');
   assert(await visible(page, '#setOverlay'), 'onboarding shown');
+  await answerProfile(page);
   await page.click('#setOverlay [data-act=saveSettings]');
   await go(page, 'incident');
   await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
@@ -1297,7 +1311,7 @@ test('data: corrupt JSON in storage → app recovers to a usable state', 'עיצ
     assert(ok, `renders with storage "${bad}"`);
     const s = await page.evaluate(() => S.settings);
     assert(/^\d{4}-\d\d-\d\d$/.test(s.startDate) && s.starsNeeded >= 1 && s.goals.length >= 2, 'settings normalized: ' + JSON.stringify(s));
-    if (await visible(page, '#setOverlay')) await page.click('#setOverlay [data-act=saveSettings]');
+    if (await visible(page, '#setOverlay')) { await answerProfile(page); await page.click('#setOverlay [data-act=saveSettings]'); }
     await go(page, 'progress');
     await page.context().close();
   }
@@ -2285,7 +2299,7 @@ test('info: all 27 entries render in the guide dictionary (4 groups 6/3/10/8, 4 
     const bad = [];
     Object.keys(INFO).forEach(id => {
       const e = INFO[id], el = document.querySelector('#info-' + id);
-      if (!el) { bad.push(id + ': missing'); return; }
+      if (!el) { if (!['turtle', 'lions', 'target'].includes(id)) bad.push(id + ': missing'); return; }
       const secs = [...el.querySelectorAll('.info-sec h3')].map(h => h.textContent);
       if (JSON.stringify(secs) !== JSON.stringify(['מה זה', 'למה זה עוזר', e.howLabel])) bad.push(id + ': sections ' + secs);
       if (!el.querySelector('.info-tip') || !el.querySelector('.info-tip').textContent.includes('טיפ:')) bad.push(id + ': no tip');
@@ -2296,9 +2310,10 @@ test('info: all 27 entries render in the guide dictionary (4 groups 6/3/10/8, 4 
       e.related.forEach(rid => { if (!INFO[rid]) bad.push(id + ': unknown related ' + rid); });
       if (!!el.querySelector('.info-say') !== !!e.kid) bad.push(id + ': child line');
     });
-    return { n: Object.keys(INFO).length, groups, bad, open: [...document.querySelectorAll('#tab-guide .dict > details')].some(d => d.open) };
+    return { n: Object.keys(INFO).length, shown: document.querySelectorAll('#tab-guide .dict-item').length, groups, bad, open: [...document.querySelectorAll('#tab-guide .dict > details')].some(d => d.open) };
   });
-  eq(r.n, 27, '27 entries');
+  // personalization added 3 games; this install has not set the profile yet, so it shows the release dictionary
+  eq([r.n, r.shown], [30, 27], '30 entries in INFO, the 27 release entries shown');
   eq(r.groups, [['dict-calm', 6], ['dict-routine', 3], ['dict-games', 10], ['dict-concepts', 8]], 'four groups in order');
   eq(r.open, false, 'groups collapsed by default');
   assert(!r.bad.length, r.bad.join('\n      '));
@@ -2419,7 +2434,9 @@ for (const scheme of ['light', 'dark']) {
  * ================================================================== */
 /** parse docs/explanations-spec.md §1 (the client-reviewed Hebrew) into entries */
 function specEntries() {
-  const md = fs.readFileSync(path.resolve(__dirname, '..', 'docs', 'explanations-spec.md'), 'utf8').split('## 2. Data model')[0];
+  const md = fs.readFileSync(path.resolve(__dirname, '..', 'docs', 'explanations-spec.md'), 'utf8').split('## 2. Data model')[0]
+    // + the 3 games added by the personalization spec (§2.3), same entry format
+    + '\n' + fs.readFileSync(path.resolve(__dirname, '..', 'docs', 'personalization-spec.md'), 'utf8').split('### 2.3')[1].split('\n## 3.')[0];
   const out = {};
   for (const b of md.split(/\n#### /).slice(1)) {
     const head = b.split('\n')[0], id = (head.match(/`(\w+)`/) || [])[1];
@@ -2434,7 +2451,7 @@ function specEntries() {
 }
 test('info content: every INFO entry is word-for-word the client-reviewed Hebrew of the spec, rendered without escaping artifacts', 'explanations §1 / Appendix A', async t => {
   const spec = specEntries();
-  eq(Object.keys(spec).length, 27, 'spec parsed: 27 entries');
+  eq(Object.keys(spec).length, 30, 'specs parsed: 27 + 3 new games');
   const page = await t.open();
   const info = await page.evaluate(() => JSON.parse(JSON.stringify(INFO)));
   const diffs = [];
@@ -2529,6 +2546,296 @@ test('info focus: closing an exercise started from the sheet returns focus to th
   assert(await page.locator('#exOverlay').isHidden(), 'exercise closed');
   const f = await page.evaluate(() => { const a = document.activeElement; return a === document.body ? 'BODY' : (a.closest('.tool-cell') ? 'tile:' + a.closest('.tool-cell').querySelector('[data-ex]').dataset.ex : a.tagName); });
   eq(f, 'tile:box', 'focus lands on the box tile (or its ⓘ)');
+});
+
+/* ================================================================== *
+ * 23. Personalization by age and family position (docs/personalization-spec.md)
+ * ================================================================== */
+/** a state whose parents already saved the profile (age, children, position) */
+function pState(age, n, pos, o = {}) {
+  const st = makeState(o);
+  Object.assign(st.settings, { childAge: age, siblingsCount: n, birthOrder: pos, profileSet: true, profileReview: false }, o.settings || {});
+  return st;
+}
+const P_CASES = [
+  // age, children, position, role, expected role-chapter title
+  [4, 1, 1, 'only', '⭐ ילד יחיד'],
+  [6, 2, 1, 'eldest', '👑 הבכור מתוך 2'],
+  [7, 7, 1, 'eldest', '👑 הבכור מתוך 7'],
+  [9, 2, 2, 'youngest', '🌱 הצעיר מתוך 2'],
+  [10, 7, 4, 'middle', '🧩 הילד האמצעי (מקום 4 מתוך 7)'],
+  [12, 6, 6, 'youngest', '🌱 הצעיר מתוך 6'],
+  [13, 3, 1, 'eldest', '👑 הבכור מתוך 3'],
+  [14, 7, 4, 'middle', '🧩 הילד האמצעי (מקום 4 מתוך 7)']
+];
+/** visible text with the display-only non-breaking spaces (bidi / dash fixes) turned back into spaces */
+const vtxt = async (page, sel) => (await txt(page, sel)).replace(/\u00a0/g, ' ');
+const SLEEP = a => a <= 5 ? 'צריך בערך 10–13 שעות שינה ביממה, כולל שנת צהריים' : a <= 12 ? 'צריך בערך 9–12 שעות שינה בלילה' : 'צריך בערך 8–10 שעות שינה בלילה';
+const AGES_OF = { colorword: [5, 14], freeze: [4, 12], jenga: [6, 14], headshoulders: [4, 11], traffic: [4, 9], simon: [4, 10], drum: [4, 14], chess: [7, 14], delaygame: [4, 14], roleplay: [6, 14], turtle: [4, 8], lions: [4, 8], target: [7, 14] };
+for (const [age, n, pos, role, title] of P_CASES) {
+  test(`profile ${age} / ${n} children / position ${pos} (${role}): sleep, games, exercises, morning, role chapter, large family, protocol, incident options`, 'personalization §2–§5', async t => {
+    const st = pState(age, n, pos, { settings: { startDate: startForWeek(6) } });
+    st.incidents.push(inc(NOW - 2 * DAY, { target: 'אח / אחות', trigger: 'אח לקח לו משהו' }));   // history from before a profile change
+    const page = await t.open({ state: st });
+    const band = age <= 6 ? '4-6' : age <= 9 ? '7-9' : age <= 12 ? '10-12' : '13-14';
+    // stop games: 14 days, always suitable, pool ≥ 6
+    const g = await page.evaluate(([now, day]) => { const ids = []; for (let d = 0; d < 14; d++) ids.push(gameOfDay(new Date(now + d * day)).id); return { ids, pool: gamesFor(profile()).map(x => x.id) }; }, [NOW, DAY]);
+    const fits = id => age >= AGES_OF[id][0] && age <= AGES_OF[id][1];
+    eq(g.pool, Object.keys(AGES_OF).filter(fits), 'pool = the games that fit his age (in order)');
+    assert(g.pool.length >= 6, 'pool ≥ 6');
+    assert(g.ids.every(fits), 'game of the day always fits: ' + g.ids);
+    eq(new Set(g.ids).size, Math.min(14, g.pool.length), 'the rotation covers the pool');
+    const box = await txt(page, '#tab-today .game b');
+    assert(fits(Object.keys(AGES_OF).find(id => box.includes(INFO_TITLES[id]))), 'Today shows a suitable game: ' + box);
+    // exercise timings by band
+    const ex = await page.evaluate(() => Object.fromEntries(['balloon', 'candle', 'box', 'robot', 'wall', 'stop'].map(id => { const d = exDef(id); return [id, [d.cycles, d.steps.map(s => s.s)]]; })));
+    const young = band === '4-6';
+    eq(ex, young
+      ? { balloon: [6, [3, 4]], candle: [6, [3, 4]], box: [3, [3, 3, 3, 3]], robot: [3, [4, 4]], wall: [1, [6, 4]], stop: [2, [4, 4, 4, 4]] }
+      : { balloon: [6, [4, 6]], candle: [6, [4, 6]], box: [4, [4, 4, 4, 4]], robot: [3, [5, 5]], wall: [1, [10, 4]], stop: [2, [3, 3, 3, 3]] }, 'EXS timings for ' + band);
+    // morning: every string follows the duration (2 min for 4–6)
+    const m = young ? 2 : 3;
+    assert((await txt(page, '#tab-today .check[data-id=morning] .ctitle')).includes(`${m} דקות נשימת בלון`), 'morning title');
+    eq((await txt(page, '#tab-today [data-act=morningBreath]')).trim(), `התחילו ${m} דקות נשימה`, 'morning button');
+    await page.click('#tab-today [data-act=morningBreath]');
+    assert((await txt(page, '#exMeta')).includes(young ? '1:59' : '3:00'), 'morning duration: ' + await txt(page, '#exMeta'));
+    await page.click('#exOverlay .ex-actions [data-act=exClose]');
+    // guide: sleep, role chapter, large-family card
+    await go(page, 'guide');
+    await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+    const gd = await txt(page, '#tab-guide');
+    assert(gd.includes(`בגיל ${age} ${SLEEP(age)}`), `sleep text for age ${age}`);
+    eq((await txt(page, '#roleChapter summary')).replace(/\s+/g, ' ').replace('פרק מיוחד ', '').trim(), title, 'role chapter title');
+    eq(await page.locator('#roleChapter .item').count(), 7, '7 role items');
+    eq(await page.locator('#largeFamily').count(), n >= 5 ? 1 : 0, 'large-family card iff 5+ children');
+    if (n >= 5) assert((await txt(page, '#largeFamily summary')).includes(`משפחה גדולה (${n} ילדים)`), 'large-family title');
+    // protocol wording and incident options
+    await go(page, 'incident');
+    const proto = await txt(page, '#tab-incident .steps-card');
+    const protect = role === 'only' ? 'קודם בטיחות' : role === 'eldest' ? 'קודם להגן על האח הקטן' : 'קודם להגן על האח שנפגע';
+    assert(proto.includes(protect), 'protocol: ' + protect);
+    assert(proto.includes(n === 1 ? 'בפרטיות, בלי קהל' : n === 2 ? 'לא מול האח או האחות' : 'לא מול האחים'), 'protocol step 2 heading');
+    const opts = f => page.locator(`#tab-incident [data-group=${f}] .chip`).evaluateAll(els => els.map(e => e.dataset.val));
+    eq((await opts('target')).includes('אח / אחות'), n > 1, 'sibling target offered iff he has siblings');
+    eq((await opts('trigger')).includes('ילד אחר לקח לו משהו'), n === 1, 'only-child trigger');
+    eq((await opts('response')).includes('הרחקנו את מי שהיה לידו'), n === 1, 'only-child response');
+    await page.click('#tab-incident details summary');
+    assert((await vtxt(page, '#tab-incident .inc-item')).includes('אח / אחות'), 'old incidents stay readable');
+  });
+}
+const INFO_TITLES = { colorword: 'צבע-מילה', freeze: 'תופסת קפואה', jenga: 'ג׳נגה על זמן', headshoulders: 'ראש-כתפיים הפוך', traffic: 'רמזור', simon: 'שמעון אומר', drum: 'תיפוף ועצירה', chess: 'שחמט או דמקה', delaygame: 'אתגר דחיית סיפוק', roleplay: 'משחק תפקידים: משפט העצירה', turtle: 'מרוץ צבים', lions: 'אריות ישנים', target: 'קליעה עם עצירה' };
+test('profile: sleep text at the age edges, the pool is ≥ 6 for every age 4–14 over 30 days', 'personalization §2.1, §5.3', async t => {
+  const page = await t.open({ state: pState(10, 7, 1) });
+  const r = await page.evaluate(([now, day]) => {
+    const out = {};
+    for (let a = 4; a <= 14; a++) {
+      S.settings.childAge = a;
+      const pool = gamesFor(profile()).map(g => g.id), seen = new Set();
+      for (let d = 0; d < 30; d++) seen.add(gameOfDay(new Date(now + d * day)).id);
+      out[a] = [pool.length, [...seen].every(id => INFO[id].ages[0] <= a && a <= INFO[id].ages[1]), guideRows(profile()).sleep];
+    }
+    return out;
+  }, [NOW, DAY]);
+  eq(Object.values(r).map(x => x[0]), [8, 9, 11, 13, 13, 11, 10, 9, 8, 7, 7], 'pool size per age (spec table)');
+  assert(Object.values(r).every(x => x[1]), 'every chosen game fits');
+  assert(r[4][2].includes('10–13') && r[4][2].includes('שנת צהריים'), '4: 10–13 with the nap note');
+  assert(r[6][2].includes('9–12') && r[12][2].includes('9–12') && r[13][2].includes('8–10'), '6 / 12 → 9–12 · 13 → 8–10');
+});
+test('profile 4–6: tile subtitles, red/orange suggestions without box, sheet texts at 2 minutes', 'personalization §3.2, §3.3, §3.5', async t => {
+  const page = await t.open({ state: pState(5, 1, 1) });
+  await go(page, 'calm');
+  assert((await vtxt(page, '#tab-calm [data-ex=box]')).includes('3 – 3 – 3 – 3') && (await txt(page, '#tab-calm [data-ex=wall]')).includes('6 שניות'), '4–6 tile subtitles');
+  for (const [c, tools] of [['red', ['stop', 'wall', 'balloon']], ['orange', ['wall', 'balloon', 'robot', 'stop']]]) {
+    await page.click(`#tab-calm .mood[data-c=${c}]`);
+    eq(await page.locator('#moodTools [data-ex]').evaluateAll(els => els.map(e => e.dataset.ex)), tools, c + ' suggestions');
+  }
+  await page.evaluate(() => document.querySelectorAll('#tab-calm details').forEach(d => { d.open = true; }));
+  eq(await page.locator('#tab-calm .card:not(#moodTools) [data-ex=box]').count(), 1, 'box stays in the full grid');
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=box]');
+  assert((await txt(page, '#exMeta')).includes('0:36'), 'box 3-3-3-3 × 3 = 36 s');
+  await page.click('#exOverlay .ex-actions [data-act=exClose]');
+  await go(page, 'today');
+  await page.click('#tab-today .check[data-id=morning] > .info-btn'); await sheetOpen(page);
+  const sh = await txt(page, '#infoSheet');
+  assert(sh.includes('ב-2 דקות של נשימת בלון') && sh.includes('התחילו 2 דקות נשימה') && !sh.includes('3 דקות'), 'morning sheet at 2 minutes');
+  eq(await txt(page, '#infoFoot'), 'התחילו 2 דקות נשימה', 'morning CTA');
+  assert((await txt(page, '#tab-today .check[data-id=move] .ctitle')).includes('שעה של משחק בתנועה'), '4–6 movement item (ruling 2)');
+});
+test('profile 13–14: mature child lines, same tool names everywhere (ruling 5)', 'personalization §3.5 + ruling 5', async t => {
+  const page = await t.open({ state: pState(13, 3, 1) });
+  await go(page, 'calm');
+  eq(await page.locator('#tab-calm .tool').evaluateAll(els => els.map(e => e.querySelector('span:last-child').firstChild.textContent)), ['משפט העצירה', 'נשימת בלון', 'נשימת נר', 'נשימת קובייה', 'רובוט וספגטי', 'לדחוף את הקיר'], 'tile names unchanged');
+  eq(await page.getAttribute('#tab-calm .tool-cell:has([data-ex=robot]) .info-btn', 'aria-label'), 'מה זה רובוט וספגטי?', 'aria-label unchanged');
+  await page.click('#tab-calm .tool-cell:has([data-ex=balloon]) .info-btn'); await sheetOpen(page);
+  eq(await txt(page, '#infoTitle'), 'נשימת בלון', 'sheet title unchanged');
+  assert((await txt(page, '#infoBody .info-kid')).includes('ואף אחד לא צריך לראות'), 'teen child line');
+  await page.keyboard.press('Escape'); await sheetClosed(page);
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=robot]');
+  assert((await txt(page, '#exText')).includes('מכווצים את כל השרירים') && (await txt(page, '#exTitle')).includes('רובוט וספגטי'), 'teen step text, same exercise title');
+});
+test('profile siblings: s0 / s1 overrides in the sheets, the checklist and the praise card', 'personalization §5.4, §5.5', async t => {
+  const only = await t.open({ state: pState(9, 1, 1) });
+  assert((await txt(only, '#tab-today .check[data-id=one] .sub')).includes('בלי טלפונים'), 'only child: one-on-one sub');
+  assert((await txt(only, '#tab-today .card.has-info > .sub')).includes('חיכית בסבלנות לתור שלך'), 'only child: praise example');
+  await only.click('#tab-today .card.has-info > .info-btn'); await sheetOpen(only);
+  assert((await txt(only, '#infoBody')).includes('וזה עזר לי מאוד'), 's0 praise how');
+  const two = await t.open({ state: pState(9, 2, 2) });
+  assert((await txt(two, '#tab-today .check[data-id=one] .sub')).includes('בלי האח או האחות'), 's1 one-on-one sub');
+  await two.click('#tab-today .check[data-id=one] > .info-btn'); await sheetOpen(two);
+  assert((await txt(two, '#infoBody')).includes('בלי האח או האחות ובלי טלפון'), 's1 one-on-one sheet');
+  const big = await t.open({ state: pState(9, 6, 6) });
+  await big.click('#tab-today .check[data-id=one] > .info-btn'); await sheetOpen(big);
+  assert((await txt(big, '#infoBody')).includes('בבית עם 6 ילדים קשה לקבל'), 's2 large: one.why counts the children');
+});
+test('onboarding: profile is required (age, count, position ≤ N), live caption and profile line, star defaults by age', 'personalization §4.2, §6', async t => {
+  const page = await t.open({ state: null });
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert((await toastText(page)).includes('בחרו בן כמה הוא'), 'age required');
+  eq(await page.evaluate(() => document.activeElement.dataset.val), '4', 'focus on the first age chip');
+  await page.click('#pfBlock [data-field=age][data-val="5"]');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert((await toastText(page)).includes('כמה ילדים'), 'count required');
+  await page.click('#pfBlock [data-field=n][data-val="4"]');
+  eq(await page.locator('#pfBlock [data-field=pos]').evaluateAll(els => els.map(e => e.getAttribute('aria-label'))), ['הבכור', 'מקום 2 מתוך 4', 'מקום 3 מתוך 4', 'הצעיר'], 'position chips');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  assert((await toastText(page)).includes('המקום שלו'), 'position required');
+  await page.click('#pfBlock [data-field=pos][data-val="3"]');
+  eq(await vtxt(page, '#pfCaption'), 'מקום 3 מתוך 4 – ילד אמצעי', 'live caption');
+  eq(await txt(page, '#pfLine'), 'התוכנית תותאם לגיל 4–6, ילד אמצעי.', 'profile line');
+  await page.click('#pfBlock [data-field=n][data-val="2"]');                       // position 3 no longer exists
+  assert((await vtxt(page, '#pfBlock')).includes('המקום שלו השתנה – בחרו שוב'), 'position cleared with a notice');
+  eq(await page.locator('#pfBlock [data-field=pos][aria-pressed=true]').count(), 0, 'no position selected');
+  await page.click('#pfBlock [data-field=n][data-val="1"]');
+  eq([await page.locator('#pfBlock [data-field=pos]').count(), await txt(page, '#pfCaption')], [0, 'ילד יחיד'], 'one child: no position chips');
+  // untouched star fields took the 4–6 defaults
+  await page.evaluate(() => { document.querySelector('#setOverlay details.card').open = true; });
+  eq([await page.inputValue('#sNeed'), await page.inputValue('#sGoal1'), await page.inputValue('#sReward'), await page.isChecked('#sMiniOn'), await page.inputValue('#sMiniText')],
+    ['8', 'הולך לפינת הרגיעה כשהוא כועס', 'יציאה לגינה עם אבא או אמא', true, 'מדבקה או עוד סיפור לפני השינה'], '4–6 star defaults');
+  await page.fill('#sNeed', '11');                                                 // touched → never overridden
+  await page.click('#pfBlock [data-field=age][data-val="13"]');
+  eq([await page.inputValue('#sNeed'), await page.inputValue('#sGoal0'), await page.isChecked('#sMiniOn')], ['11', 'מדבר בכבוד גם כשהוא כועס', false], 'touched value kept, others follow 13–14');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  const s = (await getState(page)).settings;
+  eq([s.childAge, s.siblingsCount, s.birthOrder, s.starsNeeded, s.profileSet, s.profileReview], [13, 1, 1, 11, true, false], 'saved');
+});
+test('settings: band change shows the star hint; "להחיל" only fills the stepper; mini-reward on the Today card', 'personalization §4.2, §4.4', async t => {
+  const page = await t.open({ state: pState(10, 3, 1) });
+  await page.click('.topbar [data-act=openSettings]');
+  assert(await page.locator('#needHint').isHidden(), '15 is inside 12–18: no hint');
+  await page.click('#pfBlock [data-field=age][data-val="5"]');
+  assert(await page.locator('#needHint').isVisible() && (await txt(page, '#needHint')).includes('6–10'), 'hint for 4–6');
+  eq(await page.inputValue('#sNeed'), '15', 'nothing changed by itself');
+  await page.click('#needHint [data-act=applyNeed]');
+  eq(await page.inputValue('#sNeed'), '8', 'להחיל fills the stepper');
+  eq((await getState(page)).settings.starsNeeded, 15, 'not saved yet');
+  await page.check('#sMiniOn');
+  await page.fill('#sMiniEvery', '2'); await page.fill('#sMiniText', 'עוד סיפור');
+  await page.click('#setOverlay [data-act=saveSettings]');
+  eq((await getState(page)).settings.starsNeeded, 8, 'saved after שמירה');
+  assert((await txt(page, '#tab-today .mini-line')).includes('0/2'), 'mini line 0/2');
+  await addStar(page, 'g1');
+  await addStar(page, 'g2');
+  eq(await toastText(page), '🎈 הגיע הזמן לפרס הקטן: עוד סיפור!', 'mini-reward toast');
+  assert((await txt(page, '#tab-today .mini-line')).includes('הורווח'), 'earned line');
+  assert(!(await visible(page, '#celOverlay')), 'no full celebration');
+  await addStar(page, 'g1');
+  eq(await toastText(page), '⭐ כוכב נוסף!', 'no second mini toast');
+  const s = await getState(page);
+  eq([s.days[TODAY].mini, s.celebrated, s.stars.length], [true, {}, 3], 'day flag set; weekly count and celebrated unaffected');
+});
+test('migration: an old install renders exactly the release text (except the one-time prompt); the prompt works', 'personalization §1.2, §6.4', async t => {
+  const rel = path.join(os.tmpdir(), 'ragua-release-acbea8a.html');
+  fs.writeFileSync(rel, require('child_process').execSync('git show acbea8a:index.html', { cwd: path.resolve(__dirname, '..') }));
+  const st = richState(6); st.days[TODAY].checks = {};
+  const read = async page => {
+    await page.evaluate(() => { const n = document.querySelector('.nudge'); if (n) n.remove(); });
+    const out = {};
+    for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) {
+      await page.evaluate(tb => { showTab(tb); document.querySelectorAll('.nudge').forEach(n => n.remove()); document.querySelectorAll('main details').forEach(d => { d.open = true; }); }, tab);
+      out[tab] = await page.innerText('#tab-' + tab);
+    }
+    await page.evaluate(() => { showTab('calm'); ACT.mood({ dataset: { c: 'red' } }); document.querySelectorAll('main details').forEach(d => { d.open = true; }); });
+    out.calmRed = await page.innerText('#tab-calm');
+    for (const [id, ctx] of [['morning', 'today'], ['balloon', 'calm'], ['one', 'today'], ['praise', 'today']]) { await page.evaluate(([i, c]) => { openInfo(i, c); document.querySelectorAll('#infoSheet details').forEach(d => { d.open = true; }); }, [id, ctx]); out['sheet-' + id] = await page.innerText('#infoSheet'); }
+    return out;
+  };
+  const before = await read(await t.open({ state: st, url: 'file://' + rel }));
+  const page = await t.open({ state: st });
+  assert(await page.locator('.nudge').isVisible(), 'the one-time prompt is shown');
+  const s = (await getState(page)).settings;
+  eq([s.childAge, s.siblingsCount, s.birthOrder, s.profileReview], [10, 7, 1, true], 'migrated to 10 / 7 / 1 with the prompt');
+  const after = await read(page);
+  for (const k of Object.keys(before)) eq(after[k], before[k], `"${k}" text differs from the release build`);
+  // the prompt: ✕ dismisses it for good, "לעדכון" opens the profile
+  const p2 = await t.open({ state: st });
+  await p2.click('.nudge [data-act=openProfile]');
+  assert(await visible(p2, '#setOverlay'), 'settings open');
+  eq(await p2.evaluate(() => [document.activeElement.dataset.field, document.activeElement.dataset.val]), ['age', '4'], 'focus on the first age chip');
+  await p2.click('#setOverlay [data-act=closeSettings]');
+  await p2.click('.nudge [data-act=nudgeDismiss]');
+  eq(await p2.locator('.nudge').count(), 0, 'dismissed');
+  await reload(p2);
+  eq(await p2.locator('.nudge').count(), 0, 'never comes back');
+});
+test('import: hostile and legacy values for the new fields are normalized', 'personalization §1.2', async t => {
+  const page = await t.open();
+  const r = await page.evaluate(() => {
+    const st = o => normalize({ settings: Object.assign({ onboarded: true }, o) }).settings;
+    const pick = s => [s.childAge, s.siblingsCount, s.birthOrder, s.profileReview, s.profileSet];
+    return {
+      str: pick(st({ childAge: '9', siblingsCount: '3', birthOrder: 2, profileSet: true })),
+      bad: [3, 15, 'abc', 9.5, null, {}, '<b>'].map(a => pick(st({ childAge: a, siblingsCount: 3, birthOrder: 1, profileSet: true }))),
+      over: pick(st({ childAge: 8, siblingsCount: 3, birthOrder: 5, profileSet: true })),
+      one: pick(st({ childAge: 8, siblingsCount: 1, birthOrder: 4, profileSet: true })),
+      fresh: pick(normalize({ settings: { onboarded: false, childAge: 99 } }).settings),
+      mini: [st({ miniReward: { on: 'yes', every: 99, text: 5 } }).miniReward, st({ miniReward: { on: true, every: '4', text: '  ' + 'x'.repeat(80) } }).miniReward],
+      day: normalize({ settings: {}, days: { '2026-10-12': { checks: {}, praises: [], mini: 'yes' }, '2026-10-11': { checks: {}, praises: [], mini: true } } }).days
+    };
+  });
+  eq(r.str, [9, 3, 2, false, true], 'numeric strings accepted');
+  r.bad.forEach((x, i) => eq(x, [10, 3, 1, true, false], `invalid age #${i} → 10 + prompt (onboarded)`));
+  eq(r.over, [8, 3, 1, true, false], 'position > count → cleared → prompt');
+  eq(r.one, [8, 1, 1, false, true], 'one child → position 1');
+  eq(r.fresh, [null, null, null, false, false], 'not onboarded: asked in onboarding');
+  eq(r.mini, [{ on: false, every: 10, text: 'פרס קטן להיום' }, { on: true, every: 4, text: 'x'.repeat(60) }], 'mini-reward sanitized');
+  eq(r.day, { '2026-10-12': { checks: {}, praises: [] }, '2026-10-11': { checks: {}, praises: [], mini: true } }, 'day.mini only when true');
+});
+test('mid-program change: content follows at once, history untouched, running exercise keeps its timings, draft drops values', 'personalization §1.4', async t => {
+  const st = pState(10, 3, 1, { settings: { startDate: startForWeek(2) } });
+  st.incidents.push(inc(NOW - DAY, { target: 'אח / אחות' }));
+  const page = await t.open({ state: st });
+  await go(page, 'incident');
+  await page.click('#tab-incident [data-field=target][data-val="אח / אחות"]');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await go(page, 'calm');
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=box]');            // 4-4-4-4 × 4 = 1:04
+  await page.evaluate(() => { S.settings.childAge = 5; S.settings.siblingsCount = 1; S.settings.birthOrder = 1; save(); });
+  await page.clock.runFor(4000);
+  eq(await page.evaluate(() => [EX.def.steps.map(s => s.s), EX.cycles]), [[4, 4, 4, 4], 4], 'the running exercise keeps the timings it started with');
+  await page.click('#exOverlay .ex-actions [data-act=exClose]');
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=box]');
+  assert((await txt(page, '#exMeta')).includes('0:36'), 'the next exercise uses the new profile');
+  await page.click('#exOverlay .ex-actions [data-act=exClose]');
+  await go(page, 'incident');
+  eq(await page.locator('#tab-incident [data-group=target] [aria-pressed=true]').count(), 0, 'draft dropped the sibling target');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  const s = await getState(page);
+  eq(s.incidents.map(i => i.target), ['אח / אחות', null], 'history kept; no invisible value saved');
+  await go(page, 'progress');
+  assert((await txt(page, '#tab-progress')).includes('אח / אחות'), 'old target still counted in "מול מי"');
+});
+test('guide dictionary (profile set): suitable games first, the others under "למשחקים בגילים אחרים"', 'personalization §2.2', async t => {
+  const page = await t.open({ state: pState(13, 3, 1) });
+  await go(page, 'guide');
+  const r = await page.evaluate(() => ({ count: document.querySelector('#dict-games .dict-count').textContent, items: [...document.querySelectorAll('#dict-games .dict-item')].map(d => [d.id.slice(5), !!d.querySelector('.age-pill')]), head: !!document.querySelector('#dict-games .dict-others') }));
+  eq(r.count, '7', 'counter = suitable games at 13');
+  eq(r.items.filter(x => !x[1]).map(x => x[0]), ['colorword', 'jenga', 'drum', 'chess', 'delaygame', 'roleplay', 'target'], 'suitable first');
+  eq(r.items.filter(x => x[1]).map(x => x[0]), ['freeze', 'headshoulders', 'traffic', 'simon', 'turtle', 'lions'], 'others with an age pill');
+  assert(r.head, 'sub-heading');
+  await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+  assert((await txt(page, '#dict-games')).includes('גילים 4–8'), 'age pill text');
+  eq(await page.evaluate(() => [...[...document.querySelectorAll('#tab-guide .phase-card')][2].querySelectorAll('.item > b')].map(b => b.textContent)),
+    ['🎨 צבע-מילה', '🧱 ג׳נגה על זמן', '♟️ שחמט ודמקה', '⏳ אתגר דחיית סיפוק', '🧩 פרויקט איטי', '🎭 משחק תפקידים', '🎯 קליעה עם עצירה'], 'p3 lists only games that fit 13');
 });
 
 /* ------------------------------------------------------------------ *
