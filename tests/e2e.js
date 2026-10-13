@@ -1966,7 +1966,7 @@ test('undo import: swaps with the slot (undo, then redo), states the import time
   await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(b)));
   await answer(page, true);
   await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
-  eq(JSON.parse(await page.evaluate(k => localStorage.getItem(k + '-prev-at'), KEY)), { at: NOW, undone: false }, 'import time stored with the slot');
+  eq(JSON.parse(await page.evaluate(k => localStorage.getItem(k + '-prev-at'), KEY)), { kind: 'pre-import', at: NOW, undone: false }, 'import time and slot kind stored with the slot');
   await page.clock.runFor(3600e3);
   await go(page, 'incident');                         // a change made after the import
   await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
@@ -2122,6 +2122,88 @@ test('stars: restarting the program does not re-award stars that were already re
   await setSettings(page, { sStart: addDaysKey(TODAY, 7) });
   await addStar(page, 'g1');
   assert(!(await visible(page, '#celOverlay')), 'the same 15 stars trigger a second celebration and reward after the restart');
+});
+
+/* ================================================================== *
+ * 20. Round-3 fixes: set-aside slot, celebrated rebuild, tap-guard fallback
+ * ================================================================== */
+async function importAndUndo(page, child = 'רותי') {
+  await page.click('.topbar [data-act=openSettings]');
+  const b = richState(5); b.settings.childName = child;
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(b)));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=undoImport]');
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+}
+test('undo slot: data set aside by an undo is kept beyond 7 days and can be discarded only via a danger confirm', 'R3-1', async t => {
+  const page = await t.open({ state: richState(3) });
+  await importAndUndo(page);
+  eq(JSON.parse(await page.evaluate(k => localStorage.getItem(k + '-prev-at'), KEY)).kind, 'set-aside', 'slot tagged set-aside');
+  await page.clock.setSystemTime(NOW + 30 * DAY);
+  await page.click('.topbar [data-act=openSettings]');
+  eq(await page.locator('#setOverlay [data-act=undoImport]').count(), 1, 'still offered (redo) after 30 days');
+  assert((await txt(page, '#setOverlay')).includes('נשמרים עד שתחזירו אותם או תמחקו אותם'), 'copy explains the slot is kept');
+  await page.click('#setOverlay [data-act=discardSetAside]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  eq(await txt(page, '#dlgTitle'), 'למחוק את הנתונים שהוסטו?', 'discard confirm');
+  assert((await page.getAttribute('#dlgOk', 'class')).includes('danger-solid'), 'danger styled');
+  await answer(page, false);
+  assert(await page.evaluate(k => !!localStorage.getItem(k + '-prev'), KEY), 'cancel keeps the set-aside data');
+  await page.click('#setOverlay [data-act=discardSetAside]');
+  await answer(page, true);
+  eq(await page.evaluate(k => [localStorage.getItem(k + '-prev'), localStorage.getItem(k + '-prev-at')], KEY), [null, null], 'discarded');
+  eq(await page.locator('#setOverlay [data-act=undoImport], #setOverlay [data-act=discardSetAside]').count(), 0, 'buttons gone');
+  eq((await getState(page)).settings.childName, 'דני', 'current data untouched');
+});
+test('undo slot: a new import while data is set aside warns that the set-aside data will be replaced', 'R3-1', async t => {
+  const page = await t.open({ state: richState(3) });
+  await page.click('.topbar [data-act=openSettings]');
+  await page.setInputFiles('#importFile', fileFrom('a.json', JSON.stringify(richState(4))));
+  await page.waitForSelector('#dlg:not([hidden])');
+  assert(!(await txt(page, '#dlgBody')).includes('שהוסטו'), 'no warning without a set-aside slot');
+  await answer(page, false);
+  await page.click('#setOverlay [data-act=closeSettings]');
+  await importAndUndo(page);
+  await page.click('.topbar [data-act=openSettings]');
+  await page.setInputFiles('#importFile', fileFrom('c.json', JSON.stringify(richState(6))));
+  await page.waitForSelector('#dlg:not([hidden])');
+  const body = await txt(page, '#dlgBody');
+  assert(body.includes('הנתונים שהוסטו בצד') && body.includes('יוחלפו'), 'import sheet warns: ' + body);
+  await answer(page, false);
+  eq(JSON.parse(await page.evaluate(k => localStorage.getItem(k + '-prev'), KEY)).settings.childName, 'רותי', 'cancelled import keeps the set-aside data');
+});
+test('stars: a start-date change rebuilds "celebrated" – buckets already at the target stay celebrated, others do not', 'R3-2', async t => {
+  const start = startForWeek(5);
+  const stars = [...Array(15)].map((_, i) => ({ goalId: 'g1', ts: tsIn(start, 2, 1, '12:00') + i * 60e3 }))   // old week 2: 15 (rewarded)
+    .concat([...Array(3)].map((_, i) => ({ goalId: 'g2', ts: NOW - 3600e3 + i * 60e3 })));                // this week: 3
+  const page = await t.open({ state: makeState({ settings: { startDate: start, starsNeeded: 15 }, stars, celebrated: { 2: 15, 4: 15 } }) });
+  await setSettings(page, { sStart: addDaysKey(start, -7) });     // everything shifts one week later
+  eq((await getState(page)).celebrated, { 3: 15 }, 'the full bucket (now week 3) stays celebrated; stale entries are gone; week 6 (3/15) is not');
+  assert((await txt(page, '#tab-today .pill.blue')).includes('3/15'), 'current week shows 3/15');
+});
+test('tap guards: without CSS animations the JS fallback still arms the sheet and drops the shield after 450 ms', 'R3 robustness', async t => {
+  const init = () => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '*,*::before,*::after{animation:none !important}'; document.head.appendChild(st); });
+  const page = await t.open({ state: makeState({ incidents: [inc(NOW - 3600e3)] }), init });
+  await go(page, 'incident');
+  await page.click('#tab-incident details summary');
+  await page.click('#tab-incident [data-act=delIncident]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  await page.waitForTimeout(700);                       // real time passes, but no animation runs
+  const ok = await center(page, '#dlgOk'), nav = await center(page, 'nav.bottom [data-tab=progress]');
+  await page.touchscreen.tap(...ok);
+  eq((await getState(page)).incidents.length, 1, 'still guarded before the fallback timer');
+  await page.clock.runFor(460);                         // the 450 ms JS fallback fires
+  await page.touchscreen.tap(...ok);
+  await page.waitForSelector('#dlg', { state: 'hidden' });
+  eq((await getState(page)).incidents.length, 0, 'armed by the fallback: the confirm works');
+  await page.touchscreen.tap(...nav);
+  eq(await page.evaluate(() => S.ui.tab), 'incident', 'shield swallows the follow-up tap');
+  await page.clock.runFor(460);
+  await page.touchscreen.tap(...nav);
+  eq(await page.evaluate(() => S.ui.tab), 'progress', 'shield removed by the fallback');
 });
 
 /* ------------------------------------------------------------------ *

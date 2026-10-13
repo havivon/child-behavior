@@ -426,11 +426,13 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
 .modal-card h2 + .modal-actions{margin-top:var(--sp-5)}
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
 .modal-actions.swap #dlgOk{order:-1}      /* second step of a two-step confirm: confirm moves to the other side */
-/* Tap guards, timed by CSS (real time): a freshly opened sheet ignores taps for 400 ms, and after a sheet is
-   closed by a tap a transparent shield swallows the follow-up tap of a double tap for 400 ms. */
+/* Tap guards: a freshly opened sheet ignores taps for 400 ms, and after a sheet is closed by a tap a transparent
+   shield swallows the follow-up tap of a double tap for 400 ms. They are timed by CSS animations (real time, even
+   under a test's frozen JS clock); a 450 ms JS timer and animationend both remove them, so if animations never
+   run the guards still end and a sheet can never stay unconfirmable. */
 .modal.arm::before{content:"";position:fixed;inset:0;z-index:2;animation:tapGuard .4s step-end forwards}
 #tapShield{position:fixed;inset:0;z-index:95;visibility:hidden}
-#tapShield.on{animation:tapGuard .4s step-end forwards}
+#tapShield.on{visibility:visible;animation:tapGuard .4s step-end forwards}
 @keyframes tapGuard{from{visibility:visible}to{visibility:hidden}}
 @keyframes sheetUp{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @keyframes fadeIn{from{opacity:0}}
@@ -651,7 +653,10 @@ const keepSlash = s => esc(s).replace(/ \/ /g, '&nbsp;/&nbsp;');   // "אח / א
    ========================================================= */
 const KEY = 'ragua-vehazak-v1';
 const PREV_KEY = KEY + '-prev';
-const PREV_AT_KEY = KEY + '-prev-at';   // {at: import time, undone: whether -prev currently holds the imported data}
+/* -prev-at = {kind, at, undone}: kind 'pre-import' = data from before an import (offered for 7 days after the
+   import, `at`); kind 'set-aside' = data moved aside by an undo/redo, which can hold the user's newer entries:
+   it never expires and stays until the user swaps it back or discards it. `undone`: the slot holds the import. */
+const PREV_AT_KEY = KEY + '-prev-at';
 const UNDO_DAYS = 7;
 const CORRUPT_KEY = KEY + '-corrupt';
 function defaults() {
@@ -1562,8 +1567,16 @@ function trapTab(e) {
 }
 let dlgDone = null;
 /* styled, focus-trapped confirm sheet; resolves true (OK) or false (cancel / Escape / back / scrim) */
-/* restart a CSS animation (used by the tap guards, which must run on real time) */
-function restartAnim(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+/* restart a CSS guard animation, with a real-timer fallback that removes the guard after 450 ms in any case */
+const guardTok = {};
+function restartAnim(el, cls) {
+  el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+  const tok = guardTok[el.id] = (guardTok[el.id] || 0) + 1;
+  setTimeout(() => { if (guardTok[el.id] === tok) el.classList.remove(cls); }, 450);
+}
+['#dlg', '#tapShield'].forEach(s => $(s).addEventListener('animationend', e => {
+  if (e.animationName === 'tapGuard') e.currentTarget.classList.remove(e.currentTarget.id === 'dlg' ? 'arm' : 'on');
+}));
 /* the sheet accepts activation only once its 400 ms arming cover is gone */
 const dlgArmed = () => { const d = $('#dlg'); return !d.hidden && (!d.classList.contains('arm') || getComputedStyle(d, '::before').visibility === 'hidden'); };
 /* after a sheet is closed by a tap, swallow the second tap of a double tap so it never reaches the screen behind */
@@ -1649,8 +1662,11 @@ function openSettings(welcome) {
       <div class="stack">
         <button type="button" class="btn ghost block" data-act="export">${ICON.download}ייצוא גיבוי</button>
         <button type="button" class="btn ghost block" data-act="import">${ICON.upload}ייבוא מגיבוי</button>
-        ${undo ? `<button type="button" class="btn ghost block" data-act="undoImport">${ICON.undo}${undo.undone ? 'החזרת הנתונים מהגיבוי שיובא' : 'החזרת הנתונים שלפני הייבוא האחרון'}</button>
-        <p class="sub small" style="margin:0">אפשר עד ${UNDO_DAYS} ימים מהייבוא ב-${esc(fmtFullDate(keyOf(new Date(undo.at))))}. שום דבר לא נמחק – הנתונים מתחלפים.</p>` : ''}
+          ${undo ? `<button type="button" class="btn ghost block" data-act="undoImport">${ICON.undo}${undo.undone ? 'החזרת הנתונים מהגיבוי שיובא' : 'החזרת הנתונים שלפני הייבוא האחרון'}</button>
+        ${undo.kind === 'set-aside'
+          ? `<p class="sub small" style="margin:0">הנתונים שהוסטו בצד נשמרים עד שתחזירו אותם או תמחקו אותם.</p>
+             <button type="button" class="btn danger block" data-act="discardSetAside">${ICON.trash}מחיקת הנתונים שהוסטו</button>`
+          : `<p class="sub small" style="margin:0">אפשר עד ${UNDO_DAYS} ימים מהייבוא ב-${esc(fmtFullDate(keyOf(new Date(undo.at))))}. שום דבר לא נמחק – הנתונים מתחלפים.</p>`}` : ''}
       </div>
     </div>
     <div class="card">
@@ -1664,6 +1680,13 @@ function openSettings(welcome) {
   fixRanges($('#setInner'));
 }
 function closeSettings() { $('#setOverlay').hidden = true; }
+/* after the start date moves, every star bucket (incl. week 0) that already holds ≥ target stars counts as celebrated */
+function rebuildCelebrated() {
+  const need = S.settings.starsNeeded, weeks = new Set([0]);
+  S.stars.forEach(s => { const w = wkOfTs(s.ts); if (w >= 1) weeks.add(w); });
+  S.celebrated = {};
+  weeks.forEach(w => { if (weekStars(w).length >= need) S.celebrated[w] = need; });
+}
 function saveSettings() {
   const st = S.settings;
   // validate everything first; nothing changes unless the whole form is valid
@@ -1684,11 +1707,13 @@ function saveSettings() {
   }
   st.childName = $('#sName').value.trim().slice(0, 30);
   const sd = $('#sStart').value;
-  if (isDateKey(sd) && sd !== st.startDate) { st.startDate = sd; S.celebrated = {}; }   // week numbers moved
+  const startMoved = isDateKey(sd) && sd !== st.startDate;
+  if (startMoved) st.startDate = sd;
   st.rules = [0, 1, 2].map(i => $('#sRule' + i).value.trim().slice(0, 60));
   st.goals = goals;
   st.reward = $('#sReward').value.trim().slice(0, 80) || 'פרס שבחרנו יחד';
   st.starsNeeded = clamp(Math.round(need), 1, 200);
+  if (startMoved) rebuildCelebrated();   // week numbers moved: rewards already earned must not fire again
   st.onboarded = true;
   save(); closeSettings(); rerender(); toast('נשמר ✓');
 }
@@ -1729,13 +1754,16 @@ function isEmptyState(st) {
     !Object.keys(st.days).some(k => st.days[k].praises.length || Object.keys(st.days[k].checks).some(c => st.days[k].checks[c])));
 }
 function clearUndo() { storageDel(PREV_KEY); storageDel(PREV_AT_KEY); }
-/* the undo slot is offered for 7 days after an import, and only when it holds real data */
+/* the undo slot: 'pre-import' is offered for 7 days after the import and only when it holds real data;
+   'set-aside' (moved aside by an undo/redo) is kept until the user swaps it back or discards it */
 function undoInfo() {
   let meta = null, prev = null;
   try { meta = JSON.parse(storageGet(PREV_AT_KEY)); prev = JSON.parse(storageGet(PREV_KEY)); } catch (e) { meta = null; }
-  const ok = isObj(meta) && typeof meta.at === 'number' && isObj(prev) && Date.now() - meta.at <= UNDO_DAYS * 864e5 && !isEmptyState(normalize(prev));
-  if (!ok) { if (storageGet(PREV_KEY) || storageGet(PREV_AT_KEY)) clearUndo(); return null; }
-  return { at: meta.at, undone: !!meta.undone, prev };
+  if (isObj(meta) && !meta.kind) meta.kind = meta.undone ? 'set-aside' : 'pre-import';   // slot written by the previous build
+  const valid = isObj(meta) && typeof meta.at === 'number' && isObj(prev);
+  const ok = valid && (meta.kind === 'set-aside' || (Date.now() - meta.at <= UNDO_DAYS * 864e5 && !isEmptyState(normalize(prev))));
+  if (!ok) { if (!valid || meta.kind !== 'set-aside') { if (storageGet(PREV_KEY) || storageGet(PREV_AT_KEY)) clearUndo(); } return null; }
+  return { kind: meta.kind, at: meta.at, undone: !!meta.undone, prev };
 }
 /* replaces the data only after the new state has been validated and rendered successfully.
    kind 'import': the current data goes to the undo slot; kind 'swap': current data and the slot change places */
@@ -1752,10 +1780,10 @@ function commitState(next, okMsg, kind = 'import', meta = null) {
   }
   if (kind === 'swap') {                  // undo/redo: nothing is ever lost, the two states just change places
     storageSet(PREV_KEY, prevJSON);
-    storageSet(PREV_AT_KEY, JSON.stringify({ at: meta.at, undone: !meta.undone }));
+    storageSet(PREV_AT_KEY, JSON.stringify({ kind: 'set-aside', at: meta.at, undone: !meta.undone }));
   } else if (!isEmptyState(prev)) {      // one bad import is always recoverable
     storageSet(PREV_KEY, prevJSON);
-    storageSet(PREV_AT_KEY, JSON.stringify({ at: Date.now(), undone: false }));
+    storageSet(PREV_AT_KEY, JSON.stringify({ kind: 'pre-import', at: Date.now(), undone: false }));
   } else clearUndo();                     // nothing to go back to (e.g. a restore during onboarding)
   save(); draft = null; praiseDraft = ''; chartPick = { inc: null, tool: null };
   closeSettings(); showTab(S.ui.tab);
@@ -1768,7 +1796,9 @@ function importData(file) {
     let data;
     try { data = JSON.parse(String(r.result)); } catch (e) { data = null; }
     if (!isObj(data) || !isObj(data.settings)) { toast(BAD_FILE); return; }
-    const ok = await ask({ title: 'לייבא את הגיבוי?', body: 'הייבוא יחליף את כל הנתונים שנמצאים עכשיו בטלפון. אם משהו ישתבש, אפשר יהיה להחזיר אותם מההגדרות.', ok: 'ייבוא', danger: true });
+    const u = undoInfo();
+    const warn = u && u.kind === 'set-aside' ? ' שימו לב: הנתונים שהוסטו בצד (מביטול הייבוא הקודם) יוחלפו, ולא יהיה אפשר להחזיר אותם.' : '';
+    const ok = await ask({ title: 'לייבא את הגיבוי?', body: 'הייבוא יחליף את כל הנתונים שנמצאים עכשיו בטלפון. אם משהו ישתבש, אפשר יהיה להחזיר אותם מההגדרות.' + warn, ok: 'ייבוא', danger: true });
     if (!ok) return;
     let next;
     try { next = normalize(data); } catch (e) { toast(BAD_FILE); return; }
@@ -1777,6 +1807,13 @@ function importData(file) {
   };
   r.onerror = () => toast('לא הצלחנו לקרוא את הקובץ');
   r.readAsText(file);
+}
+async function discardSetAside() {
+  const u = undoInfo();
+  if (!u || u.kind !== 'set-aside') { openSettings(false); return; }
+  const ok = await ask({ title: 'למחוק את הנתונים שהוסטו?', body: 'הנתונים שהוסטו בצד, כולל רישומים שנוספו אליהם, יימחקו ולא יהיה אפשר להחזיר אותם. הנתונים שבטלפון עכשיו לא ישתנו.', ok: 'מחיקה', danger: true });
+  if (!ok) return;
+  clearUndo(); openSettings(false); toast('הנתונים שהוסטו נמחקו');
 }
 async function undoImport() {
   const u = undoInfo();
@@ -1928,6 +1965,7 @@ const ACT = {
   export: exportData,
   import: () => $('#importFile').click(),
   undoImport,
+  discardSetAside,
   async reset() {
     if (!(await ask({ title: 'למחוק את כל הנתונים?', body: 'כל הרישומים, הכוכבים וההגדרות יימחקו מהטלפון, ואי אפשר יהיה לשחזר אותם. מומלץ לייצא גיבוי קודם.', ok: 'המשך', danger: true }))) return;
     // second step looks different on purpose: confirm on the other side, so one double tap can never pass both
