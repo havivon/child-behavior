@@ -2061,6 +2061,69 @@ test('weekly table: rows are keyboard operable with a visible focus ring', 'R2-7
   assert((await txt(page, '#tab-progress .chart-info')).includes('הקישו'), 'Space toggles the selection off');
 });
 
+/* ================================================================== *
+ * 19. Round-3 QA re-verification: adversarial taps / keys on the reset flow, undo-slot promises
+ * ================================================================== */
+test('reset (adversarial): immediate double tap, triple/quad taps and Enter auto-repeat never pass both steps', 'R2-1 (round 3)', async t => {
+  const page = await t.open({ state: richState(4) });
+  const openReset = async () => { await page.click('.topbar [data-act=openSettings]'); await page.click('#setOverlay [data-act=reset]'); await page.waitForSelector('#dlg:not([hidden])'); };
+  const intact = async what => assert((await getState(page)).incidents.length > 0, `${what}: data was wiped`);
+  const closeAll = async () => { for (let i = 0; i < 3 && await page.evaluate(() => window.__androidBack()); i++); };
+  // 1. immediate double tap (no reading delay): ignored by the arming window
+  await openReset();
+  await doubleTap(page, '#dlgOk');
+  await intact('immediate double tap');
+  eq(await txt(page, '#dlgTitle'), 'למחוק את כל הנתונים?', 'still on step 1');
+  await closeAll();
+  // 2. taps 150 ms apart (4 taps) after reading
+  await openReset(); await page.waitForTimeout(700);
+  const [x, y] = await center(page, '#dlgOk');
+  for (let i = 0; i < 4; i++) { await page.touchscreen.tap(x, y); await page.waitForTimeout(150); }
+  await page.waitForTimeout(300);
+  await intact('4 taps 150 ms apart');
+  await closeAll();
+  // 3. keyboard: confirm step 1 with Enter, then auto-repeat Enter for 1.2 s
+  await openReset(); await page.waitForTimeout(700);
+  await page.focus('#dlgOk');
+  for (let i = 0; i < 30; i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(40); }
+  await intact('Enter auto-repeat');
+  await closeAll();
+  // 4. back during the arming window of step 2 cancels safely
+  await openReset(); await page.waitForTimeout(700);
+  await page.click('#dlgOk');
+  eq(await page.evaluate(() => window.__androidBack()), true, 'back handled during step-2 arming');
+  assert(await page.locator('#dlg').isHidden(), 'step 2 cancelled by back');
+  await intact('back during arming');
+});
+test('undo import: data set aside by an undo (incl. entries made after the import) is not deleted silently when the 7 days end', 'R2-5 (round 3): sheet promises "לא יימחקו … יישמרו במקומם"', async t => {
+  const page = await t.open({ state: richState(3) });
+  await page.click('.topbar [data-act=openSettings]');
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(richState(5))));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  await page.clock.setSystemTime(NOW + 2 * DAY);
+  await go(page, 'incident');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.fill('#incNote', 'נרשם אחרי הייבוא');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  await page.clock.setSystemTime(NOW + 6 * DAY);
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=undoImport]');
+  await answer(page, true);                             // the sheet promised the current data "לא יימחקו"
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  await page.clock.setSystemTime(NOW + 8 * DAY);        // one day after the undo
+  await page.click('.topbar [data-act=openSettings]');
+  const kept = await page.evaluate(k => (localStorage.getItem(k + '-prev') || '').includes('נרשם אחרי הייבוא'), KEY);
+  assert(kept || await page.locator('#setOverlay [data-act=undoImport]').count() === 1, 'the incident logged after the import was deleted with the expired undo slot, one day after an undo that promised to keep it');
+});
+test('stars: restarting the program does not re-award stars that were already rewarded in the old program week', 'R2-3 (round 3)', async t => {
+  const stars = [...Array(15)].map((_, i) => ({ goalId: 'g1', ts: NOW - 3600e3 - i * 60e3 }));   // earned (and celebrated) this week
+  const page = await t.open({ state: makeState({ settings: { startDate: startForWeek(5), starsNeeded: 15 }, stars, celebrated: { 5: 15 } }) });
+  await setSettings(page, { sStart: addDaysKey(TODAY, 7) });
+  await addStar(page, 'g1');
+  assert(!(await visible(page, '#celOverlay')), 'the same 15 stars trigger a second celebration and reward after the restart');
+});
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */
