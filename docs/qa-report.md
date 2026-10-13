@@ -694,3 +694,90 @@ None is tautological, and each asserts the observable behaviour (state in storag
 - **Arming depends on CSS animations.** The guards are timed by CSS animations (`.modal.arm::before`, `#tapShield`), and `dlgArmed()` reads the computed visibility of `::before`. If an environment ever stopped running CSS animations entirely, the cover would stay visible and no sheet could be confirmed; cancel, Escape and back would still work. Chromium and Android WebView run them, including with reduced motion (verified), so this is a theoretical risk only. Worth a comment in the code.
 - **A deliberate tap on step 2's confirm ≥ 400 ms after step 1 does reset.** That tap must land on the *other* side of the sheet, on a red button labelled "כן, למחוק הכול", so it is a deliberate action, not an accidental double tap. This is working as intended.
 - **The pre-start star window is rolling.** Stars earned during a long pre-start period drop off 7 days later; regular weeks reset weekly anyway. This is acceptable.
+
+---
+
+# Round 4: in-app explanations (commit `acbea8a`)
+
+- **Scope:** the ⓘ explanations feature (`git diff 736cf91 acbea8a -- index.html tests/e2e.js`), checked against `docs/explanations-spec.md`.
+- **Method:**
+  1. Audited the 10 new tests (section 21).
+  2. Did an adversarial exploration of every entry point, the sheet versions, the actions, overlay stacking and layout.
+  3. Compared the content word for word with the spec.
+  4. Ran the full suite twice.
+- **What I changed:** added 7 tests (section 22). `index.html` was not edited.
+- **Screenshots:** `/tmp/qa-shots/r2/r4-*.png`.
+
+## Verdict: **ship**
+
+The feature works and its content is exactly what the client reviewed. Every ⓘ opens the right entry, and the actions start the right exercise. The tap guards hold, and nothing breaks at 320 px, light or dark.
+
+The one new bug is **Minor (accessibility)**: keyboard focus is lost on three transitions out of the sheet (R4-1). It does not affect touch users and can follow in the next release.
+
+## Suite result
+
+| Run | Tests | Pass | Fail |
+|---|---|---|---|
+| Engineer's suite at `acbea8a` (reported, and confirmed by the lead) | 139 | 139 | 0 |
+| With my 7 new tests (section 22), run 1 | **146** | **144** | **2** (#145, #146: R4-1) |
+| With my 7 new tests, run 2 | 146 | 144 | 2 (identical PASS/FAIL list) |
+
+The suite is deterministic. I confirmed that the existing 129 tests are unedited: the diff to `tests/e2e.js` is additions only.
+
+## Audit of the 10 new tests (section 21)
+
+**Verdict: real coverage, nothing tautological.** The tests click the real ⓘ buttons and check the right title, the accessible name, a ≥ 44 px hit area, the child or parent version, the CTA label, focus in and back, inert background, all 4 close paths and the tap guard. The dictionary test checks all 27 entries' sections, steps, tips and related chips against `INFO`, and also covers 320 px light and dark.
+
+Gaps I closed with section 22 (the first 5 of these pass):
+
+| Gap in section 21 | New test |
+|---|---|
+| Content was compared only with `INFO` itself, never with the client-reviewed spec, so a typo or truncation in `INFO` would pass. | **Every `INFO` field equals the spec's Hebrew (§1), parsed from `docs/explanations-spec.md`.** Also checks the rendered sheets (parent and child version) for `&quot;`, `\"`, `&amp;` and `undefined`. |
+| The game-of-the-day link was checked on one day only. | 10 consecutive days with a fake clock. The link always opens that day's game, and all 10 games appear. |
+| The protocol ⓘ was checked on the Incident tab only. | The guide protocol (anger-management phase, week 6) opens תוצאה הגיונית and תיקון. |
+| Only a single tap on an ⓘ was tested. | Double and triple taps on all 6 Calm ⓘ buttons open the sheet only, never start an exercise, and never reach the screen behind. |
+| "נסו עכשיו" from a Today sheet was checked only up to `EX.returnTo`. | It ends with the parent screen ("מכירים את התרגיל"), with no mood dots and "חזרה להיום". No mood is logged, and the morning item is not ticked by a normal balloon practice. |
+| Focus after leaving the sheet for the guide or an exercise was not checked. | #145 and #146 (failing, R4-1). |
+
+One weak spot: the dictionary test calls `openInfo()` directly (white-box) to render every entry in the sheet. That's acceptable because the real ⓘ buttons are covered by the other tests.
+
+## Adversarial exploration
+
+| Area | Result |
+|---|---|
+| **Calm tiles**: 6 tiles × both grids ("מה יעזור לך עכשיו" for green, yellow and orange, plus "כל הכלים") | Each ⓘ opens the right entry in the child version: child line first, "להורים" collapsed, "בוא ננסה" in the footer. A tap on the rest of the tile still starts the exercise. At 320 px the ⓘ sits in the tile corner without covering the name. |
+| **Red state** | There is no ⓘ on the 3 recommended tiles; the full grid keeps all 6 (ruling 3). |
+| **Checklist**: 5 rows | They open morning, move, stopgame, one and bed (`CHECK_INFO`). The accessible names match §3.5, the ⓘ never toggles a row, and its hit area doesn't overlap the row text. |
+| **Game of the day** | It was correct on 12 consecutive days. The box text comes from `INFO` (single source). |
+| **Praise card; protocol on the Incident tab and the guide** | All open the right entries (שבח ספציפי, תוצאה הגיונית, תיקון). This also works by keyboard, and Escape returns focus to the ⓘ. |
+| **Child vs parent versions** | Calm context: child line + collapsed parent sections, with no chips and no guide link. Parent context: 3 sections, tip, "איך להסביר לו" (calm tools only), "ראו גם" chips, and the guide link. |
+| **"ראו גם" chains** | I chained praise → bed → praise → one → praise → bed. Each chip replaces the content in place with the body scrolled to the top and focus on the title. Escape at the end returns focus to the original ⓘ. Chips are also covered by the 400 ms guard. |
+| **Actions** | Each one does what it says: "בוא ננסה" from Calm starts the exercise with a mood check-in afterwards; "נסו עכשיו" from Today or the guide gives the parent screen with no mood; morning from the Today sheet ticks the item; morning from the guide dictionary ticks it, says "המשימה סומנה בסדר היום" and returns to the guide; the CTA disappears once the morning item is done. |
+| **Guide practice** | No mood is logged, and "חזרה למדריך" reopens the same entry and scrolls to it (smooth, or instant with reduced motion). |
+| **Stacking and back** | `OVERLAY_ORDER` puts the sheet above the exercise and settings. Starting an exercise closes the sheet first, so they never overlap. Escape and Android back close the sheet without leaving the tab. Double/triple taps, rapid open → ✕ → re-tap (swallowed by the 400 ms shield, then works) and midnight with the sheet open all behaved; no page errors. |
+| **Layout** | Checked at 320 px light, 320 px dark with reduced motion, and 390 px dark: the header and footer stay fixed while the long entries (morning, stop with parents expanded, roleplay) scroll in the body. No horizontal scroll in sheets, the dictionary, the Calm grid or the protocol. |
+| **Content** | All 27 entries are identical to the spec §1 in every field. Groups 6/3/10/8 are in spec order, and `GAMES` order is unchanged (so `gameOfDay()` is stable). `TOOLS[t].name` equals `INFO[t].title`. The timings in the text match `EXS` (balloon/candle 4/6×6, box 4×4×4, robot 5/5×3, wall 10 s, stop 4×3 s×2, morning 18 cycles = 3:00). No escaping artifacts in the sheet or the guide. |
+
+## New bugs
+
+#### R4-1. Keyboard focus is lost when leaving the explanation sheet for the guide or an exercise
+- **Severity:** Minor (accessibility; touch users are not affected)
+- **Tests:** #145, #146
+- **Repro A:** Today ⓘ (e.g. "תנועה בחוץ") → "כל הכלים והמושגים במדריך". The guide entry opens and scrolls into view, but `document.activeElement` is `<body>`.
+- **Repro B:** In the guide dictionary, "נסו עכשיו" → finish → "חזרה למדריך". Again focus is on `<body>`.
+- **Repro C:** On a Calm tile, ⓘ → "בוא ננסה" → close the exercise (✕, Escape or back). Focus stays on a hidden element or `<body>` instead of returning to the tile.
+- **Also:** if the day changes while a sheet is open, the midnight re-render removes the ⓘ that opened it, so focus goes to `<body>` when the sheet closes.
+- **Expected:** Per spec §4.4/§5.3, focus moves to the entry's `summary` (A, B), and to the tile or its ⓘ (C).
+- **Cause:**
+  - `openDictEntry()` (2209–2216) calls `summary.focus()` while `main` is still `inert`. `syncOverlays()` (2082) only removes `inert` later, in the MutationObserver callback (2105), so the `focus()` call is ignored.
+  - Paths: `infoToGuide` (2507), `exClose` (2549).
+  - In case C, the exercise's opener was the "בוא ננסה" button inside the now-hidden sheet, so there is nothing to return focus to (`infoAction`, 2497).
+- **Fix hint:**
+  - Call `syncOverlays()` synchronously in `closeInfo()` and `stopEx()` before navigating, or defer `openDictEntry`'s focus with `requestAnimationFrame` / `setTimeout(0)`.
+  - Record the sheet's own opener (the ⓘ) as the exercise's return target.
+
+## Notes (no defect)
+
+- **The morning entry is 113 words**, slightly over the spec's own 55–110 guideline. It is identical to the client-reviewed spec text, so this is a content note for the designer, not an implementation bug.
+- **`infoInline()` always opens the parent ("today") version.** On the guide tab, the sheet's "כל הכלים והמושגים במדריך" link therefore closes the sheet and jumps within the same tab. This is harmless.
+- **The spec's open questions 1–5 were implemented as the designer recommended:** concept sharing, the fourth "סדר היום" group, no ⓘ in the red state, "בוא ננסה" vs "נסו עכשיו", and the §5.4 entry points. The §5.4 "עוד על זה" links on the guide phase items were **not** added, which the spec marks as optional.
