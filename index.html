@@ -196,6 +196,8 @@ ul.clean{list-style:none;margin:0;padding:0}
 .progress > span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--blue));border-radius:6px;transition:width .5s ease}
 
 /* ---------- praise ---------- */
+.praise-btn .pname{min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-weight:inherit}
+.praise-btn .cnt{flex:0 0 auto;white-space:nowrap;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 .praise-btn{width:100%;min-height:76px;font-size:var(--fs-md);border-radius:var(--r-lg);background:linear-gradient(135deg,var(--praise-from),var(--praise-to));color:var(--on-praise);box-shadow:0 6px 18px rgba(243,154,69,.35)}
 .praise-dots{display:flex;gap:8px;justify-content:center;margin:12px 0 4px;flex-wrap:wrap}
 .praise-dots i{width:22px;height:22px;border-radius:50%;background:var(--surface2);border:2px solid var(--line-strong)}
@@ -313,6 +315,7 @@ table.wk{width:100%;border-collapse:collapse;font-size:var(--fs-sm);text-align:c
 table.wk th{font-size:var(--fs-xs);color:var(--muted);font-weight:700;padding:6px 2px;border-bottom:1px solid var(--line)}
 table.wk td{padding:9px 2px;border-bottom:1px solid var(--line)}
 table.wk tbody tr{cursor:pointer}
+table.wk tbody tr:focus-visible{outline:3px solid var(--focus);outline-offset:-3px}
 table.wk tr.cur td{background:var(--accent-soft);font-weight:700}
 table.wk tr.pick td{box-shadow:inset 0 2px 0 var(--text),inset 0 -2px 0 var(--text)}
 .encourage{background:linear-gradient(135deg,var(--good-soft),var(--accent-soft));border:none}
@@ -422,6 +425,13 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
 .modal-card p[hidden]{display:none}
 .modal-card h2 + .modal-actions{margin-top:var(--sp-5)}
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+.modal-actions.swap #dlgOk{order:-1}      /* second step of a two-step confirm: confirm moves to the other side */
+/* Tap guards, timed by CSS (real time): a freshly opened sheet ignores taps for 400 ms, and after a sheet is
+   closed by a tap a transparent shield swallows the follow-up tap of a double tap for 400 ms. */
+.modal.arm::before{content:"";position:fixed;inset:0;z-index:2;animation:tapGuard .4s step-end forwards}
+#tapShield{position:fixed;inset:0;z-index:95;visibility:hidden}
+#tapShield.on{animation:tapGuard .4s step-end forwards}
+@keyframes tapGuard{from{visibility:visible}to{visibility:hidden}}
 @keyframes sheetUp{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @keyframes fadeIn{from{opacity:0}}
 @media (prefers-color-scheme: dark){ .btn.danger-solid{color:#2a0b0b} }
@@ -433,6 +443,8 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
   /* the slow breathing scale is the content of the exercise, not decoration: keep it */
   .ex .circle{transition-duration:var(--breath-dur,4s) !important}
+  /* the tap guards are safety timers, not motion */
+  #tapShield.on,.modal.arm::before{animation-duration:.4s !important}
 }
 </style>
 </head>
@@ -489,6 +501,7 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
   </div>
 </div>
 
+<div id="tapShield" aria-hidden="true"></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 
@@ -638,6 +651,8 @@ const keepSlash = s => esc(s).replace(/ \/ /g, '&nbsp;/&nbsp;');   // "אח / א
    ========================================================= */
 const KEY = 'ragua-vehazak-v1';
 const PREV_KEY = KEY + '-prev';
+const PREV_AT_KEY = KEY + '-prev-at';   // {at: import time, undone: whether -prev currently holds the imported data}
+const UNDO_DAYS = 7;
 const CORRUPT_KEY = KEY + '-corrupt';
 function defaults() {
   return {
@@ -793,7 +808,15 @@ const weekRaw = (date = new Date()) => Math.floor(dayDiff(date, parseKey(S.setti
 const wkOfTs = ts => weekRaw(new Date(ts));     // ≤ 0 = before the start date (not part of week 1)
 const activePhases = w => PHASES.filter(p => w >= p.from && w <= p.to);
 const starWeek = () => Math.max(0, weekRaw()); // 0 = the "before the start" bucket
-function weekStars(w) { return S.stars.filter(s => { const k = wkOfTs(s.ts); return w === 0 ? k <= 0 : k === w; }); }
+/* week 0 = "before the start": only stars from before the start date that were earned in the last 7 days
+   (rolling, from midnight 6 days ago), so it can never hold more than one week could really earn */
+function weekStars(w) {
+  if (w === 0) {
+    const n = new Date(), from = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 6).getTime();
+    return S.stars.filter(s => s.ts >= from && wkOfTs(s.ts) <= 0);
+  }
+  return S.stars.filter(s => wkOfTs(s.ts) === w);
+}
 const notFuture = ts => ts <= Date.now() + FUTURE_TOL;
 
 /* =========================================================
@@ -879,7 +902,7 @@ function renderToday() {
     <p class="sub">שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאחיך על התור". היעד: 5 ביום.</p>
     <label class="sr-only" for="praiseNote">מה ראיתם?</label>
     <input class="input mt3" id="praiseNote" maxlength="120" value="${esc(praiseDraft)}" placeholder="מה ראיתם? (לא חובה)" enterkeyhint="done">
-    <button type="button" class="btn praise-btn mt3" data-act="praise">⭐ תפסתי ${childName() ? 'את ' + esc(childName()) : 'אותו'}! <span>(${esc(praises.length)}/5)</span></button>
+    <button type="button" class="btn praise-btn mt3" data-act="praise"><b class="pname">⭐ תפסתי ${childName() ? 'את ' + esc(childName()) : 'אותו'}!</b> <span class="cnt">(${esc(praises.length)}/5)</span></button>
     <div class="praise-dots" role="img" aria-label="${esc(praises.length)} שבחים מתוך 5 היום">${Array.from({ length: Math.max(5, praises.length) }, (_, i) => `<i class="${i < praises.length ? 'on' : ''}"></i>`).join('')}</div>
     ${praises.length >= 5 ? `<p class="small" style="text-align:center;font-weight:700;color:var(--good)">הגעתם ליעד היומי! 🎉</p>` : ''}
     ${praises.length ? `<ul class="clean note-list">${praises.map((p, i) => `<li><span><b>${esc(fmtTime(p.ts))}</b> · ${p.note ? esc(p.note) : '<span class="muted">בלי הערה</span>'}</span><button type="button" class="x-btn" data-act="delPraise" data-i="${i}" aria-label="מחיקה">${ICON.close}</button></li>`).join('')}</ul>` : ''}
@@ -1234,7 +1257,7 @@ function renderProgress() {
     <h2>📅 סיכום שבועי</h2>
     <table class="wk">
       <thead><tr><th scope="col">שבוע</th><th scope="col">אירועים</th><th scope="col">מכות</th><th scope="col">כלי %</th><th scope="col" aria-label="כוכבים">⭐</th><th scope="col" aria-label="תפסתי אותו">👀</th></tr></thead>
-      <tbody>${stats.slice(0, cw).map(x => `<tr class="${x.w === cw && raw <= 12 ? 'cur' : ''} ${x.w === chartPick.inc ? 'pick' : ''}" data-act="pickWeek" data-w="${x.w}"><td>${x.w}</td><td>${esc(x.all)}</td><td>${esc(x.hits)}</td><td>${toolPct(x) == null ? '–' : esc(toolPct(x)) + '%'}</td><td>${esc(x.stars)}</td><td>${esc(x.praises)}</td></tr>`).join('')}</tbody>
+      <tbody>${stats.slice(0, cw).map(x => `<tr class="${x.w === cw && raw <= 12 ? 'cur' : ''} ${x.w === chartPick.inc ? 'pick' : ''}" data-act="pickWeek" data-w="${x.w}" tabindex="0" aria-label="שבוע ${x.w}: ${esc(incWord(x.all))}, ${esc(x.hits)} עם מכות. הצגה בגרף"><td>${x.w}</td><td>${esc(x.all)}</td><td>${esc(x.hits)}</td><td>${toolPct(x) == null ? '–' : esc(toolPct(x)) + '%'}</td><td>${esc(x.stars)}</td><td>${esc(x.praises)}</td></tr>`).join('')}</tbody>
     </table>
     <p class="sub small">⭐ כוכבים · 👀 "תפסתי אותו מתנהג יפה" · הקישו על שורה כדי לסמן את השבוע בגרף</p>
   </section>
@@ -1539,7 +1562,13 @@ function trapTab(e) {
 }
 let dlgDone = null;
 /* styled, focus-trapped confirm sheet; resolves true (OK) or false (cancel / Escape / back / scrim) */
-function ask({ title, body = '', ok = 'אישור', cancel = 'ביטול', danger = false }) {
+/* restart a CSS animation (used by the tap guards, which must run on real time) */
+function restartAnim(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+/* the sheet accepts activation only once its 400 ms arming cover is gone */
+const dlgArmed = () => { const d = $('#dlg'); return !d.hidden && (!d.classList.contains('arm') || getComputedStyle(d, '::before').visibility === 'hidden'); };
+/* after a sheet is closed by a tap, swallow the second tap of a double tap so it never reaches the screen behind */
+const shieldTaps = () => restartAnim($('#tapShield'), 'on');
+function ask({ title, body = '', ok = 'אישור', cancel = 'ביטול', danger = false, swap = false }) {
   if (dlgDone) dlgDone(false);
   return new Promise(resolve => {
     const d = $('#dlg'), okB = $('#dlgOk'), cB = $('#dlgCancel');
@@ -1547,11 +1576,16 @@ function ask({ title, body = '', ok = 'אישור', cancel = 'ביטול', dange
     $('#dlgBody').textContent = body; $('#dlgBody').hidden = !body;
     okB.textContent = ok; cB.textContent = cancel;
     okB.className = 'btn' + (danger ? ' danger-solid' : '');
+    $('#dlg .modal-actions').classList.toggle('swap', swap);
+    $('#toast').classList.remove('show');   // a toast must never cover the sheet's text
     dlgDone = v => { dlgDone = null; d.hidden = true; resolve(v); };
     d.hidden = false;
+    restartAnim(d, 'arm');
   });
 }
-$('#dlg').addEventListener('click', e => { if (e.target === e.currentTarget && dlgDone) dlgDone(false); });
+/* a tap on a sheet button or on the scrim: ignored while arming; closes with the tap shield */
+function dlgTap(v) { if (!dlgDone || !dlgArmed()) return; shieldTaps(); dlgDone(v); }
+$('#dlg').addEventListener('click', e => { if (e.target === e.currentTarget) dlgTap(false); });
 function closeCelebration() { $('#celOverlay').hidden = true; $$('.confetti').forEach(c => c.remove()); }
 /* Android hardware back (contract in android/README.md) – also used for Escape on desktop.
    Returns true when something was closed/handled, false to let the app go to the background. */
@@ -1570,7 +1604,7 @@ window.__androidBack = () => { try { return androidBack() === true; } catch (e) 
    ========================================================= */
 function openSettings(welcome) {
   const st = S.settings;
-  const hasPrev = !welcome && !!storageGet(PREV_KEY);
+  const undo = welcome ? null : undoInfo();
   const rulesHTML = [0, 1, 2].map(i => `<input class="input" id="sRule${i}" maxlength="60" value="${esc(st.rules[i] || '')}" placeholder="חוק ${i + 1}" aria-label="חוק ${i + 1}" style="margin-bottom:8px">`).join('');
   const goalsHTML = [0, 1, 2].map(i => { const g = st.goals[i]; return `<input class="input" id="sGoal${i}" data-goal-id="${esc(g ? g.id : '')}" maxlength="50" value="${esc(g ? g.text : '')}" placeholder="יעד ${i + 1}${i === 2 ? ' (לא חובה)' : ''}" aria-label="יעד ${i + 1}${i === 2 ? ' (לא חובה)' : ''}" style="margin-bottom:8px">`; }).join('');
   const starsHTML = `
@@ -1615,8 +1649,9 @@ function openSettings(welcome) {
       <div class="stack">
         <button type="button" class="btn ghost block" data-act="export">${ICON.download}ייצוא גיבוי</button>
         <button type="button" class="btn ghost block" data-act="import">${ICON.upload}ייבוא מגיבוי</button>
+        ${undo ? `<button type="button" class="btn ghost block" data-act="undoImport">${ICON.undo}${undo.undone ? 'החזרת הנתונים מהגיבוי שיובא' : 'החזרת הנתונים שלפני הייבוא האחרון'}</button>
+        <p class="sub small" style="margin:0">אפשר עד ${UNDO_DAYS} ימים מהייבוא ב-${esc(fmtFullDate(keyOf(new Date(undo.at))))}. שום דבר לא נמחק – הנתונים מתחלפים.</p>` : ''}
       </div>
-      ${hasPrev ? `<button type="button" class="btn ghost block mt3" data-act="undoImport">${ICON.undo}החזרת הנתונים שלפני הייבוא האחרון</button>` : ''}
     </div>
     <div class="card">
       <h2>🗑️ איפוס</h2>
@@ -1688,8 +1723,23 @@ function downloadBlob(json, name) {
   } catch (e) { toast('הייצוא נכשל. נסו שוב.'); }
 }
 const BAD_FILE = 'זה לא נראה כמו קובץ גיבוי של רגוע וחזק';
-/* replaces the data only after the imported state has been validated and rendered successfully */
-function commitState(next, okMsg) {
+/* a state with nothing worth restoring (e.g. the default state of a fresh install) */
+function isEmptyState(st) {
+  return !st.settings.onboarded || (!st.incidents.length && !st.stars.length && !st.moods.length &&
+    !Object.keys(st.days).some(k => st.days[k].praises.length || Object.keys(st.days[k].checks).some(c => st.days[k].checks[c])));
+}
+function clearUndo() { storageDel(PREV_KEY); storageDel(PREV_AT_KEY); }
+/* the undo slot is offered for 7 days after an import, and only when it holds real data */
+function undoInfo() {
+  let meta = null, prev = null;
+  try { meta = JSON.parse(storageGet(PREV_AT_KEY)); prev = JSON.parse(storageGet(PREV_KEY)); } catch (e) { meta = null; }
+  const ok = isObj(meta) && typeof meta.at === 'number' && isObj(prev) && Date.now() - meta.at <= UNDO_DAYS * 864e5 && !isEmptyState(normalize(prev));
+  if (!ok) { if (storageGet(PREV_KEY) || storageGet(PREV_AT_KEY)) clearUndo(); return null; }
+  return { at: meta.at, undone: !!meta.undone, prev };
+}
+/* replaces the data only after the new state has been validated and rendered successfully.
+   kind 'import': the current data goes to the undo slot; kind 'swap': current data and the slot change places */
+function commitState(next, okMsg, kind = 'import', meta = null) {
   const prev = S, prevJSON = JSON.stringify(S);
   S = next;
   try {
@@ -1700,7 +1750,13 @@ function commitState(next, okMsg) {
     toast('לא הצלחנו לטעון את הגיבוי. הנתונים הקודמים נשארו כמו שהיו.');
     return false;
   }
-  storageSet(PREV_KEY, prevJSON);         // one bad import is always recoverable
+  if (kind === 'swap') {                  // undo/redo: nothing is ever lost, the two states just change places
+    storageSet(PREV_KEY, prevJSON);
+    storageSet(PREV_AT_KEY, JSON.stringify({ at: meta.at, undone: !meta.undone }));
+  } else if (!isEmptyState(prev)) {      // one bad import is always recoverable
+    storageSet(PREV_KEY, prevJSON);
+    storageSet(PREV_AT_KEY, JSON.stringify({ at: Date.now(), undone: false }));
+  } else clearUndo();                     // nothing to go back to (e.g. a restore during onboarding)
   save(); draft = null; praiseDraft = ''; chartPick = { inc: null, tool: null };
   closeSettings(); showTab(S.ui.tab);
   toast(okMsg);
@@ -1723,14 +1779,16 @@ function importData(file) {
   r.readAsText(file);
 }
 async function undoImport() {
-  const t = storageGet(PREV_KEY);
-  let data = null;
-  try { data = JSON.parse(t); } catch (e) { data = null; }
-  if (!isObj(data)) { storageDel(PREV_KEY); toast('אין נתונים קודמים לשחזור'); return; }
-  const ok = await ask({ title: 'להחזיר את הנתונים הקודמים?', body: 'הנתונים שנמצאים עכשיו בטלפון יוחלפו בנתונים שהיו בו לפני הייבוא האחרון.', ok: 'החזרה' });
+  const u = undoInfo();
+  if (!u) { toast('אין נתונים קודמים לשחזור'); openSettings(false); return; }
+  const when = `${fmtFullDate(keyOf(new Date(u.at)))} בשעה ${fmtTime(u.at)}`;
+  const keep = 'הנתונים שבטלפון עכשיו, כולל כל מה שנוסף מאז, לא יימחקו: הם יישמרו במקומם, ואפשר יהיה להחזיר אותם באותו כפתור.';
+  const ok = await ask(u.undone
+    ? { title: 'להחזיר את הנתונים מהגיבוי?', body: `יחזרו הנתונים מהגיבוי שיובא ב-${when}. ${keep}`, ok: 'החזרה' }
+    : { title: 'להחזיר את הנתונים שלפני הייבוא?', body: `יחזרו הנתונים שהיו בטלפון לפני הייבוא ב-${when}. ${keep}`, ok: 'החזרה' });
   if (!ok) return;
-  const next = normalize(data); next.settings.onboarded = true;
-  if (commitState(next, 'הנתונים הקודמים הוחזרו ✓')) storageDel(PREV_KEY);
+  const next = normalize(u.prev); next.settings.onboarded = true;
+  commitState(next, u.undone ? 'הנתונים מהגיבוי הוחזרו ✓' : 'הנתונים שלפני הייבוא הוחזרו ✓', 'swap', u);
 }
 
 /* =========================================================
@@ -1771,6 +1829,8 @@ function toast(msg) {
    Actions (event delegation)
    ========================================================= */
 const lastStarTap = {};
+/* keep keyboard focus on the same control after a re-render */
+function refocus(sel) { const el = $(sel); if (el) el.focus({ preventScroll: true }); }
 const ACT = {
   tab: el => showTab(el.dataset.tab),
   check(el) {
@@ -1859,8 +1919,8 @@ const ACT = {
     $('#tab-incident details').open = true;
   },
   chartMode(el) { S.ui.chartMode = el.dataset.mode === 'hits' ? 'hits' : 'all'; save(); renderProgress(); },
-  bar(el) { const c = el.dataset.chart, w = +el.dataset.w; chartPick[c] = chartPick[c] === w ? null : w; renderProgress(); },
-  pickWeek(el) { const w = +el.dataset.w; chartPick.inc = chartPick.inc === w ? null : w; chartPick.tool = chartPick.inc; renderProgress(); },
+  bar(el) { const c = el.dataset.chart, w = +el.dataset.w, had = document.activeElement === el; chartPick[c] = chartPick[c] === w ? null : w; renderProgress(); if (had) refocus(`#tab-progress rect[data-chart="${c}"][data-w="${w}"]`); },
+  pickWeek(el) { const w = +el.dataset.w, had = document.activeElement === el; chartPick.inc = chartPick.inc === w ? null : w; chartPick.tool = chartPick.inc; renderProgress(); if (had) refocus(`#tab-progress tr[data-w="${w}"]`); },
   openSettings: () => openSettings(false),
   closeSettings,
   saveSettings,
@@ -1870,12 +1930,13 @@ const ACT = {
   undoImport,
   async reset() {
     if (!(await ask({ title: 'למחוק את כל הנתונים?', body: 'כל הרישומים, הכוכבים וההגדרות יימחקו מהטלפון, ואי אפשר יהיה לשחזר אותם. מומלץ לייצא גיבוי קודם.', ok: 'המשך', danger: true }))) return;
-    if (!(await ask({ title: 'בטוחים?', body: 'זה הצעד האחרון – אחריו הכול נמחק.', ok: 'כן, למחוק הכול', danger: true }))) return;
-    S = defaults(); save(); storageDel(PREV_KEY); closeSettings(); draft = null; praiseDraft = ''; selMood = null; showTab('today'); openSettings(true);
+    // second step looks different on purpose: confirm on the other side, so one double tap can never pass both
+    if (!(await ask({ title: 'בטוחים?', body: 'זה הצעד האחרון – אחריו הכול נמחק.', ok: 'כן, למחוק הכול', danger: true, swap: true }))) return;
+    S = defaults(); save(); clearUndo(); closeSettings(); draft = null; praiseDraft = ''; selMood = null; showTab('today'); openSettings(true);
   },
   celClose: closeCelebration,
-  dlgOk: () => { if (dlgDone) dlgDone(true); },
-  dlgCancel: () => { if (dlgDone) dlgDone(false); }
+  dlgOk: () => dlgTap(true),
+  dlgCancel: () => dlgTap(false)
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
@@ -1885,7 +1946,7 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (androidBack()) { e.preventDefault(); e.stopPropagation(); } return; }
   if (e.key === 'Tab') { trapTab(e); return; }
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role=button][data-act]:not(button)')) {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role=button][data-act]:not(button), tr[data-act][tabindex]')) {
     e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   }
   if (e.key === 'Enter' && e.target.id === 'praiseNote') { e.preventDefault(); ACT.praise(); }
@@ -1900,16 +1961,26 @@ $('#importFile').addEventListener('change', e => { const f = e.target.files[0]; 
 
 /* Day rollover (checklist resets at midnight, also while the app stays open) and a fresh
    automatic incident time after the app was in the background. */
-let lastDay = todayKey();
+let lastDay = todayKey(), rerenderPending = false;
+const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || (a.tagName === 'INPUT' && !/^(button|submit|checkbox|radio|file)$/.test(a.type))); };
 function onClock() {
   const k = todayKey();
-  if (k !== lastDay) { lastDay = k; rerender(); return; }
+  if (k !== lastDay) {
+    lastDay = k;
+    // never re-render under the user's fingers: wait until they leave the field (drafts are kept either way)
+    if (typing()) rerenderPending = true; else rerender();
+    return;
+  }
   if (S.ui.tab === 'incident' && draft && !draft.tsEdited) {
     const el = $('#incTs');
     if (el && document.activeElement !== el) { draft.ts = el.value = localInputValue(new Date()); el.max = maxIncidentInput(); }
   }
 }
 setInterval(onClock, 60e3);
+document.addEventListener('focusout', () => {
+  if (!rerenderPending) return;
+  setTimeout(() => { if (rerenderPending && !typing()) { rerenderPending = false; rerender(); } }, 250);
+});
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onClock(); });
 
 /* =========================================================

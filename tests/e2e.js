@@ -1476,6 +1476,7 @@ test('dialog: deletes use the in-app confirm sheet (focus inside, Escape and scr
   eq((await getState(page)).incidents.length, 1, 'Escape = cancel');
   await page.click('#tab-incident [data-act=delIncident]');
   await page.waitForSelector('#dlg:not([hidden])');
+  await page.waitForTimeout(700); // a new sheet ignores taps for 400 ms (R2-1a)
   await page.mouse.click(20, 40); // tap on the scrim above the sheet
   assert(await page.locator('#dlg').isHidden(), 'tap on the scrim closes the sheet');
   eq((await getState(page)).incidents.length, 1, 'scrim = cancel');
@@ -1861,6 +1862,7 @@ test('dialog: a double tap on "המשך" in the reset sheet must not also confir
   await page.click('.topbar [data-act=openSettings]');
   await page.click('#setOverlay [data-act=reset]');
   await page.waitForSelector('#dlg:not([hidden])');
+  await page.waitForTimeout(700);  // the user reads the sheet first (a new sheet ignores taps for its first 400 ms, R2-1a)
   await doubleTap(page, '#dlgOk');
   const s = await getState(page);
   assert(s.incidents.length > 0 && s.settings.onboarded === true, `a double tap wiped all data (incidents left: ${s.incidents.length})`);
@@ -1872,6 +1874,7 @@ test('dialog: a double tap on a confirm button does not click through to the scr
   await page.click('#tab-incident details summary');
   await page.click('#tab-incident [data-act=delIncident] >> nth=0');
   await page.waitForSelector('#dlg:not([hidden])');
+  await page.waitForTimeout(700);  // the user reads the sheet first (a new sheet ignores taps for its first 400 ms, R2-1a)
   await doubleTap(page, '#dlgOk');
   eq((await getState(page)).incidents.length, 1, 'exactly one incident deleted');
   eq(await page.evaluate(() => S.ui.tab), 'incident', 'second tap must not activate whatever is under the sheet (e.g. a nav tab)');
@@ -1899,6 +1902,163 @@ test('layout: the praise counter "(n/5)" never wraps inside itself (long child n
   const page = await t.open({ width: 320, state: st });
   const lines = await page.locator('#tab-today .praise-btn > span').evaluate(e => e.getClientRects().length > 1 ? e.getClientRects().length : Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight || 24)));
   eq(lines, 1, '"(3/5)" is split over several lines');
+});
+
+/* ================================================================== *
+ * 18. Round-2 fixes: tap guards, undo swap, pre-start window, midnight focus, table keyboard
+ * ================================================================== */
+const center = async (page, sel) => { const b = await page.locator(sel).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+test('dialog guard: a new sheet ignores taps (buttons and scrim) for its first 400 ms', 'R2-1a', async t => {
+  const page = await t.open({ state: makeState({ incidents: [inc(NOW - 3600e3)] }) });
+  await go(page, 'incident');
+  await page.click('#tab-incident details summary');
+  await page.click('#tab-incident [data-act=delIncident]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  const [x, y] = await center(page, '#dlgOk');
+  await page.touchscreen.tap(x, y);                 // immediately: ignored
+  await page.touchscreen.tap(20, 40);               // scrim, immediately: ignored too
+  assert(await visible(page, '#dlg'), 'sheet still open');
+  eq((await getState(page)).incidents.length, 1, 'early tap did not confirm');
+  await page.waitForTimeout(700);
+  await page.touchscreen.tap(x, y);
+  await page.waitForSelector('#dlg', { state: 'hidden' });
+  eq((await getState(page)).incidents.length, 0, 'a deliberate tap after 400 ms confirms');
+});
+test('dialog guard: the tap right after a sheet closes is swallowed (no click-through), later taps work', 'R2-1b / R2-2', async t => {
+  const page = await t.open({ state: makeState({ incidents: [inc(NOW - 3600e3)] }) });
+  await go(page, 'incident');
+  await page.click('#tab-incident details summary');
+  await page.click('#tab-incident [data-act=delIncident]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  await page.waitForTimeout(700);
+  const ok = await center(page, '#dlgOk'), nav = await center(page, 'nav.bottom [data-tab=progress]');
+  await page.touchscreen.tap(...ok);
+  await page.touchscreen.tap(...nav);               // within 400 ms of closing: swallowed
+  eq(await page.evaluate(() => S.ui.tab), 'incident', 'tap after closing does not reach the nav');
+  await page.waitForTimeout(700);
+  await page.touchscreen.tap(...nav);
+  eq(await page.evaluate(() => S.ui.tab), 'progress', 'a later tap works normally');
+});
+test('reset: the second step is laid out differently, so repeated double taps can never pass both', 'R2-1c', async t => {
+  const page = await t.open({ state: richState(4) });
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=reset]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  await page.waitForTimeout(700);
+  const ok1 = await center(page, '#dlgOk');
+  await doubleTap(page, '#dlgOk');                    // first tap confirms step 1, second one is swallowed
+  eq(await txt(page, '#dlgTitle'), 'בטוחים?', 'step 2 waiting');
+  eq(await txt(page, '#dlgOk'), 'כן, למחוק הכול', 'step 2 confirm label');
+  const ok2 = await center(page, '#dlgOk'), cancel2 = await center(page, '#dlgCancel');
+  assert(Math.abs(ok2[0] - ok1[0]) > 50, `step 2 confirm is on the other side (x ${ok1[0]} → ${ok2[0]})`);
+  near(cancel2[0], ok1[0], 2, 'step 2 cancel sits where step 1 confirm was');
+  await page.waitForTimeout(700);
+  await page.touchscreen.tap(...ok1);                 // a second double tap at the same spot hits "ביטול"
+  await page.touchscreen.tap(...ok1);
+  await page.waitForTimeout(700);
+  assert(await page.locator('#dlg').isHidden(), 'sheet closed by cancel');
+  assert((await getState(page)).incidents.length > 0, 'data kept');
+});
+test('undo import: swaps with the slot (undo, then redo), states the import time, nothing is lost', 'R2-5', async t => {
+  const page = await t.open({ state: richState(3) });
+  await page.click('.topbar [data-act=openSettings]');
+  const b = richState(6); b.settings.childName = 'רותי';
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(b)));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  eq(JSON.parse(await page.evaluate(k => localStorage.getItem(k + '-prev-at'), KEY)), { at: NOW, undone: false }, 'import time stored with the slot');
+  await page.clock.runFor(3600e3);
+  await go(page, 'incident');                         // a change made after the import
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  const afterImport = (await getState(page)).incidents.length;
+  await page.click('.topbar [data-act=openSettings]');
+  assert((await txt(page, '#setOverlay [data-act=undoImport]')).includes('לפני הייבוא'), 'undo offered');
+  await page.click('#setOverlay [data-act=undoImport]');
+  const body = await txt(page, '#dlgBody');
+  assert(body.includes('12.10.2026') && body.includes('10:00') && body.includes('לא יימחקו'), 'sheet states the import date/time and that nothing is lost: ' + body);
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  eq((await getState(page)).settings.childName, 'דני', 'undo: data from before the import');
+  eq(JSON.parse(await page.evaluate(k => localStorage.getItem(k + '-prev'), KEY)).incidents.length, afterImport, 'the imported data plus later changes moved to the slot');
+  await page.click('.topbar [data-act=openSettings]');
+  assert((await txt(page, '#setOverlay [data-act=undoImport]')).includes('מהגיבוי'), 'redo offered');
+  await page.click('#setOverlay [data-act=undoImport]');
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  const s = await getState(page);
+  eq([s.settings.childName, s.incidents.length], ['רותי', afterImport], 'redo: imported data back, including the later change');
+});
+test('undo import: offered only for 7 days, and never when the slot would be an empty default state', 'R2-5', async t => {
+  const page = await t.open({ state: richState(3) });
+  await page.click('.topbar [data-act=openSettings]');
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(richState(5))));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  await page.clock.setSystemTime(NOW + 6 * DAY);
+  await page.click('.topbar [data-act=openSettings]');
+  eq(await page.locator('#setOverlay [data-act=undoImport]').count(), 1, 'offered on day 6');
+  await page.click('#setOverlay [data-act=closeSettings]');
+  await page.clock.setSystemTime(NOW + 7.5 * DAY);
+  await page.click('.topbar [data-act=openSettings]');
+  eq(await page.locator('#setOverlay [data-act=undoImport]').count(), 0, 'not offered after 7 days');
+  eq(await page.evaluate(k => [localStorage.getItem(k + '-prev'), localStorage.getItem(k + '-prev-at')], KEY), [null, null], 'expired slot cleared');
+  // restore during onboarding (new phone): there is nothing to go back to
+  const fresh = await t.open({ state: null });
+  await fresh.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(richState(4))));
+  await answer(fresh, true);
+  await fresh.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  eq(await fresh.evaluate(k => localStorage.getItem(k + '-prev'), KEY), null, 'no undo slot for an empty default state');
+  await fresh.click('.topbar [data-act=openSettings]');
+  eq(await fresh.locator('#setOverlay [data-act=undoImport]').count(), 0, 'no undo button');
+});
+test('pre-start stars: week 0 counts only the last 7 days (from midnight 6 days ago) before the start', 'R2-3', async t => {
+  const stars = [7, 8, 10].map(d => ({ goalId: 'g1', ts: NOW - d * DAY }))                 // too old
+    .concat([{ goalId: 'g1', ts: tsJ(addDaysKey(TODAY, -6) + 'T00:05') }, { goalId: 'g2', ts: NOW - 2 * DAY }]);  // inside the window
+  const page = await t.open({ state: makeState({ settings: { startDate: addDaysKey(TODAY, 3), starsNeeded: 3 }, stars, celebrated: { 0: 3 } }) });
+  assert((await txt(page, '#tab-today .pill.blue')).includes('2/3'), 'only the 2 stars of the last 7 days: ' + await txt(page, '#tab-today .pill.blue'));
+  await page.click('.topbar [data-act=openSettings]');
+  await page.fill('#sStart', addDaysKey(TODAY, 4));
+  await page.click('#setOverlay [data-act=saveSettings]');
+  eq((await getState(page)).celebrated, {}, 'celebrated[0] cleared when the start date changes');
+  await addStar(page, 'g1');
+  assert(await visible(page, '#celOverlay'), '3/3 in the pre-start week celebrates');
+});
+test('midnight while typing: the re-render waits until the field is left; drafts are kept', 'R2-4 / QA #5', async t => {
+  const page = await t.open({ time: tsJ(TODAY + 'T23:59') });
+  await page.click('#tab-today .check-hit[data-id=move]');
+  await page.click('#praiseNote');
+  await page.keyboard.type('עזר');
+  await page.clock.runFor(61e3);                       // midnight passes while the field is focused
+  eq(await page.evaluate(() => document.activeElement.id), 'praiseNote', 'focus kept');
+  eq(await page.locator('#tab-today .check.done').count(), 1, 're-render deferred (yesterday still on screen while typing)');
+  await page.evaluate(() => document.activeElement.blur());
+  await page.clock.runFor(300);
+  eq(await page.locator('#tab-today .check.done').count(), 0, 'new day shown once the field is left');
+  eq(await page.inputValue('#praiseNote'), 'עזר', 'typed text kept');
+  // same on the incident tab
+  await go(page, 'incident');
+  await page.click('#incNote');
+  await page.keyboard.type('בגן');
+  await page.clock.setSystemTime(tsJ(addDaysKey(TODAY, 2) + 'T08:00'));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  eq(await page.evaluate(() => document.activeElement.id), 'incNote', 'focus kept on the incident note');
+  await page.keyboard.type(' היום');
+  eq(await page.inputValue('#incNote'), 'בגן היום', 'keystrokes continue');
+});
+test('weekly table: rows are keyboard operable with a visible focus ring', 'R2-7', async t => {
+  const page = await t.open({ state: progressFixture() });
+  await go(page, 'progress');
+  const row = '#tab-progress table.wk tbody tr[data-w="2"]';
+  eq(await page.getAttribute(row, 'tabindex'), '0', 'row focusable');
+  await page.focus(row);
+  await page.keyboard.press('Enter');
+  assert((await txt(page, '#tab-progress .chart-info')).includes('שבוע 2: 7 אירועים'), 'Enter selects the week');
+  eq(await page.evaluate(() => document.activeElement.dataset.w), '2', 'focus stays on the row after the re-render');
+  const ring = await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
+  eq(ring, 'solid', 'visible focus ring');
+  await page.keyboard.press('Space');
+  assert((await txt(page, '#tab-progress .chart-info')).includes('הקישו'), 'Space toggles the selection off');
 });
 
 /* ------------------------------------------------------------------ *
