@@ -121,7 +121,7 @@ async function open(t, opts = {}) {
   const state = opts.state === undefined ? makeState() : opts.state;
   if (state !== null) {
     await ctx.addInitScript(([k, v]) => {
-      try { if (!sessionStorage.getItem('__qa_seeded')) { localStorage.setItem(k, v); sessionStorage.setItem('__qa_seeded', '1'); } } catch (e) { /* storage disabled by test */ }
+      try { if (!localStorage.getItem('__qa_seeded')) { localStorage.setItem(k, v); localStorage.setItem('__qa_seeded', '1'); } } catch (e) { /* storage disabled by test */ }
     }, [KEY, typeof state === 'string' ? state : JSON.stringify(state)]);
   }
   if (opts.init) await ctx.addInitScript(opts.init);
@@ -150,6 +150,23 @@ async function setSettings(page, fields) {
   await page.click('.topbar [data-act=openSettings]');
   for (const [id, v] of Object.entries(fields)) await page.fill('#' + id, String(v));
   await page.click('#setOverlay [data-act=saveSettings]');
+}
+/**
+ * page.reload() that tolerates a Chromium quirk with file:// pages: in a fresh context, a reload occasionally
+ * comes back with an EMPTY localStorage (all writes of the previous document lost – reproduced with a 3-line
+ * page and the original app build; never happens over http://). A marker key detects that case; the
+ * pre-reload snapshot is then restored and the page reloaded again, so tests see what the app really saved.
+ * (The seed guard lives in localStorage, not sessionStorage: sessionStorage is also occasionally lost on reload,
+ * which made the seed script overwrite the app's data – the cause of a ~10% flake in the round-2 runs.)
+ */
+async function reload(page) {
+  const snap = await page.evaluate(() => { localStorage.setItem('__qa_marker', String(Math.random())); return JSON.stringify(Object.entries(localStorage)); });
+  await page.reload();
+  for (let i = 0; i < 3 && !(await page.evaluate(() => localStorage.getItem('__qa_marker') !== null)); i++) {
+    page.storageRetries = (page.storageRetries || 0) + 1;
+    await page.evaluate(sn => { localStorage.clear(); for (const [k, v] of JSON.parse(sn)) localStorage.setItem(k, v); }, snap);
+    await page.reload();
+  }
 }
 const fileFrom = (name, content) => ({ name, mimeType: 'application/json', buffer: Buffer.from(content) });
 /** answer the in-app confirm sheet (#dlg): ok=true → confirm button, false → cancel */
@@ -288,7 +305,7 @@ test('onboarding: first run shows welcome settings; cannot be dismissed; save st
   eq([s.settings.onboarded, s.settings.childName, s.settings.startDate], [true, 'יוסי', startForWeek(3)], 'saved settings (name trimmed)');
   assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 3 מתוך 12'), 'hero week after onboarding');
   assert((await txt(page, '.hero .eyebrow')).includes('יוסי'), 'child name in greeting');
-  await page.reload();
+  await reload(page);
   assert(!(await visible(page, '#setOverlay')), 'onboarding not shown again after reload');
 });
 test('settings: values are saved and reflected (rules, goals, reward, stars needed)', 'הגדרות: "שם הילד, תאריך התחלה, 3 חוקי הבית, יעדי הכוכבים, הפרס ומספר הכוכבים הנדרש"', async t => {
@@ -301,7 +318,7 @@ test('settings: values are saved and reflected (rules, goals, reward, stars need
   eq(await page.locator('#tab-today ol.bullets li').allInnerTexts(), ['חוק א', 'חוק ב', 'חוק ג'], 'rules rendered');
   assert((await txt(page, '#tab-today .pill.blue')).includes('0/9'), 'stars needed in pill');
   assert((await txt(page, '#tab-today .reward')).includes('טיול לים'), 'reward text');
-  await page.reload();
+  await reload(page);
   const s = await getState(page);
   eq([s.settings.reward, s.settings.starsNeeded, s.settings.goals.length], ['טיול לים', 9, 3], 'persisted');
 });
@@ -429,7 +446,7 @@ test('checklist: 5 items, toggle (click + keyboard), counter, persistence across
   await page.click('#tab-today .check-hit[data-id=move]');
   eq(await page.getAttribute('#tab-today .check-hit[data-id=move]', 'aria-checked'), 'false', 'second click unchecks');
   eq(await page.locator('#tab-today .check-hit button, #tab-today [role=checkbox] [data-act]').count(), 0, 'no interactive control nested inside a checkbox');
-  await page.reload();
+  await reload(page);
   eq(await page.getAttribute('#tab-today .check-hit[data-id=one]', 'aria-checked'), 'true', 'persisted across reload');
   eq((await getState(page)).days[TODAY].checks, { move: false, one: true }, 'stored under today key');
   for (const id of ['morning', 'move', 'stop', 'bed']) await page.click(`#tab-today .check[data-id=${id}] .box`);
@@ -441,7 +458,7 @@ test('checklist: resets on the next day (reload) and the game of the day rotates
   await page.click('#tab-today .check[data-id=bed]');
   const game1 = await txt(page, '#tab-today .game b');
   await page.clock.setSystemTime(tsJ(addDaysKey(TODAY, 1) + 'T07:30'));
-  await page.reload();
+  await reload(page);
   eq(await page.locator('#tab-today .check.done').count(), 0, 'no item checked on the new day');
   const game2 = await txt(page, '#tab-today .game b');
   assert(game1 !== game2, `game should change daily ("${game1}" vs "${game2}")`);
@@ -513,10 +530,10 @@ test('praise: daily counter with target 5, note saved, Enter key, delete', 'הי
   assert((await txt(page, '#tab-today .praise-btn')).includes('(4/5)'), 'deleted');
   assert(page.dialogs[0].includes('למחוק את הרישום'), 'confirm sheet asks: ' + page.dialogs[0]);
   assert(!(await txt(page, '#tab-today .note-list')).includes('עזר לאחותו'), 'the right entry was deleted');
-  await page.reload();
+  await reload(page);
   eq((await getState(page)).days[TODAY].praises.length, 4, 'persisted');
   await page.clock.setSystemTime(tsJ(addDaysKey(TODAY, 1) + 'T08:00'));
-  await page.reload();
+  await reload(page);
   assert((await txt(page, '#tab-today .praise-btn')).includes('(0/5)'), 'counter is daily');
 });
 
@@ -553,13 +570,13 @@ test('stars: celebration fires exactly once when weekly target is reached; reset
   assert((await txt(page, '#tab-today .reward')).includes('הפרס הורווח השבוע'), 'reward earned banner');
   await addStar(page, 'g2');
   assert(!(await visible(page, '#celOverlay')), 'no second celebration (4/3)');
-  await page.reload();
+  await reload(page);
   await addStar(page, 'g2');
   assert(!(await visible(page, '#celOverlay')), 'no second celebration after reload');
   eq((await getState(page)).stars.length, 5, '5 stars stored');
   // next program week
   await page.clock.setSystemTime(NOW + 7 * DAY);
-  await page.reload();
+  await reload(page);
   assert((await txt(page, '#tab-today .pill.blue')).includes('0/3'), 'weekly stars reset in week 2');
   eq(await page.locator('#tab-today .goal .stars .s').count(), 0, 'no stars shown in new week');
   for (let i = 0; i < 2; i++) await addStar(page, 'g1');
@@ -728,6 +745,7 @@ for (const ex of ['candle', 'balloon', 'box', 'robot', 'wall', 'stop']) {
     const cycles = +(rec.initialMeta.match(/מתוך (\d+)/) || [0, 1])[1];
     if (cycles === 1) assert(!/סבב/.test(rec.initialMeta), 'single-cycle meta has no "סבב 1 מתוך 1": ' + rec.initialMeta);
     if (exp.cycles) eq(cycles, exp.cycles, 'cycles');
+    else assert(cycles >= 2 && /סבב 1 מתוך \d+/.test(rec.initialMeta), 'multi-cycle exercise announces its cycles: ' + rec.initialMeta);
     const stepsPerCycle = rec.segs.length / cycles;
     assert(Number.isInteger(stepsPerCycle), `segments ${rec.segs.length} not divisible by cycles ${cycles}`);
     if (exp.steps) eq(per, Array(cycles).fill(exp.steps).flat(), 'step durations (s)');
@@ -963,7 +981,7 @@ test('progress: bar chart values, baseline (week 1) and −70% target lines, "al
   near(r.refs.find(x => !x.dash).y, r.bars[0].bottom - 1.8 * (r.bars[0].bottom - r.bars[0].top) / 6, 0.6, 'hits target line at 1.8');
   eq(r.bars.length, 3, 'hits mode: weeks with hits (6,3,1) have bars, week 4 has 0');
   near((r.bars[0].bottom - r.bars[1].top) / (r.bars[0].bottom - r.bars[0].top), 0.5, 0.02, 'hits week 2 = half of week 1');
-  await page.reload();
+  await reload(page);
   await go(page, 'progress');
   eq(await page.getAttribute('#tab-progress [data-mode=hits]', 'aria-pressed'), 'true', 'chart mode persisted');
   // tapping a bar shows details
@@ -1074,7 +1092,8 @@ for (const [days, expectCard] of [[7, true], [6, true], [3, false]]) {
 test('robustness: 500 incidents still render progress quickly', 'התקדמות (performance)', async t => {
   const start = startForWeek(12);
   const I = [];
-  for (let i = 0; i < 500; i++) I.push(inc(tsIn(start, 1 + (i % 12), i % 7, pad2(6 + i % 16) + ':' + pad2(i % 60)), { actions: i % 3 ? ['מכה'] : ['צעקה'], used: i % 2 ? 'yes' : 'no' }));
+  // weeks 1–11 plus earlier today (week 12, day 0, before 10:00) – nothing in the future, so all 500 must count
+  for (let i = 0; i < 500; i++) I.push(inc(i % 12 === 11 ? NOW - (i + 1) * 60e3 : tsIn(start, 1 + (i % 12), i % 7, pad2(6 + i % 16) + ':' + pad2(i % 60)), { actions: i % 3 ? ['מכה'] : ['צעקה'], used: i % 2 ? 'yes' : 'no' }));
   const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: I }) });
   const t0 = Date.now();
   await go(page, 'progress');
@@ -1084,9 +1103,8 @@ test('robustness: 500 incidents still render progress quickly', 'התקדמות 
   const sum = await page.locator('#tab-progress table.wk tbody tr td:nth-child(2)').evaluateAll(tds => tds.reduce((a, td) => a + +td.textContent, 0));
   // the fixture also spreads incidents over the rest of the current week (i.e. in the future); future-dated
   // incidents can no longer be logged and are not counted in the weekly stats (QA #6)
-  const past = I.filter(x => x.ts <= NOW).length;
-  assert(past < 500, 'fixture has future incidents');
-  eq(sum, past, 'all (non-future) incidents counted');
+  assert(I.every(x => x.ts <= NOW), 'fixture has no future incidents');
+  eq(sum, 500, 'all 500 incidents counted');
   const t1 = Date.now();
   await go(page, 'incident');
   assert(Date.now() - t1 < 1000, 'incident tab fast with 500 incidents');
@@ -1204,7 +1222,7 @@ test('data: structurally hostile import is rejected or sanitized; app never brea
     await answer(page, true);
     await page.waitForFunction(() => document.querySelector('#toast').textContent !== '');
     for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) { await page.evaluate(() => document.querySelector('#setOverlay').hidden = true); await go(page, tab).catch(() => {}); }
-    await page.reload();
+    await reload(page);
     const rendered = await page.evaluate(() => { const a = document.querySelector('main .tab.active'); return !!a && a.innerHTML.length > 100; });
     if (page.errors.length || !rendered) fails.push(`${name}: ${rendered ? '' : 'app blank after reload; '}${page.errors.slice(0, 2).join(' | ')}`);
     page.errors.length = 0; // reported here, not by the harness
@@ -1646,7 +1664,7 @@ test('before the start date: data is not counted in week 1, stars use a pre-star
   eq(await page.locator('#tab-incident .inc-item').count(), 2, 'pre-start incidents stay in the list');
   // three days later = week 1: the pre-start data is not week 1
   await page.clock.setSystemTime(NOW + 3 * DAY);
-  await page.reload();
+  await reload(page);
   await go(page, 'today');
   assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 1 מתוך 12'), 'week 1 after the start');
   assert((await txt(page, '#tab-today .pill.blue')).includes('0/2'), 'week 1 stars start at 0');
@@ -1668,7 +1686,7 @@ test('progress: partial current week is never compared; the last completed week 
   const p1 = await t.open({ state: makeState({ incidents: [inc(NOW - 3600e3)] }) });
   await go(p1, 'progress');
   eq(await p1.locator('#tab-progress .kpi').count(), 3, 'week 1: no comparison KPI');
-  assert(!(await txt(p1, '#tab-progress')).includes('%  לעומת'), 'no percentage comparison');
+  assert(!(await p1.locator('#tab-progress .kpis').innerText()).includes('לעומת'), 'no comparison KPI text in week 1');
 });
 test('progress: baseline = first week with incidents (and first week with hits in "hits only" mode)', 'ruling 7 / QA #13, #25', async t => {
   const start = startForWeek(4);
@@ -1825,6 +1843,62 @@ test('install: icon is the designer\'s stones icon (teal → blue gradient, ligh
   assert(px.tl[1] > px.tl[0] && px.tl[1] > 120, 'teal top-left: ' + px.tl);
   assert(px.br[2] > px.br[1] - 10, 'blue-ish bottom-right: ' + px.br);
   assert(px.mid[0] > 200 && px.mid[1] > 200 && px.mid[2] > 200, 'light stone in the centre: ' + px.mid);
+});
+
+/* ================================================================== *
+ * 17. Round-2 QA regression audit: new surface (confirm sheet, pre-start bucket, midnight tick)
+ * ================================================================== */
+async function doubleTap(page, sel) {
+  const bx = await page.locator(sel).boundingBox();
+  const x = bx.x + bx.width / 2, y = bx.y + bx.height / 2;
+  await page.touchscreen.tap(x, y);
+  await page.waitForTimeout(120);       // a quick human double tap
+  await page.touchscreen.tap(x, y);
+  await page.waitForTimeout(200);
+}
+test('dialog: a double tap on "המשך" in the reset sheet must not also confirm the second ("בטוחים?") step', 'הגדרות: "איפוס" (two-step confirmation)', async t => {
+  const page = await t.open({ state: richState(4) });
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=reset]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  await doubleTap(page, '#dlgOk');
+  const s = await getState(page);
+  assert(s.incidents.length > 0 && s.settings.onboarded === true, `a double tap wiped all data (incidents left: ${s.incidents.length})`);
+  assert(await visible(page, '#dlg') && (await txt(page, '#dlgTitle')).includes('בטוחים'), 'the second confirmation is still waiting for a deliberate tap');
+});
+test('dialog: a double tap on a confirm button does not click through to the screen behind', 'confirm sheet (ruling 4)', async t => {
+  const page = await t.open({ state: makeState({ incidents: [inc(NOW - 3600e3), inc(NOW - 7200e3)] }) });
+  await go(page, 'incident');
+  await page.click('#tab-incident details summary');
+  await page.click('#tab-incident [data-act=delIncident] >> nth=0');
+  await page.waitForSelector('#dlg:not([hidden])');
+  await doubleTap(page, '#dlgOk');
+  eq((await getState(page)).incidents.length, 1, 'exactly one incident deleted');
+  eq(await page.evaluate(() => S.ui.tab), 'incident', 'second tap must not activate whatever is under the sheet (e.g. a nav tab)');
+});
+test('stars: moving the start date into the future does not count old program stars in the pre-start bucket', 'ruling 8 / QA #18', async t => {
+  const stars = [...Array(20)].map((_, i) => ({ goalId: 'g1', ts: NOW - (i + 1) * DAY }));
+  const page = await t.open({ state: makeState({ settings: { startDate: startForWeek(5), starsNeeded: 15 }, stars }) });
+  await setSettings(page, { sStart: addDaysKey(TODAY, 7) }); // restart the program next week
+  const pill = await txt(page, '#tab-today .pill.blue');
+  assert(!(await txt(page, '#tab-today .reward')).includes('הפרס הורווח'), `restart shows the reward as already earned (pill ${pill})`);
+  await addStar(page, 'g1');
+  assert(!(await visible(page, '#celOverlay')), 'one new star after a restart triggers a celebration');
+});
+test('midnight: the day-rollover re-render keeps focus (and the keyboard) in the field being typed', 'ruling 12 / QA #5', async t => {
+  const page = await t.open({ time: tsJ(TODAY + 'T23:59') });
+  await page.click('#praiseNote');
+  await page.keyboard.type('ויתר');
+  await page.clock.runFor(61e3);
+  await page.keyboard.type(' על התור');
+  eq(await page.inputValue('#praiseNote'), 'ויתר על התור', 'keystrokes after midnight are lost (focus dropped by the re-render)');
+});
+test('layout: the praise counter "(n/5)" never wraps inside itself (long child name, 320 px)', 'עיצוב (design P1-2 bidi)', async t => {
+  const st = makeState({ settings: { childName: 'אברהם יצחק בן-דוד לוי' } });
+  st.days[TODAY] = { checks: {}, praises: [{ ts: NOW - 1000, note: '' }, { ts: NOW - 900, note: '' }, { ts: NOW - 800, note: '' }] };
+  const page = await t.open({ width: 320, state: st });
+  const lines = await page.locator('#tab-today .praise-btn > span').evaluate(e => e.getClientRects().length > 1 ? e.getClientRects().length : Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight || 24)));
+  eq(lines, 1, '"(3/5)" is split over several lines');
 });
 
 /* ------------------------------------------------------------------ *

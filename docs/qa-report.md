@@ -356,3 +356,232 @@ Format: **severity**, then the failing automated test (if any), spec reference, 
 7. **"טופס מהיר (פחות מ-30 שניות)"**, which needs a usability timing study.
 8. **Correct wording of the Hebrew content.** Presence of every spec item is verified, but whether the wording is correct and appropriate is not. The spec's trigger option "לא" was interpreted as "ללא טריגר ברור".
 9. **Round 2: the Android APK.** This is owned by another teammate and was not tested here.
+
+---
+
+# Round 2 regression audit (release commit `5ac98ed`)
+
+- **Audited by:** QA, independently of the engineer's report.
+- **Build:** `index.html` at `5ac98ed`, which was heavily reworked: 1,980 lines, up from 1,364.
+- **Test diff audited:** `git diff db816f4 -- tests/e2e.js`.
+- **Method:**
+  1. Re-ran all my round-1 repros, not just the suite.
+  2. Read the new code.
+  3. Did a fresh exploratory pass. Screenshots are in `/tmp/qa-shots/r2/`.
+
+## Verdict: **don't ship yet**
+
+All 31 round-1 bugs are fixed, and the engineer's test changes are legitimate. However, the release introduces one **Major** regression: a double tap on the first reset confirmation also confirms the second one and **wipes all data** (R2-1). The fix is small. Once R2-1 is fixed (ideally together with R2-2, which has the same root cause), I'd ship. The remaining new bugs are Minor or Cosmetic and can follow.
+
+## Suite result
+
+| Run | Tests | Pass | Fail |
+|---|---|---|---|
+| Engineer's suite as committed, run 1 | 109 | 109 | 0 |
+| Engineer's suite as committed, run 2 | 109 | **108** | **1 (flaky: test 51, "chart mode persisted")** |
+| After the audit (harness fix + 3 strengthened tests + 5 new tests), run 1 | **114** | **109** | **5** |
+| After the audit, run 2 | 114 | 109 | 5 (identical PASS/FAIL list to run 1) |
+
+The suite is deterministic now.
+
+**The 109/109 claim was not reproducible every time.** About 10% of runs failed a reload-dependent test.
+- **Root cause:** a harness bug, not an app bug, and it was in my own round-1 harness. In Chromium, reloading a `file://` page in a fresh context sometimes loses sessionStorage. My seed guard lived in sessionStorage, so the seed script re-ran and overwrote the app's saved data.
+- **Proof that it's environmental:**
+  - It reproduces with the original `fef60fb` build.
+  - It reproduces with a 3-line test page.
+  - It never happens over `http://`. Over `file://`, it happened in 3–9 of 60 reloads.
+- **Fix in `tests/e2e.js`:**
+  - The seed guard is now a localStorage key (`__qa_seeded`).
+  - All reloads go through a new `reload(page)` helper. It writes a marker key before reloading. If the marker is gone afterwards (the whole storage area was lost, which also happens occasionally), it restores the pre-reload snapshot and reloads again.
+  - After the fix, the three reload-heaviest tests passed 90 out of 90 times.
+
+## Test-change audit
+
+I checked every modified hunk against the team-lead rulings.
+
+**Verdict: no test was made tautological, and none of the rulings was used to hide a bug.** Most changes simply follow the new UI or a ruling:
+- `.check` → `.check-hit`.
+- New Hebrew copy.
+- The in-app confirm sheet via `answer()`. A native `confirm()` now fails the test, which makes the suite stricter.
+- `addStar()` advancing the clock past the 800 ms double-tap guard.
+- KPI comparisons now use the last completed week.
+- Legends say "עד N בשבוע".
+- Hour buckets are listed in chronological order.
+- The new duration buckets.
+- The countdown hero.
+
+Several tests got **stronger**:
+- The automatic incident time is now asserted as exactly the save time (it used to be ±6 min).
+- The offline test now asserts zero remote requests (fonts used to be allowed).
+- The re-celebration test now also checks that lowering the target does not celebrate again.
+- The checklist test now covers the Enter key and asserts that no control is nested inside the checkbox.
+- The reset test now asserts that the data survives the first confirmation.
+
+**Three mild weakenings, all now strengthened in `tests/e2e.js`:**
+
+| Test | What changed in the release round | Fix |
+|---|---|---|
+| `robustness: 500 incidents…` | `eq(sum, 500)` was relaxed to "all non-future incidents". The original fixture did put some incidents later in the current week, and future incidents are no longer counted (ruling 11), so the relaxation was understandable. But the test no longer proved that 500 real incidents are all counted. | The fixture now has no future incidents, and the test asserts that all 500 are counted again. Passes. |
+| `exercise <id>: …` | A fallback treats a missing "סבב n מתוך m" as 1 cycle. This is needed for single-cycle exercises (design P2-17). But for candle, balloon and stop it meant a missing cycle display would pass silently. | Multi-cycle exercises must now show "סבב 1 מתוך N" with N ≥ 2. Passes. |
+| `progress: partial current week…` | The "week 1: no comparison" check used `!includes('%  לעומת')` (two spaces), which can never match, so it checked nothing. The real assertion (3 KPIs) was fine. | Replaced with "the KPI row contains no 'לעומת'". Passes. |
+
+Two more notes:
+- **Brittle, but not weakened:** the hostile-import and import-XSS tests now call `answer(page, true)`. If a future build correctly rejected such a file *before* asking for confirmation, these tests would time out instead of passing. Keep this in mind if import validation moves ahead of the confirm.
+- **Accepted:** for a star target of 0, the test now expects a rejection with a message ("לפחות 1") and nothing saved, instead of a clamp to 1. This matches the "min 1" ruling and is at least as strict.
+
+## Verification of round-1 bugs (original repros re-run)
+
+| # | Round-1 bug | Status | How verified |
+|---|---|---|---|
+| 1 | Invalid import wipes data and breaks screens | **Fixed** | Re-imported all 7 original payloads. Each is deep-sanitized, every tab renders before and after reload, there are 0 page errors, and the old data is kept in `-prev`. A failed render rolls back (engineer's test). |
+| 2 | XSS via imported ids or mood color | **Fixed** | Original test passes. A new payload with HTML in the name, goal, reward, trigger, actions and note is rendered as text. |
+| 3 | Stale automatic time on resume | **Fixed** | Original test passes (save time = `Date.now()` unless the user edited the field). |
+| 4 | "−100%, target reached" on day 1 of a week | **Fixed** | Original test passes. The comparison now uses the last completed week. |
+| 5 | Checklist not reset at midnight while open | **Fixed** | Original test passes (60 s tick). See the new R2-4 for a side effect. |
+| 6 | Future incident time accepted | **Fixed** | Original test (2027 date) passes. `max` is set to now + 5 min, with a message. |
+| 7 | Star target 0 becomes 15 | **Fixed** | Rejected with "לפחות 1". Values ≥ 1 save. |
+| 8 | No celebration after the target is raised | **Fixed** | Original test passes. `celebrated[w]` stores the target that was celebrated. |
+| 9 | Editing goals moves stars | **Fixed** | Original test passes. Goal ids are stable. |
+| 10 | Double tap adds 2 stars | **Fixed** | Original test passes (800 ms guard, per goal). |
+| 11 | Typed praise note lost | **Fixed** | Original test passes (`praiseDraft`). |
+| 12 | Long unbroken text breaks the layout | **Fixed** | Original test passes; `overflow-wrap:anywhere` is set. See the new R2-6 (a cosmetic leftover). |
+| 13 | No pro-help card when week 1 is empty | **Fixed** | Original test passes (baseline = first week with data). |
+| 14 | Tap targets under 44 px | **Fixed** | Original test passes. |
+| 15 | Overlay focus; Escape on the celebration | **Fixed** | Original test passes. Tab is trapped in settings (0 escapes in 60 Tabs), and focus returns to the control that opened the overlay. |
+| 16 | Morning breathing returns to Calm | **Fixed** | It now returns to Today with "חזרה להיום". |
+| 17 | Long-outburst threshold | **Fixed** | Rule is 20+ minutes; new buckets; legacy values are displayed but not counted. |
+| 18 | Pre-start data counted in week 1 | **Fixed** | Pre-start data is excluded and stars have their own pre-start bucket. See the new R2-3. |
+| 19 | Cancelled share sheet still downloads | **Fixed** | An AbortError does nothing; other errors fall back to a download. |
+| 20 | Corrupt storage overwritten silently | **Fixed** | The raw data is copied to `-corrupt` and a toast tells the user. |
+| 21 | No restore during onboarding | **Fixed** | "שחזור מגיבוי" is on the welcome screen. |
+| 22 | Nested control, unlabeled chips, contrast | **Fixed** | There is no nested control, and chip groups have `role=group` + `aria-labelledby`. Measured contrast: green mood 6.5:1, `.btn` 4.8:1, hero text 4.8:1 in light mode and 6.9:1 in dark mode. |
+| 23 | Wrong axis label at max 5 | **Fixed** | Original test passes. |
+| 24 | Pause drift | **Fixed** | Timers now use wall-clock time. My repro (resume 0.2 s before a tick) is exact. |
+| 25 | Misleading "hits only" message | **Fixed** | The message is now accurate. |
+| 26 | Future chart weeks tappable | **Fixed** | Only elapsed weeks are tappable, and bars have `aria-label`s. |
+| 27 | "שבוע 1" shown before the start | **Fixed** | The hero now shows a countdown ("מחר", "בעוד יומיים", "בעוד N ימים"). |
+| 28 | Celebration doesn't lock scroll | **Fixed** | `body` gets `overflow:hidden` whenever any overlay is open. |
+| 29 | LTR chart in an RTL app | **Fixed** | Week 1 is on the right, matching the hero strip. |
+| 30 | Long incident form | **Fixed** | The save button is sticky. Checked with the keyboard open (375×400 and 320×360): the focused note field is never covered. |
+| 31 | Small inconsistencies | **Fixed** | `praise-dots` has `role=img`, and the praise button uses the child's name. |
+
+**31 of 31 fixed.**
+
+## New bugs found in round 2
+
+Each one has a failing regression test in `tests/e2e.js`, section 17, except R2-5 and R2-7, which come from exploratory testing and code reading.
+
+#### R2-1. A double tap on "המשך" in the reset sheet also confirms "בטוחים?" and deletes everything
+- **Severity:** **Major** (data loss; defeats the two-step safety)
+- **Test:** #110
+- **Repro:**
+  1. Open ⚙️ and tap "איפוס כל הנתונים".
+  2. In the sheet "למחוק את כל הנתונים?", double tap "המשך" (two taps about 120 ms apart).
+- **Expected:** The second sheet "בטוחים?" appears and waits for a deliberate tap.
+- **Actual:** All data is deleted and onboarding is shown. Reproduced with both `dblclick` and two separate touch taps.
+- **Cause:**
+  - `ask()` (1542–1553) and `ACT.reset` (1871–1873).
+  - The second `ask()` opens the same `#dlg` within a microtask after the first resolves. Its "כן, למחוק הכול" button sits exactly where "המשך" was, so the second tap of the double tap lands on it.
+- **Fix hint:**
+  - Ignore clicks on `#dlgOk` for about 400–500 ms after the sheet opens, or require a `pointerdown` that started after it opened.
+  - Or give the second step a different layout or position.
+
+#### R2-2. A double tap on a confirm button clicks through to the screen behind
+- **Severity:** Minor
+- **Test:** #111
+- **Repro:**
+  1. Go to Incident → "אירועים אחרונים" → 🗑️.
+  2. Double tap "מחיקה".
+- **Expected:** One deletion, and the user stays on the Incident tab.
+- **Actual:** The incident is deleted, and the second tap hits the bottom nav, so the app jumps to Progress.
+- **Cause:**
+  - `dlgDone` hides `#dlg` synchronously (1550).
+  - `syncOverlays` removes `inert` from `nav` and `main` through a MutationObserver (1531) before the second tap arrives.
+  - Whatever is under the button receives the tap.
+- **Fix:** The same click guard as R2-1, or swallow the next click after the sheet closes.
+
+#### R2-3. Moving the start date into the future puts old program stars into the pre-start bucket
+- **Severity:** Minor
+- **Test:** #112
+- **Repro:**
+  1. The program is in week 5 and 20 stars were earned in earlier weeks.
+  2. In ⚙️, set the start date to next week (restarting the program).
+- **Expected:** The star table shows 0/15.
+- **Actual:**
+  - It shows **20/15 "הפרס הורווח!"**, and the next star fires a celebration.
+  - The pre-start bucket also accumulates without limit if the app is used for several weeks before the start.
+- **Cause:** `weekStars(0)` counts every star with `wkOfTs <= 0` (795–796). It should count only stars since the start date was set, or only those in the 7 days before the start.
+
+#### R2-4. The midnight re-render drops focus from the field being typed in
+- **Severity:** Minor
+- **Test:** #113
+- **Repro:** Type in "מה ראיתם?" (Today) or in the incident note at 23:59, and keep typing past 00:00.
+- **Expected:** Typing continues.
+- **Actual:**
+  - The text typed so far is kept (good), but focus is lost.
+  - On a phone the keyboard closes, and further keystrokes go nowhere.
+  - On the Incident tab, chips and the note are kept, but focus is lost the same way.
+- **Cause:** `onClock()` (1904–1906) calls `rerender()` on a day change.
+- **Fix hint:** Restore focus and selection to the active input after the re-render, or postpone the re-render while an input is focused.
+
+#### R2-5. "Undo import" can't be undone, and after a restore during onboarding it offers to wipe everything
+- **Severity:** Minor
+- **Found by:** exploratory testing and code reading
+- **Repro A:**
+  1. Import backup B; the old data A goes into `-prev`.
+  2. Use the app for weeks.
+  3. In ⚙️, tap "החזרת הנתונים שלפני הייבוא האחרון" and confirm.
+- **Actual A:** The data is back to A, `-prev` is deleted, and everything entered since the import is permanently gone. The button stays available indefinitely, so this can happen long after the import.
+- **Repro B:** Restore a backup from the welcome screen (new phone).
+- **Actual B:** `-prev` now holds the empty default state. Settings permanently offers "undo", which resets the app to empty data (marked as onboarded).
+- **Code:** `commitState` 1703, `undoImport` 1725–1734, `openSettings` 1573/1619.
+- **Fix hint:**
+  - Swap the current data into `-prev` on undo instead of deleting it.
+  - Don't create `-prev` when the previous state was never onboarded.
+  - Consider letting the slot expire.
+
+#### R2-6. The praise counter "(n/5)" wraps inside itself with long child names
+- **Severity:** Cosmetic
+- **Test:** #114
+- **Repro:** Child name "אברהם יצחק בן-דוד לוי" at 320 px (wraps over 3 lines) or 375 px (2 lines).
+- **Actual:** The counter in the button shows as "3) /5 (" or "3/( 5)", with broken parentheses (screenshots `praise-320-21.png`, `praise-375-21.png`). Names of 8 characters or fewer are fine.
+- **Cause:** The `<span>(n/5)</span>` inside the inline-flex `.praise-btn` (882) can shrink, and the global `overflow-wrap:anywhere` (95) breaks it.
+- **Fix:** `white-space:nowrap; flex:0 0 auto` on the span, or a `.rng`-style LTR isolate.
+
+#### R2-7. Weekly-table rows are mouse/touch only
+- **Severity:** Cosmetic (accessibility)
+- **Found by:** code reading
+- **Actual:** `<tr data-act="pickWeek">` (1237) has no `tabindex` or role, so keyboard and switch users can't select a week from the table. The chart bars are accessible, so the feature is still reachable.
+
+## Exploratory notes on the new surface (no defect found)
+
+- **Confirm sheet:**
+  - Focus starts on "ביטול" and Enter cancels.
+  - Tab is trapped inside the sheet.
+  - Escape, the Android back button and a tap on the scrim all cancel.
+  - Focus returns to the control that opened it (e.g. 🗑️).
+  - Opened from settings, the sheet makes settings inert. Escape closes the sheet first, then settings.
+- **Import rollback and hostile files:**
+  - All original hostile payloads are sanitized and every tab renders.
+  - HTML in any field is rendered as text.
+  - A 20,000-incident file imports in about 2.8 s; with that data, Progress renders in about 0.5 s and Incident in about 0.3 s.
+- **`-prev`:** After imports A→B→C, it holds B (one level, as designed).
+- **Pre-start and week boundaries:**
+  - The countdown wording is correct for 1, 2, 3, 7 and 10+ days.
+  - With the app left open across midnight into the start date, the hero switches to "שבוע 1 מתוך 12" and the pre-start stars drop out of week 1.
+  - At the week 1→2 boundary, no comparison is shown until week 2 is complete.
+  - After week 12, the KPIs say "בשבוע 12".
+- **60 s tick:** It never wipes typed text. It only updates the automatic time field when that field isn't focused and hasn't been edited. The midnight re-render is the only issue (R2-4).
+- **Sticky save bar:** With a simulated keyboard (375×400, 320×360), the focused note field stays fully visible above the bar.
+- **Layout:**
+  - 320 px light and 375 px dark with reduced motion, using long realistic Hebrew strings (21-character name, 50-character goals, 80-character reward, long rules and notes): no horizontal scroll and no console errors.
+  - Reduced motion skips the confetti.
+  - Dark-mode contrast passes.
+
+## Remaining manual checks before release
+
+These are unchanged from round 1:
+- Installing to the home screen on real Android and iOS devices.
+- `sw.js` over https.
+- Real-device haptics through the new `AndroidBridge.vibrate`.
+- The real Android back button through `__androidBack`, which can only be simulated here.
