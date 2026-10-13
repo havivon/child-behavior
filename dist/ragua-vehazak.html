@@ -250,7 +250,11 @@ textarea.input{min-height:80px;resize:vertical}
 .tool .ti{font-size:36px;line-height:1}
 .tool small{font-weight:400;color:var(--muted);font-size:var(--fs-xs)}
 .tool:active{transform:scale(.97)}
-.tool.wide{grid-column:1 / -1;flex-direction:row;min-height:76px;gap:12px}
+.tool.wide{flex-direction:row;min-height:76px;gap:12px}
+.tool-cell{position:relative;display:flex;min-width:0}
+.tool-cell.wide{grid-column:1 / -1}
+.tool-cell > .tool{flex:1;min-width:0}
+.tool-cell.has-info > .tool.wide{padding-inline:40px}   /* keep the centred row clear of the ⓘ */
 .tool[data-ex=stop]{background:linear-gradient(135deg,var(--danger-soft),var(--warn-soft))}
 .vent{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}
 .vent li{display:flex;align-items:center;gap:8px;padding:var(--sp-2) var(--sp-1);font-weight:700;font-size:var(--fs-sm)}
@@ -416,6 +420,73 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
 .confetti{position:fixed;top:-20px;width:10px;height:14px;z-index:60;pointer-events:none;border-radius:2px;animation:fall linear forwards}
 @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
 
+/* personalization */
+.chips.num .chip{min-width:48px;justify-content:center}
+.nudge{background:var(--accent-soft);border-color:transparent}
+.nudge .spread > h2{margin-bottom:0}
+.pf-line{font-weight:700;color:var(--accent-strong)}
+.pf-moved{color:var(--warn);font-weight:700}
+.need-hint{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);margin-top:var(--sp-2);font-size:var(--fs-sm);color:var(--muted)}
+.need-hint[hidden]{display:none}
+.need-hint > span{flex:1;min-width:0}
+.need-hint .btn{flex:0 0 auto;white-space:nowrap}
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);min-height:52px;margin-top:var(--sp-4);font-weight:700;cursor:pointer}
+.switch{appearance:none;-webkit-appearance:none;flex:0 0 auto;width:52px;height:32px;border-radius:var(--r-pill);background:var(--line-strong);position:relative;cursor:pointer;transition:background .2s;margin:0}
+.switch::after{content:"";position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:#fff;transition:right .2s}
+.switch:checked{background:var(--accent)}
+.switch:checked::after{right:24px}
+.mini-line{margin:var(--sp-3) 0 0;font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
+.dict-others{font-size:var(--fs-sm);color:var(--muted);margin:var(--sp-4) 0 var(--sp-1)}
+.age-pill{flex:0 0 auto;font-size:var(--fs-xs);font-weight:700;color:var(--muted);background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-pill);padding:0 8px;white-space:nowrap}
+
+/* ⓘ explanations */
+.info-btn{position:absolute;top:0;inset-inline-end:0;z-index:1;width:44px;height:44px;display:grid;place-items:center;padding:0;border:none;background:none;color:var(--accent-strong);border-radius:var(--r-md)}
+.info-btn .ic{width:22px;height:22px}
+.info-btn:active,.info-link:active,.info-inline:active{background:rgba(26,127,118,.14);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.check{position:relative}
+.check-hit{padding-inline-end:52px}
+.check > .info-btn{top:6px;inset-inline-end:6px}
+.card.has-info{position:relative}
+.card.has-info > h2{padding-inline-end:40px}
+.card.has-info > .info-btn{top:14px;inset-inline-end:12px}
+.info-link{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin-top:2px;margin-inline-start:-8px;padding:0 8px;border:none;background:none;color:var(--accent-strong);font-weight:700;font-size:var(--fs-sm);border-radius:var(--r-sm)}
+.info-link .ic{width:20px;height:20px}
+.info-inline{display:inline-grid;place-items:center;width:44px;height:44px;margin:-12px -6px;padding:0;border:none;background:none;color:var(--accent-strong);border-radius:var(--r-md);vertical-align:middle}
+.info-inline .ic{width:20px;height:20px}
+#dlg{z-index:81}
+.info-card{display:flex;flex-direction:column;max-width:560px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px - env(safe-area-inset-top));padding:0;overflow:hidden}
+.modal-card.info-card p{color:var(--text);margin:0}   /* beats .modal-card p (muted + margin) */
+.info-head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) var(--sp-5);padding-inline-end:var(--sp-4);border-bottom:1px solid var(--line)}
+.info-head h2{flex:1;min-width:0;margin:0;font-size:var(--fs-md)}
+.info-ic{font-size:28px;line-height:1;flex:0 0 auto}
+.info-body{overflow-y:auto;overscroll-behavior:contain;padding:var(--sp-4) var(--sp-5) var(--sp-5)}
+.info-foot{padding:var(--sp-3) var(--sp-5) var(--sp-4);border-top:1px solid var(--line)}
+.info-foot:empty{display:none}
+.info-sec + .info-sec{margin-top:var(--sp-4)}
+.info-sec h3{margin:0 0 var(--sp-1);font-size:var(--fs-sm);font-weight:800;color:var(--accent-strong)}
+.info-steps{margin:0;padding-inline-start:1.3em}
+.info-steps li{margin:4px 0;padding-inline-start:2px}
+.info-steps li::marker{font-weight:800;color:var(--accent-strong)}
+.info-tip{display:flex;gap:var(--sp-2);margin-top:var(--sp-4);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-md);background:var(--warn-soft)}
+.info-kid{margin:0 0 var(--sp-4);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-lg);background:var(--accent-soft);font-size:var(--fs-md);font-weight:700}
+.info-say{margin-top:var(--sp-4);padding-inline-start:var(--sp-3);border-inline-start:4px solid var(--accent)}
+.info-say b{display:block;font-size:var(--fs-xs);color:var(--muted)}
+.info-related{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);margin-top:var(--sp-4)}
+.info-related > b{font-size:var(--fs-sm);color:var(--muted);width:100%}
+.info-related .chip{min-height:44px;font-size:var(--fs-sm)}
+.info-more{margin-top:var(--sp-3)}
+.info-parents{margin-top:var(--sp-2)}
+.info-parents > summary{font-size:var(--fs-base)}
+.info-parents[open] > summary{margin-bottom:var(--sp-3)}
+.dict-count{display:inline-block;margin-inline-start:6px;padding:0 8px;border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent-strong);font-size:var(--fs-xs);font-weight:800;vertical-align:middle}
+.dict-item{border-top:1px solid var(--line)}
+.dict-item > summary{min-height:52px;padding:var(--sp-2) 0;font-size:var(--fs-base);font-weight:700;justify-content:flex-start;gap:var(--sp-3)}
+.dict-item > summary .di-ic{flex:0 0 28px;font-size:22px;text-align:center}
+.dict-item > summary .di-t{flex:1;min-width:0}
+.dict-item[open] > summary{color:var(--accent-strong)}
+.dict-body{padding:0 0 var(--sp-4);padding-inline-start:calc(28px + var(--sp-3))}
+.dict-body .btn{margin-top:var(--sp-3)}
+
 /* confirm sheet */
 .modal{position:fixed;inset:0;z-index:80;display:grid;place-items:end center;padding:var(--sp-4) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom));background:var(--scrim);animation:fadeIn .2s ease}
 .modal[hidden]{display:none}
@@ -503,6 +574,19 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
   </div>
 </div>
 
+<!-- explanation sheet (ⓘ) -->
+<div id="infoSheet" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+  <div class="modal-card info-card">
+    <div class="info-head">
+      <span class="info-ic" id="infoIcon" aria-hidden="true"></span>
+      <h2 id="infoTitle" tabindex="-1"></h2>
+      <button type="button" class="icon-btn" data-act="infoClose" aria-label="סגירה"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="info-body" id="infoBody"></div>
+    <div class="info-foot" id="infoFoot"></div>
+  </div>
+</div>
+
 <div id="tapShield" aria-hidden="true"></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -556,7 +640,8 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>',
   download: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   upload: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>',
-  undo: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-3"/></svg>'
+  undo: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-3"/></svg>',
+  info: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6v.01" stroke-width="2.6"/></svg>'
 };
 const CHECK_SVG = '<svg viewBox="0 0 24 24" class="ic" style="stroke-width:3.2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
@@ -598,19 +683,475 @@ const PHASES = [
   { id: 'p4', from: 6, to: 9, name: 'ניהול כעס', tip: 'פרוטוקול תגובה רגוע: עוצרים, מגינים ומדברים רק אחרי שהוא נרגע.' },
   { id: 'p5', from: 8, to: 12, name: 'שתלטנות וחברה', tip: 'בחירות, אחריות אמיתית, תור למנהיג ומפגשי משחק עם חבר.' }
 ];
-const GAMES = [
-  { n: 'צבע-מילה', d: 'אומרים צבע והוא עושה תנועה שסיכמתם (אדום = קופץ, כחול = קופא, ירוק = מסתובב). באמצע מחליפים את החוקים!' },
-  { n: 'תופסת קפואה', d: 'רצים ורוקדים עם מוזיקה. כשהמוזיקה נעצרת – קופאים כמו פסל. מי שזז מחכה סיבוב אחד.' },
-  { n: 'ג׳נגה על זמן', d: 'כל אחד מוציא לבנה בתורו עם טיימר של 10 שניות. מתרגלים סבלנות, תור והפסד בכבוד.' },
-  { n: 'ראש-כתפיים הפוך', d: 'כשאומרים "ראש" נוגעים בכתפיים, וכשאומרים "כתפיים" נוגעים בראש. מאיצים בהדרגה.' },
-  { n: 'רמזור', d: 'ירוק – הולכים, צהוב – לאט מאוד, אדום – עוצרים במקום. ההורה מחליף מהר ולפעמים מנסה לבלבל.' },
-  { n: 'שמעון אומר', d: 'מבצעים רק כשנאמר "שמעון אומר". בסבב השני הוא מוביל – ומתרגל להוביל בהגינות.' },
-  { n: 'תיפוף ועצירה', d: 'מתופפים על השולחן לפי הקצב של ההורה, ועוצרים בדיוק ברגע שההורה עוצר.' },
-  { n: 'שחמט או דמקה', d: 'משחק אחד בלי למהר. לפני כל מהלך אומרים בשקט: "עצור, חושב, בוחר". מסיימים בלחיצת יד.' },
-  { n: 'אתגר דחיית סיפוק', d: 'פרס קטן עכשיו, או כפול אם מחכים 10 דקות. מאריכים את זמן ההמתנה בהדרגה.' },
-  { n: 'משחק תפקידים: משפט העצירה', d: 'מדמים מצב (אח לוקח משהו, מפסידים במשחק) ומתרגלים "עצור – נושם – חושב – בוחר". מתחלפים בתפקידים.' }
+/* Explanations: one source of truth for the ⓘ sheets, the guide chapter and the Today game box
+   (docs/explanations-spec.md, Appendix A). */
+const INFO = {
+  balloon: {
+    group: "calm",
+    icon: "🎈",
+    title: "נשימת בלון",
+    kid: "אתה מנפח את הבטן כמו בלון ומרוקן אותה לאט – והגוף שלך נרגע.",
+    what: "נשימה עמוקה לבטן: שואפים מהאף ומרגישים את הבטן מתנפחת כמו בלון, ואז נושפים לאט מהפה עד שהבלון מתרוקן.",
+    why: "כשהנשיפה איטית וארוכה יותר מהשאיפה, הגוף מקבל אות להאט: הלב נרגע והשרירים משתחררים. הדימוי של בלון עוזר להתרכז בבטן ולא בכעס.",
+    howLabel: "איך מלמדים",
+    how: [
+      "יושבים או עומדים בנוח, יד אחת על הבטן.",
+      "שואפים מהאף 4 שניות – היד עולה כשהבטן מתנפחת.",
+      "נושפים לאט מהפה 6 שניות – היד יורדת כשהבלון מתרוקן.",
+      "חוזרים 6 פעמים, בערך דקה. בבוקר – 3 דקות.",
+      "באפליקציה העיגול גדל בשאיפה וקטן בנשיפה, ואפשר פשוט לנשום איתו."
+    ],
+    tip: "כשהוא שוכב, הניחו לו בובה קטנה על הבטן ותנו לו לראות אותה עולה ויורדת.",
+    related: ["morning", "candle", "thermo"],
+    ex: "balloon"
+  },
+  candle: {
+    group: "calm",
+    icon: "🕯️",
+    title: "נשימת נר",
+    kid: "אתה מריח פרח ונושף על נר בעדינות – שהלהבה תזוז ולא תכבה.",
+    what: "נשימה עם דמיון: שואפים לאט מהאף כאילו מריחים פרח, ונושפים בעדינות מהפה כאילו מזיזים להבה של נר – בלי לכבות אותה.",
+    why: "הנר \"מבקש\" נשיפה איטית ורכה, וזו בדיוק הנשיפה שמרגיעה את הגוף. הדמיון נותן לילד משימה פשוטה שמסיטה את תשומת הלב מהכעס.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מרימים אצבע מול הפה – זה הנר.",
+      "מריחים פרח: שואפים לאט מהאף, 4 שניות.",
+      "נושפים על הנר בעדינות, 6 שניות – שהלהבה רק תרקוד.",
+      "חוזרים 6 פעמים."
+    ],
+    tip: "בפעם הראשונה החזיקו פיסת טישו מול הפה שלו – המטרה שהיא תזוז, לא שתעוף.",
+    related: ["balloon", "box"],
+    ex: "candle"
+  },
+  box: {
+    group: "calm",
+    icon: "🟦",
+    title: "נשימת קובייה",
+    kid: "אתה נושם בארבעה צעדים של 4: שואף, מחזיק, נושף ומחכה – כמו לצייר ריבוע.",
+    what: "נשימה בארבעה שלבים שווים של 4 שניות: שואפים, מחזיקים, נושפים ומחכים – כמו לצייר ריבוע עם הנשימה.",
+    why: "הספירה הקבועה נותנת לראש משהו להתמקד בו, והקצב האחיד מאט את הנשימה. היא מתאימה במיוחד כשהמחשבות רצות מהר.",
+    howLabel: "איך מלמדים",
+    how: [
+      "שואפים מהאף וסופרים לאט עד 4.",
+      "מחזיקים את האוויר – עד 4.",
+      "נושפים מהפה – עד 4.",
+      "מחכים רגע בלי לנשום – עד 4.",
+      "עושים 4 סבבים, בערך דקה. אפשר לצייר באצבע ריבוע באוויר תוך כדי."
+    ],
+    tip: "החזקת האוויר צריכה להיות נוחה, בלי מאמץ. אם קשה לו, תרגלו קודם בלי האפליקציה, בספירה של 3.",
+    related: ["balloon", "robot"],
+    ex: "box"
+  },
+  robot: {
+    group: "calm",
+    icon: "🤖",
+    title: "רובוט וספגטי",
+    kid: "קודם אתה רובוט קשוח ומכווץ, ואז ספגטי רך ורפוי – והמתח יוצא מהגוף.",
+    what: "משחק הרפיה: 5 שניות \"רובוט\" – מכווצים את כל הגוף חזק, ואז 5 שניות \"ספגטי\" – משחררים הכול ונהיים רכים ורפויים. 3 סבבים.",
+    why: "אחרי כיווץ חזק קל יותר לשרירים להשתחרר, והילד לומד להרגיש את ההבדל בין גוף מתוח לגוף רגוע. זה מתאים במיוחד לילד שקשה לו לשבת בשקט ולנשום.",
+    howLabel: "איך מלמדים",
+    how: [
+      "עומדים או יושבים.",
+      "\"רובוט!\" – אגרופים קפוצים, כתפיים למעלה, פנים מכווצות, 5 שניות.",
+      "\"ספגטי!\" – משחררים הכול: ידיים רפויות, כתפיים למטה, 5 שניות.",
+      "חוזרים 3 פעמים."
+    ],
+    tip: "עשו את זה יחד איתו ותגזימו – רובוט קשוח וספגטי מתנדנד. צחוק קטן הוא חלק מההרגעה.",
+    related: ["wall", "corner"],
+    ex: "robot"
+  },
+  wall: {
+    group: "calm",
+    icon: "🧱",
+    title: "לדחוף את הקיר",
+    kid: "אתה דוחף את הקיר בכל הכוח 10 שניות, ואז עוזב ונושם עמוק. הכעס יוצא, ואף אחד לא נפגע.",
+    what: "עומדים מול קיר, ידיים ישרות על הקיר, ודוחפים בכל הכוח 10 שניות. אחר כך עוזבים ונושמים עמוק.",
+    why: "כעס מגיע עם הרבה אנרגיה בגוף. דחיפה חזקה מוציאה אותה דרך השרירים בדרך בטוחה, ואחרי מאמץ חזק הגוף נוטה להשתחרר. זה כלי טוב במיוחד בכתום ובאדום.",
+    howLabel: "איך מלמדים",
+    how: [
+      "עומדים מול קיר, רגל אחת קצת מאחור.",
+      "מניחים כפות ידיים על הקיר בגובה הכתפיים, ידיים ישרות.",
+      "דוחפים בכל הכוח 10 שניות – כאילו מזיזים את הקיר.",
+      "עוזבים, מנערים את הידיים ונושמים עמוק.",
+      "אם צריך – עוד סבב."
+    ],
+    tip: "בחרו מראש \"קיר כעס\" קבוע בבית. כשאתם רואים כתום, מספיק להציע: \"בוא לקיר\".",
+    related: ["robot", "thermo"],
+    ex: "wall"
+  },
+  stop: {
+    group: "calm",
+    icon: "✋",
+    title: "משפט העצירה",
+    kid: "כשהכעס עולה, אתה עוצר, נושם, חושב – ובוחר מה לעשות.",
+    what: "ארבע מילים שעוצרות רגע לפני מעשה: עצור (הגוף קופא), נושם (נשימה אחת עמוקה), חושב (מה יקרה אם…?), בוחר (דרך מותרת).",
+    why: "בכעס הגוף פועל מהר יותר מהמחשבה. המשפט יוצר הפסקה קצרה בין הדחף למעשה, ובהפסקה הזו אפשר לבחור אחרת. קל לזכור מילים קבועות גם כשקשה.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מלמדים בזמן רגוע, לא באמצע התפרצות.",
+      "אומרים יחד בקול, מילה אחרי מילה, עם תנועה: יד עוצרת, נשימה, אצבע לרקה, אגודל למעלה.",
+      "באפליקציה כל מילה נדלקת ל-3 שניות, בשני סבבים.",
+      "מתרגלים במשחק תפקידים, ורק אז משתמשים ברגע אמת – בשקט ובקצרה."
+    ],
+    tip: "השתמשו במשפט גם בעצמכם, בקול, כשאתם מתעצבנים. ילדים לומדים הכי הרבה ממה שהם רואים.",
+    related: ["roleplay", "stopgame"],
+    ex: "stop"
+  },
+  morning: {
+    group: "routine",
+    icon: "🌅",
+    title: "נשימת בוקר ושאלת המדחום",
+    what: "פותחים את היום ב-3 דקות של נשימת בלון ביחד, ואז שואלים: \"איפה אתה במדחום?\" – ירוק, צהוב, כתום או אדום.",
+    why: "תרגול בזמן רגוע הופך את הנשימה להרגל, כך שהיא זמינה גם ברגע קשה. השאלה על המדחום מלמדת אותו לשים לב למה שהוא מרגיש לפני שהכעס גדל.",
+    howLabel: "איך עושים",
+    how: [
+      "בוחרים רגע קבוע, למשל לפני ארוחת הבוקר.",
+      "לוחצים \"התחילו 3 דקות נשימה\" ונושמים יחד: 4 שניות שאיפה, 6 שניות נשיפה.",
+      "שואלים: \"איפה אתה במדחום עכשיו?\" ומקבלים כל תשובה בלי ויכוח.",
+      "אם הוא בצהוב, בכתום או באדום – שואלים בעדינות מה קרה ומציעים כלי.",
+      "בסוף הנשימה המשימה מסומנת בסדר היום מעצמה."
+    ],
+    tip: "גם \"אדום\" בבוקר הוא תשובה טובה – הוא זיהה את מה שהוא מרגיש. אמרו לו: \"תודה שסיפרת\".",
+    related: ["balloon", "thermo"],
+    act: "morningBreath"
+  },
+  move: {
+    group: "routine",
+    icon: "🏃",
+    title: "תנועה בחוץ",
+    what: "30–60 דקות של תנועה פעילה בחוץ בכל יום: ריצה, אופניים, כדור, טיפוס או קפיצה בחבל.",
+    why: "ילד חסר מנוחה צובר הרבה אנרגיה. כשהיא יוצאת במשחק ובתנועה, נשאר פחות \"דלק\" להתפרצויות, ולרוב גם השינה טובה יותר.",
+    howLabel: "איך עושים",
+    how: [
+      "קובעים זמן קבוע, עדיף אחר הצהריים – לפני השעות המועדות.",
+      "נותנים לו לבחור פעילות מתוך 2–3 אפשרויות.",
+      "מכוונים למאמץ שגורם להזיע ולהתנשף, לא רק להליכה איטית.",
+      "אפשר לחלק: 20 דקות אחרי בית הספר ועוד 20 לפני הערב."
+    ],
+    tip: "הצטרפו מדי פעם. מסירות כדור או מרוץ קצר הם גם זמן איכות איתו.",
+    related: ["stopgame"]
+  },
+  bed: {
+    group: "routine",
+    icon: "🌙",
+    title: "\"מה הצלחת היום?\" וסיפור",
+    what: "לפני השינה שואלים: \"מה הצלחת היום?\", מוצאים יחד לפחות הצלחה אחת, ומסיימים בסיפור.",
+    why: "גם אחרי יום קשה, הדבר האחרון שהוא שומע הוא משהו טוב שהוא עשה. זה בונה אצלו תחושה של \"אני מסוגל\", והטקס הקבוע עוזר להירגע לקראת השינה.",
+    howLabel: "איך עושים",
+    how: [
+      "שואלים בקול רך: \"מה הצלחת היום?\"",
+      "אם הוא לא מוצא – עוזרים לו: \"ראיתי שהבוקר חיכית לתור שלך.\"",
+      "אפשר להיעזר בשבחים שנרשמו היום ב\"תפסתי אותו מתנהג יפה\".",
+      "לא מדברים עכשיו על האירועים הקשים של היום – יש לזה זמן אחר.",
+      "מסיימים בסיפור, גם קצר."
+    ],
+    tip: "ספרו גם אתם על הצלחה קטנה שלכם מהיום – כך זו שיחה ולא מבחן.",
+    related: ["praise"]
+  },
+  colorword: {
+    group: "games",
+    icon: "🎨",
+    title: "צבע-מילה",
+    what: "אומרים צבע, והוא עושה תנועה שסיכמתם מראש – למשל אדום = קופץ, כחול = קופא, ירוק = מסתובב. באמצע מחליפים את החוקים!",
+    why: "הוא צריך להקשיב, לזכור את החוק ולעצור את התגובה הישנה כשהחוקים משתנים. זה אימון לגמישות ולעצירה.",
+    howLabel: "איך משחקים",
+    how: [
+      "מסכימים על 3 צבעים ו-3 תנועות.",
+      "קוראים צבעים בקצב איטי, ואז מהר יותר.",
+      "אחרי כמה סבבים מחליפים חוק: עכשיו אדום = קופא.",
+      "מתחלפים – הוא קורא ואתם זזים."
+    ],
+    tip: "כשהוא מתבלבל, צחקו יחד. הטעויות הן חלק מהכיף ומהאימון.",
+    related: ["stopgame", "headshoulders"]
+  },
+  freeze: {
+    group: "games",
+    icon: "🧊",
+    title: "תופסת קפואה",
+    what: "רוקדים ומתרוצצים עם מוזיקה. כשהמוזיקה נעצרת – קופאים כמו פסל. מי שזז מחכה סיבוב אחד.",
+    why: "לעצור את הגוף באמצע תנועה ובשיא ההתרגשות – זה בדיוק מה שצריך גם ברגע של כעס.",
+    howLabel: "איך משחקים",
+    how: [
+      "מפעילים מוזיקה קצבית.",
+      "עוצרים אותה ברגעים לא צפויים.",
+      "כולם קופאים, ומי שזז מחכה סיבוב אחד בצד.",
+      "מאריכים בהדרגה את זמן הקפיאה."
+    ],
+    tip: "שתפו גם את האחים הקטנים, ותנו לו להיות זה שמפעיל את המוזיקה.",
+    related: ["stopgame", "traffic"]
+  },
+  jenga: {
+    group: "games",
+    icon: "🏗️",
+    title: "ג׳נגה על זמן",
+    what: "ג׳נגה רגילה, אבל לכל תור יש 10 שניות. כל אחד בתורו מוציא לבנה ומניח אותה למעלה.",
+    why: "צריך לחכות לתור, לפעול בזהירות תחת לחץ קטן ולהתמודד עם הרגע שבו המגדל נופל. זה תרגול של סבלנות ושל הפסד בכבוד.",
+    howLabel: "איך משחקים",
+    how: [
+      "בונים את המגדל יחד.",
+      "מפעילים טיימר של 10 שניות לכל תור.",
+      "מי שהפיל אומר \"אוף, בפעם הבאה\", ובונים מחדש."
+    ],
+    tip: "הפילו גם אתם את המגדל מדי פעם, והדגימו הפסד רגוע.",
+    related: ["stopgame", "chess"]
+  },
+  headshoulders: {
+    group: "games",
+    icon: "🙃",
+    title: "ראש-כתפיים הפוך",
+    what: "כשאומרים \"ראש\" נוגעים בכתפיים, וכשאומרים \"כתפיים\" נוגעים בראש. מאיצים בהדרגה.",
+    why: "הגוף רוצה לעשות את מה שהוא שומע. לעשות הפוך מאמן לעצור תגובה אוטומטית – כמו לעצור יד שרוצה להכות.",
+    howLabel: "איך משחקים",
+    how: [
+      "מתחילים לאט, עם שתי מילים בלבד: ראש וכתפיים.",
+      "מאיצים בהדרגה.",
+      "מוסיפים זוג חדש: ברכיים ובהונות.",
+      "מתחלפים – הוא נותן את ההוראות."
+    ],
+    tip: "התחילו לאט מספיק כדי שיצליח. הצלחה בהתחלה נותנת חשק להמשיך.",
+    related: ["stopgame", "colorword"]
+  },
+  traffic: {
+    group: "games",
+    icon: "🚦",
+    title: "רמזור",
+    what: "ירוק – הולכים, צהוב – לאט מאוד, אדום – עוצרים במקום. ההורה מחליף צבעים מהר, ולפעמים מנסה לבלבל.",
+    why: "המשחק מאמן להאט ולעצור את הגוף לפי סימן, והצבעים מזכירים את מדחום הרגשות.",
+    howLabel: "איך משחקים",
+    how: [
+      "משחקים במסדרון או בחצר.",
+      "קוראים צבעים, או מרימים דפים צבעוניים.",
+      "מחליפים מהר יותר ככל שהוא מצליח.",
+      "מי שזז באדום חוזר כמה צעדים אחורה."
+    ],
+    tip: "אחרי המשחק אפשר לקשר: \"גם בכעס יש צהוב – זה הרגע להאט.\"",
+    related: ["thermo", "freeze"]
+  },
+  simon: {
+    group: "games",
+    icon: "🗣️",
+    title: "שמעון אומר",
+    what: "מבצעים הוראה רק אם היא מתחילה ב\"שמעון אומר\". בסבב השני הוא מוביל – ומתרגל להוביל בהגינות.",
+    why: "צריך להקשיב עד הסוף לפני שפועלים, בדיוק ההפך מתגובה מהירה בלי מחשבה. ההובלה נותנת לו תפקיד חיובי.",
+    howLabel: "איך משחקים",
+    how: [
+      "נותנים הוראות: \"שמעון אומר: קפוץ!\" – קופצים. \"קפוץ!\" – לא זזים.",
+      "מגבירים את הקצב.",
+      "בסבב השני הוא שמעון.",
+      "בסוף שואלים: מה היה קשה? מה עזר לך לעצור?"
+    ],
+    tip: "כשהוא מוביל, שבחו הובלה הוגנת: \"נתת לכולם הזדמנות – ככה נראה מנהיג טוב.\"",
+    related: ["stopgame"]
+  },
+  drum: {
+    group: "games",
+    icon: "🥁",
+    title: "תיפוף ועצירה",
+    what: "מתופפים על השולחן לפי הקצב של ההורה, ועוצרים בדיוק ברגע שההורה עוצר.",
+    why: "הוא צריך להקשיב, לעקוב ולעצור ברגע. זה אימון קצר לשליטה בתנועה, שגם פורק אנרגיה.",
+    howLabel: "איך משחקים",
+    how: [
+      "מתופפים קצב פשוט, והוא מחקה.",
+      "עוצרים פתאום – והוא עוצר מיד.",
+      "משנים קצב: מהר, לאט, חזק, חלש.",
+      "מתחלפים בתפקידים."
+    ],
+    tip: "אפשר לתופף גם על הברכיים – בהמתנה לאוטובוס או לפני ארוחה.",
+    related: ["stopgame"]
+  },
+  chess: {
+    group: "games",
+    icon: "♟️",
+    title: "שחמט או דמקה",
+    what: "משחק אחד בלי למהר. לפני כל מהלך אומרים בשקט: \"עצור, חושב, בוחר\". מסיימים בלחיצת יד.",
+    why: "משחקי חשיבה מלמדים לעצור ולחשוב לפני שזזים, ולהפסיד בלי להתפרץ. ההפסד קורה בתוך משחק – מקום בטוח לתרגל אותו.",
+    howLabel: "איך משחקים",
+    how: [
+      "בוחרים משחק שהוא מכיר, או לומדים יחד את החוקים.",
+      "לפני כל מהלך אומרים: \"עצור, חושב, בוחר\".",
+      "בסוף לוחצים ידיים, לא משנה מי ניצח.",
+      "משבחים כל הפסד רגוע."
+    ],
+    tip: "הדגימו הפסד יפה בקול: \"אוף, הפסדתי. היה משחק טוב – בפעם הבאה.\"",
+    related: ["stop", "jenga"]
+  },
+  delaygame: {
+    group: "games",
+    icon: "🍬",
+    title: "אתגר דחיית סיפוק",
+    what: "מציעים בחירה: פרס קטן עכשיו, או כפול אם מחכים 10 דקות. מאריכים את זמן ההמתנה בהדרגה.",
+    why: "הוא מתאמן להחזיק דחף ולבחור ב\"אחר כך\" – אותה יכולת שעוזרת לו לעצור כשהוא כועס.",
+    howLabel: "איך משחקים",
+    how: [
+      "בוחרים פרס קטן ואהוב: ממתק, מדבקה או 5 דקות משחק.",
+      "מציעים: \"אחד עכשיו, או שניים אם תחכה 10 דקות.\"",
+      "מפעילים טיימר שהוא רואה, ונותנים לו משהו לעשות בינתיים.",
+      "עומדים בהבטחה מיד כשהטיימר מצלצל."
+    ],
+    tip: "אם הוא בחר \"עכשיו\" – זה בסדר. בלי ביקורת; מנסים שוב מחר.",
+    related: ["delay"]
+  },
+  roleplay: {
+    group: "games",
+    icon: "🎭",
+    title: "משחק תפקידים: משפט העצירה",
+    what: "מדמים מצב מעצבן – אח לוקח משהו, מפסידים במשחק – ומתרגלים \"עצור – נושם – חושב – בוחר\". מתחלפים בתפקידים.",
+    why: "אחרי שמתרגלים רגע קשה כמה פעמים בזמן רגוע, קל יותר לבחור נכון גם ברגע אמת – כמו חזרה לפני הצגה.",
+    howLabel: "איך משחקים",
+    how: [
+      "בוחרים מצב אמיתי שקורה בבית.",
+      "אתם משחקים את האח, והוא מתרגל לעצור, לנשום, לחשוב ולבחור.",
+      "מתחלפים: הוא משחק את האח, ואתם מראים בחירה טובה – או בחירה גרועה ומצחיקה שהוא מתקן.",
+      "בסוף שואלים יחד: איזו בחירה עבדה הכי טוב?"
+    ],
+    tip: "שמרו על אווירה קלילה ומצחיקה, ואל תתרגלו מיד אחרי אירוע אמיתי.",
+    related: ["stop"]
+  },
+  thermo: {
+    group: "concepts",
+    icon: "🌡️",
+    title: "מדחום הרגשות",
+    what: "סולם של ארבעה צבעים שעוזר לילד לתאר כמה הרגש חזק: ירוק – רגוע, צהוב – מתעצבן, כתום – כועס, אדום – עומד להתפוצץ.",
+    why: "קשה לעצור כעס כשהוא כבר באדום. כשהילד לומד לזהות \"צהוב\", אפשר להשתמש בכלי בזמן, לפני הפיצוץ. הצבעים נותנים לכם שפה משותפת, בלי מילים מסובכות.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מסבירים את ארבעת הצבעים בזמן רגוע, עם דוגמאות מהחיים שלו.",
+      "שואלים כמה פעמים ביום: \"איפה אתה במדחום?\"",
+      "מדגימים בעצמכם: אומרים בקול כשאתם בצהוב, ומה אתם עושים כדי להירגע.",
+      "בלשונית \"רגיעה\" הוא בוחר צבע ומקבל כלים שמתאימים לו."
+    ],
+    tip: "אין צבע \"רע\". גם אדום הוא מידע – שבחו אותו על כך שזיהה.",
+    related: ["balloon", "corner"]
+  },
+  corner: {
+    group: "concepts",
+    icon: "🛋️",
+    title: "פינת רגיעה",
+    what: "פינה נעימה בבית שהילד בוחר ומעצב, ואליה הוא הולך כדי להירגע. זו לא פינת עונש: לא שולחים אליה – מזמינים אליה.",
+    why: "מקום שקט ומוכר עוזר לגוף להירגע מהר יותר. כשזו בחירה שלו ולא עונש, הוא לומד שלהירגע זה כוח, לא השפלה.",
+    howLabel: "איך עושים",
+    how: [
+      "בוחרים מקום יחד: פינה בחדר, מתחת לשולחן, ליד חלון.",
+      "ממלאים אותה יחד: כרית, שמיכה, כדור לחץ, דפים וצבעים, ספר אהוב.",
+      "מתרגלים ללכת אליה כשהוא בירוק, כדי שתהיה מוכרת.",
+      "ברגע קשה מציעים: \"רוצה ללכת לפינה שלך?\" – ולא \"לך לפינה!\".",
+      "הוא חוזר כשהוא מוכן, ואז משבחים אותו."
+    ],
+    tip: "אחד היעדים בטבלת הכוכבים יכול להיות \"משתמש בפינת הרגיעה\" – כוכב על כל פעם שהלך אליה בעצמו.",
+    related: ["thermo", "robot"]
+  },
+  stopgame: {
+    group: "concepts",
+    icon: "🛑",
+    title: "משחק עצירה",
+    what: "משחק קצר ומצחיק שבו צריך לעצור, לחכות או לעשות הפוך ממה שהגוף רוצה – כמו תופסת קפואה או רמזור. בכל יום האפליקציה מציעה משחק אחר.",
+    why: "עצירה היא מיומנות שמתחזקת באימון, כמו שריר. כשמתרגלים אותה בכיף ובלי לחץ, קל יותר להשתמש בה גם בכעס.",
+    howLabel: "איך עושים",
+    how: [
+      "מקדישים 10–15 דקות, עדיף באותה שעה בכל יום.",
+      "משחקים את \"המשחק של היום\" מכרטיס \"סדר היום\", או כל משחק אחר מהרשימה.",
+      "מתחילים לאט וקל, ומקשים בהדרגה.",
+      "משבחים כל עצירה מוצלחת: \"וואו, קפאת בדיוק בזמן!\"",
+      "כשמפסידים – מתרגלים גם הפסד בכבוד."
+    ],
+    tip: "תנו לו להוביל סבב. ילדים שאוהבים לשלוט נהנים להיות \"השופט\" – וזה מלמד להוביל בהגינות.",
+    related: ["freeze", "roleplay"]
+  },
+  one: {
+    group: "concepts",
+    icon: "💙",
+    title: "זמן אחד-על-אחד",
+    what: "15 דקות ביום שבהן הורה נמצא רק איתו – בלי אחים ובלי טלפון – והוא בוחר מה עושים.",
+    why: "בבית עם שבעה ילדים קשה לקבל תשומת לב חיובית. זמן קבוע שהוא רק שלו נותן לו אותה בדרך טובה, ומפחית את הצורך להשיג אותה בהתנהגות קשה.",
+    howLabel: "איך עושים",
+    how: [
+      "קובעים שעה קבועה ומכריזים: \"זה הזמן שלנו\".",
+      "מכבים טלפונים ומרחיקים את האחים – הורה שני או בייביסיטר יכולים לעזור.",
+      "הוא בוחר את הפעילות, בתוך גבולות סבירים.",
+      "משתתפים, מתארים ומתלהבים – בלי לתקן, בלי שאלות מבחן ובלי ביקורת.",
+      "מסיימים בזמן ובחיוך: \"נהניתי איתך. מחר נמשיך.\""
+    ],
+    tip: "לא מבטלים את הזמן הזה כעונש. הוא קורה גם אחרי יום קשה – ודווקא אז.",
+    related: ["praise"]
+  },
+  consequence: {
+    group: "concepts",
+    icon: "⚖️",
+    title: "תוצאה הגיונית",
+    what: "תגובה של ההורה למעשה לא מקובל, שקשורה ישירות למעשה, קצרה ובגודל מתאים. למשל: שבר – עוזר לתקן; היכה במשחק – המשחק נגמר להיום.",
+    why: "כשהתוצאה קשורה למעשה, הילד מבין את הקשר בין מה שעשה למה שקרה, ולא מרגיש שמענישים אותו סתם. תוצאה קצרה מאפשרת גם להתחיל מחדש מהר.",
+    howLabel: "איך עושים",
+    how: [
+      "מחכים שכולם יירגעו – לא קובעים תוצאה בשיא הכעס.",
+      "בודקים: זה קשור למעשה? זה קצר? זה הוגן?",
+      "אומרים בקול רגוע ובקצרה: \"זרקת את המשחק, אז המשחק נגמר להיום.\"",
+      "עומדים במה שאמרתם, בלי הרצאה ובלי להוסיף.",
+      "למחרת מתחילים דף חדש."
+    ],
+    tip: "אם קשה לחשוב על תוצאה ברגע, אפשר לומר \"אחשוב על זה ואגיד לך אחר כך\" – ולחזור כשאתם רגועים.",
+    related: ["repair"]
+  },
+  repair: {
+    group: "concepts",
+    icon: "🔧",
+    title: "תיקון",
+    what: "אחרי שפגע במישהו או בחפץ, הילד עושה משהו שמתקן – לא רק אומר \"סליחה\": עוזר לבנות מחדש, מביא קרח, מצייר ציור, מחזיר את מה שלקח.",
+    why: "תיקון מלמד אחריות בלי בושה: \"טעיתי, ואני יכול לתקן\". הוא גם עוזר לאח שנפגע להרגיש שרואים אותו, ומחזיר את השקט בין האחים.",
+    howLabel: "איך עושים",
+    how: [
+      "מחכים שיירגע, ומדברים בפרטיות – לא מול האחים.",
+      "שואלים: \"מה יכול לעזור לו עכשיו להרגיש טוב יותר?\"",
+      "נותנים לו לבחור דרך לתקן – אפשר להציע 2–3 רעיונות.",
+      "מלווים אותו כשהוא מתקן, ומשבחים את המעשה."
+    ],
+    tip: "אל תכריחו \"סליחה\" מיד. סליחה בכפייה מלמדת רק להגיד מילים; מעשה קטן של תיקון שווה יותר.",
+    related: ["consequence"]
+  },
+  praise: {
+    group: "concepts",
+    icon: "👀",
+    title: "שבח ספציפי",
+    what: "שבח שמתאר בדיוק מה הילד עשה, מיד כשזה קורה. למשל: \"ראיתי שוויתרת לאחיך על התור – זה היה בוגר\", במקום \"כל הכבוד\".",
+    why: "ילדים חוזרים על מה שמקבל תשומת לב. שבח ספציפי אומר לו בדיוק מה כדאי לעשות שוב, ומראה לו שרואים גם את הרגעים הטובים, לא רק את הקשים.",
+    howLabel: "איך עושים",
+    how: [
+      "\"תופסים\" אותו מתנהג יפה – גם בדברים קטנים ורגילים.",
+      "מתארים את המעשה: \"ראיתי ש…\"",
+      "מוסיפים מילה חמה או את ההשפעה: \"…וזה עזר לאחותך.\"",
+      "בלי \"אבל\" בסוף, ובלי להזכיר את מה שהיה פעם.",
+      "מכוונים ל-5 שבחים ביום, ורושמים ב\"תפסתי אותו מתנהג יפה\"."
+    ],
+    tip: "מול האחים, שבח בלחישה או אגודל למעלה עובד מצוין – בלי להביך אותו.",
+    related: ["bed", "one"]
+  },
+  delay: {
+    group: "concepts",
+    icon: "⏳",
+    title: "דחיית סיפוק",
+    what: "היכולת לחכות למשהו שרוצים – לוותר על \"עכשיו\" בשביל משהו טוב יותר אחר כך.",
+    why: "ילד שמתאמן בהמתנה לומד להחזיק דחף לרגע – אותה יכולת שהוא צריך כשאח לוקח לו משהו או כשהוא מפסיד. כמו כל מיומנות, היא משתפרת באימון.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מתחילים בהמתנות קצרות וקלות: \"עוד 2 דקות ונתחיל.\"",
+      "משתמשים בטיימר שהוא רואה – קל יותר לחכות כשרואים את הסוף.",
+      "מציעים בחירה: פרס קטן עכשיו, או גדול יותר אחרי המתנה (ראו \"אתגר דחיית סיפוק\").",
+      "מאריכים את ההמתנה בהדרגה, ומשבחים כל המתנה מוצלחת.",
+      "עומדים בהבטחה – תמיד. אחרת אין סיבה לחכות."
+    ],
+    tip: "עזרו לו למצוא מה לעשות בזמן ההמתנה – לשיר, לספור, לשחק במשהו אחר. כשהידיים עסוקות, קל יותר לחכות.",
+    related: ["delaygame"]
+  }
+};
+const INFO_GROUPS = [
+  { id: 'calm', icon: '🧘', title: 'כלי רגיעה', ids: ['balloon', 'candle', 'box', 'robot', 'wall', 'stop'] },
+  { id: 'routine', icon: '📅', title: 'סדר היום', ids: ['morning', 'move', 'bed'] },
+  { id: 'games', icon: '🛑', title: 'משחקי עצירה', ids: ['colorword', 'freeze', 'jenga', 'headshoulders', 'traffic', 'simon', 'drum', 'chess', 'delaygame', 'roleplay'] },
+  { id: 'concepts', icon: '💡', title: 'מושגים', ids: ['thermo', 'corner', 'stopgame', 'one', 'consequence', 'repair', 'praise', 'delay'] }
 ];
-const gameOfDay = (d = new Date()) => GAMES[Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) % GAMES.length];
+const CHECK_INFO = { morning: 'morning', move: 'move', stop: 'stopgame', one: 'one', bed: 'bed' };
+const CHECK_ARIA = { morning: 'מה זה נשימת הבוקר ושאלת המדחום?', move: 'למה תנועה בחוץ?', stop: 'מה זה משחק עצירה?', one: 'מה זה זמן אחד-על-אחד?', bed: 'הסבר: "מה הצלחת היום?" וסיפור' };
+/* the order drives gameOfDay(); names and summaries come from INFO */
+const GAMES = ['colorword', 'freeze', 'jenga', 'headshoulders', 'traffic', 'simon', 'drum', 'chess', 'delaygame', 'roleplay'].map(id => ({ id }));
 const CHECKS = [
   { id: 'morning', when: 'בוקר', icon: '🌅', title: '3 דקות נשימת בלון', sub: 'ושאלה: "איפה אתה במדחום?"' },
   { id: 'move', when: 'אחר הצהריים', icon: '🏃', title: '30–60 דקות תנועה בחוץ', sub: 'ריצה, אופניים, כדור, טיפוס – פריקת אנרגיה.' },
@@ -649,6 +1190,331 @@ const isHit = i => i.actions.includes('מכה');
 const keepSlash = s => esc(s).replace(/ \/ /g, '&nbsp;/&nbsp;');   // "אח / אחות" never wraps at the slash
 
 /* =========================================================
+   Personalization: the child's age and his position in the family (docs/personalization-spec.md).
+   Content is derived at render time from profile(); merge order is always base → age band → sibling count.
+   ========================================================= */
+const BANDS = ['4-6', '7-9', '10-12', '13-14'];
+const bandLabel = b => b.replace('-', '–');
+/* The single read of the profile. `legacy`: an install (or backup) from before personalization whose parents
+   haven't saved the new fields yet – it keeps showing exactly the release-1.0 content (10 / eldest of 7). */
+const isLegacy = () => S.settings.profileSet !== true;
+/* The single legacy gate: a legacy install always gets the release persona (10 years, eldest of 7), so every
+   personalised function – timings, minutes, role chapter, incident options… – returns the release behaviour. */
+function profile() {
+  const st = S.settings, legacy = isLegacy();
+  const age = !legacy && Number.isInteger(st.childAge) ? st.childAge : 10;
+  const n = !legacy && Number.isInteger(st.siblingsCount) ? st.siblingsCount : 7;
+  const pos = n === 1 ? 1 : clamp(!legacy && Number.isInteger(st.birthOrder) ? st.birthOrder : 1, 1, n);
+  const band = age <= 6 ? '4-6' : age <= 9 ? '7-9' : age <= 12 ? '10-12' : '13-14';
+  const role = n === 1 ? 'only' : pos === 1 ? 'eldest' : pos === n ? 'youngest' : 'middle';
+  const sibs = n - 1;
+  return { age, band, n, pos, role, sibs, sib: sibs === 0 ? 's0' : sibs === 1 ? 's1' : 's2', large: n >= 5, older: pos - 1, younger: n - pos, legacy };
+}
+const pick = (map, key) => (map && Object.prototype.hasOwnProperty.call(map, key)) ? map[key] : map.default;
+/* variant lookup for the current profile: legacy installs always get the default (release) text */
+const vary = (p, map, key) => p.legacy ? map.default : pick(map, key);
+const ROLE_LABEL = { only: 'ילד יחיד', eldest: 'הבכור', middle: 'ילד אמצעי', youngest: 'הצעיר' };
+
+/* ---------- stop games by age ---------- */
+const GAME_AGES = { colorword: [5, 14], freeze: [4, 12], jenga: [6, 14], headshoulders: [4, 11], traffic: [4, 9], simon: [4, 10], drum: [4, 14], chess: [7, 14], delaygame: [4, 14], roleplay: [6, 14], turtle: [4, 8], lions: [4, 8], target: [7, 14] };
+Object.assign(INFO, {
+  turtle: {
+    group: "games", icon: "🐢", title: "מרוץ צבים",
+    what: "מרוץ הפוך: כולם יוצאים יחד, ומי שמגיע אחרון לקו הסיום – מנצח. אסור לעצור לגמרי, רק לזוז לאט-לאט.",
+    why: "כדי לזוז לאט כשהגוף רוצה לרוץ, צריך לשלוט בו בכל רגע. זה תרגול מצחיק של האטה – בדיוק מה שצריך כשמתחילים לכעוס.",
+    howLabel: "איך משחקים",
+    how: ["מסמנים קו התחלה וקו סיום, במרחק כמה צעדים.", "\"היכון, הכן, צב!\" – כולם מתחילים לזוז לאט מאוד.", "מי שעוצר לגמרי או רץ – חוזר להתחלה.", "מי שמגיע אחרון מנצח, ומתחילים סיבוב חדש."],
+    tip: "זוזו גם אתם לאט, בהגזמה ועם קול של צב – הצחוק הוא חלק מהאימון.",
+    related: ["stopgame", "freeze"]
+  },
+  lions: {
+    group: "games", icon: "🦁", title: "אריות ישנים",
+    what: "שוכבים על הרצפה כמו אריות ישנים, בלי לזוז ובלי לצחוק. ההורה מנסה \"להעיר\" את האריות במילים מצחיקות – בלי לגעת.",
+    why: "לשכב בשקט כשמישהו מנסה להצחיק – זה אימון בשליטה בגוף ובדחף, ובסוף גם מרגיע.",
+    howLabel: "איך משחקים",
+    how: ["נשכבים בנוח ועוצמים עיניים.", "ההורה מספר בדיחות או עושה קולות – בלי לגעת.", "מי שזז או צוחק מתחיל סיבוב חדש. אם משחקים כמה ילדים, הוא מצטרף \"להעיר\" את השאר.", "מתחילים בדקה אחת, ומאריכים בהדרגה."],
+    tip: "מתאים מאוד לסוף יום עמוס או לפני השינה – המשחק נגמר כשכולם כבר באמת רגועים.",
+    related: ["stopgame", "corner"]
+  },
+  target: {
+    group: "games", icon: "🎯", title: "קליעה עם עצירה",
+    what: "זורקים כדור לסל, לדלי או למטרה – אבל לפני כל זריקה עוצרים, נושמים פעם אחת ומכוונים.",
+    why: "הדחף הוא לזרוק מהר. העצירה הקצרה לפני כל זריקה מלמדת שחשיבה של שנייה משפרת את התוצאה – במשחק וגם בכעס.",
+    howLabel: "איך משחקים",
+    how: ["בוחרים מטרה: סל, דלי, קופסה או חישוק.", "לפני כל זריקה: עוצרים, נושמים, מכוונים – ורק אז זורקים.", "משווים סבב \"מהיר\" לסבב \"עם עצירה\" – באיזה מהם קלע יותר?", "מתחלפים, ומעודדים גם החטאות."],
+    tip: "לגדולים אפשר להפוך את זה לאתגר אישי: כמה קליעות מתוך 10 – ולשבור את השיא של עצמו.",
+    related: ["stopgame", "stop"]
+  }
+});
+Object.keys(GAME_AGES).forEach(id => { INFO[id].ages = GAME_AGES[id]; });
+GAMES.push({ id: 'turtle' }, { id: 'lions' }, { id: 'target' });
+INFO_GROUPS.find(g => g.id === 'games').ids.push('turtle', 'lions', 'target');
+const LEGACY_GAMES = GAMES.slice(0, 10);
+const fitsAge = (id, p) => { const a = INFO[id].ages; return !a || (p.age >= a[0] && p.age <= a[1]); };
+const gamesFor = p => p.legacy ? LEGACY_GAMES : GAMES.filter(g => fitsAge(g.id, p));
+function gameOfDay(d = new Date()) {
+  const pool = gamesFor(profile());
+  return pool[Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) % pool.length];
+}
+
+/* ---------- INFO overrides: base → band → siblings ---------- */
+const INFO_BAND = {
+  '4-6': {
+    balloon: { kid: 'אתה מנפח בלון בבטן, ואז מוציא את האוויר לאט – פשששש.', how: { 1: 'שואפים מהאף 3 שניות – היד עולה כשהבטן מתנפחת.', 2: 'נושפים לאט מהפה 4 שניות – היד יורדת כשהבלון מתרוקן.', 3: 'חוזרים 6 פעמים, פחות מדקה. בבוקר – 2 דקות.' } },
+    candle: { kid: 'אתה מריח פרח, ואז נושף לאט-לאט על הנר – שלא יכבה.', how: { 1: 'מריחים פרח: שואפים לאט מהאף, 3 שניות.', 2: 'נושפים על הנר בעדינות, 4 שניות – שהלהבה רק תרקוד.' } },
+    box: {
+      kid: 'אתה נושם כמו ריבוע: שואף, מחזיק קצת, נושף ומחכה.',
+      what: 'נשימה בארבעה שלבים קצרים של 3 שניות: שואפים, מחזיקים קצת, נושפים ומחכים – כמו לצייר ריבוע קטן.',
+      how: ['שואפים מהאף וסופרים לאט עד 3.', 'מחזיקים את האוויר קצת – עד 3.', 'נושפים מהפה – עד 3.', 'מחכים רגע – עד 3.', 'עושים 3 סבבים. אפשר לצייר באצבע ריבוע על השולחן תוך כדי.'],
+      tip: 'אם החזקת האוויר לא נוחה לו, דלגו עליה – בגיל הזה שאיפה ונשיפה איטיות מספיקות.'
+    },
+    robot: {
+      kid: 'אתה רובוט קשה-קשה, ואז ספגטי רך-רך.',
+      what: 'משחק הרפיה: 4 שניות "רובוט" – מכווצים את כל הגוף חזק, ואז 4 שניות "ספגטי" – משחררים הכול ונהיים רכים. 3 סבבים.',
+      how: { 1: '"רובוט!" – אגרופים קפוצים, כתפיים למעלה, פנים מכווצות, 4 שניות.', 2: '"ספגטי!" – משחררים הכול: ידיים רפויות, כתפיים למטה, 4 שניות.' }
+    },
+    wall: { kid: 'אתה דוחף את הקיר חזק-חזק, ואז נח ונושם.', what: 'עומדים מול קיר, ידיים ישרות על הקיר, ודוחפים בכל הכוח 6 שניות. אחר כך עוזבים ונושמים עמוק.', how: { 2: 'דוחפים בכל הכוח 6 שניות – כאילו מזיזים את הקיר.' } },
+    stop: { kid: 'כשאתה כועס: עוצר, נושם, חושב – ובוחר.', how: { 2: 'באפליקציה כל מילה נדלקת ל-4 שניות, בשני סבבים.' } },
+    morning: { what: 'פותחים את היום ב-2 דקות של נשימת בלון ביחד, ואז שואלים: "איפה אתה במדחום?" – ירוק, צהוב, כתום או אדום.', how: { 1: 'לוחצים "התחילו 2 דקות נשימה" ונושמים יחד: 3 שניות שאיפה, 4 שניות נשיפה.' } },
+    move: { what: 'שעה ויותר ביום של משחק בתנועה, עדיף בחוץ: ריצה, מגלשות, כדור, קפיצות ואופניים.', how: { 3: 'אפשר לחלק: חצי שעה אחרי הגן ועוד חצי שעה לפני הערב.' } },
+    thermo: { how: { 0: 'מסבירים את ארבעת הצבעים בזמן רגוע, ומציירים יחד מדחום עם פרצופים לתלות על המקרר.' } },
+    one: { how: { 2: 'הוא בוחר את הפעילות – למשל משחק על הרצפה, בנייה בקוביות, ציור או ספר.' } },
+    delaygame: {
+      what: 'מציעים בחירה: פרס קטן עכשיו, או כפול אם מחכים דקה אחת. מאריכים בהדרגה, עד כמה דקות.',
+      how: { 1: 'מציעים: "אחד עכשיו, או שניים אם תחכה עד שהשעון יצלצל."', 2: 'מפעילים טיימר שהוא רואה – שעון חול או טיימר בטלפון – ונותנים לו משהו לעשות בינתיים.' }
+    },
+    delay: { how: { 0: 'מתחילים בהמתנות קצרות מאוד: "עוד דקה ונתחיל."' } }
+  },
+  '7-9': {
+    one: { how: { 2: 'הוא בוחר את הפעילות – למשל משחק קופסה, לגו, כדור בחצר או בישול של משהו פשוט.' } },
+    delaygame: { what: 'מציעים בחירה: פרס קטן עכשיו, או כפול אם מחכים 5 דקות. מאריכים בהדרגה, עד 10 דקות.', how: { 1: 'מציעים: "אחד עכשיו, או שניים אם תחכה 5 דקות."' } }
+  },
+  '10-12': {
+    one: { how: { 2: 'הוא בוחר את הפעילות – למשל משחק קלפים או קופסה, אופניים, בישול או פרויקט קטן ביחד.' } }
+  },
+  /* 13–14: a more mature tone; the tools keep their names (team-lead ruling 5) */
+  '13-14': {
+    balloon: {
+      kid: 'נשימה איטית לבטן – הדרך הכי מהירה להוריד את הלחץ בגוף, ואף אחד לא צריך לראות שאתה עושה את זה.',
+      what: 'נשימה עמוקה לבטן: שואפים לאט מהאף והבטן מתרחבת, ואז נושפים לאט מהפה – ארוך יותר מהשאיפה.',
+      tip: 'בהתחלה מתרגלים בשכיבה עם יד על הבטן, ואחר כך בישיבה – כך אפשר לעשות את זה גם בכיתה, בלי שאף אחד ישים לב.'
+    },
+    candle: { kid: 'שאיפה איטית ונשיפה ארוכה ושקטה – הנשיפה הארוכה היא מה שמאט את הגוף.' },
+    box: { kid: '4 שניות שאיפה, 4 החזקה, 4 נשיפה, 4 המתנה – טכניקה שגם ספורטאים משתמשים בה לפני רגע לחוץ.' },
+    robot: {
+      kid: 'מכווצים את כל השרירים חזק, ואז משחררים – והמתח יוצא מהגוף.',
+      what: 'תרגיל הרפיה: 5 שניות מכווצים את כל השרירים חזק, ואז 5 שניות משחררים הכול. 3 סבבים.',
+      how: { 1: 'מכווצים: אגרופים קפוצים, כתפיים למעלה, פנים מכווצות – 5 שניות.', 2: 'משחררים הכול: ידיים רפויות, כתפיים למטה – 5 שניות.' },
+      tip: 'מתאים גם לפני מבחן או משחק חשוב – ואפשר לעשות אותו בישיבה, בלי שאף אחד יראה.'
+    },
+    wall: { kid: 'דוחפים קיר בכל הכוח 10 שניות – מוציאים את האנרגיה של הכעס בלי לפגוע באף אחד.' },
+    stop: { kid: 'כשהכעס עולה: עוצר, נושם, חושב – ובוחר מה לעשות. אתה מחליט, לא הכעס.' },
+    morning: {
+      what: 'פותחים את היום ב-3 דקות של נשימה איטית, ואז שואלים: "איפה אתה במדחום?" – ירוק, צהוב, כתום או אדום.',
+      tip: 'אם הוא לא רוצה לנשום ביחד – זה בסדר. הציעו לו לעשות את זה לבד, עם אוזניות, ורק שאלו על המדחום.'
+    },
+    bed: { what: 'לפני השינה שואלים: "מה הצלחת היום?", מוצאים יחד לפחות הצלחה אחת, ומסיימים בשיחה קצרה או בקריאה.', how: { 4: 'מסיימים בשיחה קצרה, בקריאה או בשיר – מה שהוא אוהב.' } },
+    corner: {
+      what: 'מקום שקט משלו – בחדר או בפינה בבית – שהוא בוחר, ואליו הוא הולך כדי להירגע. זה לא עונש: לא שולחים אליו – מציעים.',
+      how: { 1: 'ממלאים אותו יחד: אוזניות ומוזיקה שמרגיעה אותו, כדור לחץ, מחברת, משהו לשתות.' }
+    },
+    thermo: { tip: 'יש מתבגרים שמעדיפים מספר מ-1 עד 10 על פני צבעים – אפשר להשתמש בשניהם.' },
+    praise: { tip: 'מתבגרים נבוכים משבחים בקול. שבח קצר בפרטיות, או הודעה בטלפון, עובדים טוב יותר.' },
+    one: { how: { 2: 'הוא בוחר את הפעילות – למשל הליכה או נסיעה קצרה, בישול, משחק מחשב ביחד או קניות קטנות. שיחות טובות קורות דווקא כשעושים משהו ביחד.' } },
+    stopgame: {
+      what: 'משחק קצר שבו צריך לעצור, לחכות או לכוון לפני שפועלים – כמו ג׳נגה על זמן או קליעה עם עצירה. בכל יום האפליקציה מציעה משחק אחר.',
+      how: { 3: 'משבחים כל עצירה מוצלחת: "יפה, עצרת וחשבת לפני הזריקה."' }
+    },
+    delaygame: {
+      what: 'מציעים בחירה: משהו קטן עכשיו, או משהו גדול יותר בעוד כמה ימים – למשל לחסוך דמי כיס לקנייה. מאריכים בהדרגה.',
+      how: { 0: 'בוחרים יחד מטרה שהוא באמת רוצה: משחק, בגד או יציאה.', 1: 'מציעים: "אפשר משהו קטן עכשיו, או לחכות לסוף השבוע ולקבל משהו גדול יותר."', 2: 'עוקבים יחד אחרי ההתקדמות – בטבלה, בצנצנת חיסכון או באפליקציה.' }
+    },
+    delay: { how: { 0: 'מתחילים בהמתנות שהוא בוחר: לחכות לסוף השבוע לפני קנייה, או לסיים משימה לפני הטלפון.' } }
+  }
+};
+const ONE_WHY_TAIL = 'זמן קבוע שהוא רק שלו נותן לו אותה בדרך טובה, ומפחית את הצורך להשיג אותה בהתנהגות קשה.';
+const INFO_SIB = {
+  s0: {
+    freeze: { tip: 'שתפו חברים או בני דודים כשאפשר, ותנו לו להיות זה שמפעיל את המוזיקה.' },
+    roleplay: {
+      what: 'מדמים מצב מעצבן – חבר לוקח משהו, מפסידים במשחק – ומתרגלים "עצור – נושם – חושב – בוחר". מתחלפים בתפקידים.',
+      how: { 1: 'אתם משחקים את החבר, והוא מתרגל לעצור, לנשום, לחשוב ולבחור.', 2: 'מתחלפים: הוא משחק את החבר, ואתם מראים בחירה טובה – או בחירה גרועה ומצחיקה שהוא מתקן.' }
+    },
+    one: {
+      what: '15 דקות ביום שבהן הורה פנוי רק לו – בלי טלפון ובלי מטלות – והוא בוחר מה עושים.',
+      why: 'גם כשאין אחים, ימים עמוסים משאירים מעט זמן שבו ההורה באמת פנוי. זמן קבוע שהוא רק שלו נותן לו תשומת לב חיובית, ומפחית את הצורך להשיג אותה בהתנהגות קשה.',
+      how: { 1: 'מכבים טלפונים ומניחים בצד מטלות – הזמן הזה מוקדש רק לו.' }
+    },
+    repair: { why: 'תיקון מלמד אחריות בלי בושה: "טעיתי, ואני יכול לתקן". הוא גם עוזר למי שנפגע להרגיש שרואים אותו, ומחזיר את השקט בבית.', how: { 0: 'מחכים שיירגע, ומדברים בפרטיות – בלי קהל.' } },
+    praise: {
+      what: 'שבח שמתאר בדיוק מה הילד עשה, מיד כשזה קורה. למשל: "ראיתי שחיכית בסבלנות לתור שלך – זה היה בוגר", במקום "כל הכבוד".',
+      how: { 2: 'מוסיפים מילה חמה או את ההשפעה: "…וזה עזר לי מאוד."' },
+      tip: 'מול אחרים, שבח בלחישה או אגודל למעלה עובד מצוין – בלי להביך אותו.'
+    },
+    delay: { why: 'ילד שמתאמן בהמתנה לומד להחזיק דחף לרגע – אותה יכולת שהוא צריך כשחבר לוקח לו משהו או כשהוא מפסיד. כמו כל מיומנות, היא משתפרת באימון.' }
+  },
+  s1: {
+    freeze: { tip: 'שתפו גם את האח או האחות, ותנו לו להיות זה שמפעיל את המוזיקה.' },
+    one: {
+      what: '15 דקות ביום שבהן הורה נמצא רק איתו – בלי האח או האחות ובלי טלפון – והוא בוחר מה עושים.',
+      why: 'כשיש בבית עוד ילד, קשה לקבל מספיק תשומת לב חיובית. ' + ONE_WHY_TAIL,
+      how: { 1: 'מכבים טלפונים ומעסיקים את האח או האחות – הורה שני או בייביסיטר יכולים לעזור.' }
+    },
+    repair: { why: 'תיקון מלמד אחריות בלי בושה: "טעיתי, ואני יכול לתקן". הוא גם עוזר לאח שנפגע להרגיש שרואים אותו, ומחזיר את השקט ביניהם.', how: { 0: 'מחכים שיירגע, ומדברים בפרטיות – לא מול האח או האחות.' } },
+    praise: {
+      what: 'שבח שמתאר בדיוק מה הילד עשה, מיד כשזה קורה. למשל: "ראיתי שוויתרת לאח או לאחות שלך על התור – זה היה בוגר", במקום "כל הכבוד".',
+      how: { 2: 'מוסיפים מילה חמה או את ההשפעה: "…וזה עזר לאח או לאחות שלך."' },
+      tip: 'מול האח או האחות, שבח בלחישה או אגודל למעלה עובד מצוין – בלי להביך אותו.'
+    }
+  },
+  /* two or more siblings: the base text, except where it depends on the family size or his position */
+  s2: {
+    one: { why: p => (p.large ? `בבית עם ${p.n} ילדים קשה לקבל תשומת לב חיובית. ` : 'כשיש בבית עוד ילדים, קשה לקבל מספיק תשומת לב חיובית. ') + ONE_WHY_TAIL },
+    freeze: { tip: p => p.role === 'youngest' ? 'שתפו גם את האחים הגדולים, ותנו לו להיות זה שמפעיל את המוזיקה.'
+      : p.younger === 1 ? 'שתפו גם את האח הקטן או האחות הקטנה, ותנו לו להיות זה שמפעיל את המוזיקה.' : INFO.freeze.tip }
+  }
+};
+function mergeInfo(e, o, p) {
+  if (!o) return e;
+  const r = Object.assign({}, e);
+  Object.keys(o).forEach(k => {
+    const v = typeof o[k] === 'function' ? o[k](p) : o[k];
+    if (k === 'how' && !Array.isArray(v)) { const h = r.how.slice(); Object.keys(v).forEach(i => { h[+i] = typeof v[i] === 'function' ? v[i](p) : v[i]; }); r.how = h; }
+    else r[k] = v;
+  });
+  return r;
+}
+/* every read of an explanation goes through info(): base INFO → age band → sibling count */
+function info(id) {
+  const e = INFO[id];
+  if (!e) return null;
+  const p = profile();
+  if (p.legacy) return e;
+  let r = mergeInfo(e, INFO_BAND[p.band] && INFO_BAND[p.band][id], p);
+  r = mergeInfo(r, INFO_SIB[p.sib] && INFO_SIB[p.sib][id], p);
+  const teenTip = p.band === '13-14' && INFO_BAND['13-14'][id] && INFO_BAND['13-14'][id].tip;
+  if (teenTip && id === 'praise') r.tip = teenTip;   // the 13–14 praise tip wins over the sibling tip
+  return r;
+}
+
+/* ---------- exercises, tiles, moods by age ---------- */
+const EXS_BAND = {
+  '4-6': {
+    balloon: { steps: [{ t: 'שואפים מהאף… הבטן גדלה כמו בלון', label: 'שואפים', s: 3, sc: 1 }, { t: 'נושפים לאט… פשששש', label: 'נושפים', s: 4, sc: .45 }] },
+    candle: { steps: [{ t: 'מריחים פרח…', label: 'שואפים', s: 3, sc: 1 }, { t: 'נושפים לאט על הנר – שלא יכבה', label: 'נושפים', s: 4, sc: .45 }] },
+    box: { cycles: 3, steps: [{ t: 'שואפים…', label: 'שואפים', s: 3, sc: 1 }, { t: 'מחזיקים קצת…', label: 'מחזיקים', s: 3, sc: 1 }, { t: 'נושפים…', label: 'נושפים', s: 3, sc: .45 }, { t: 'מחכים…', label: 'מחכים', s: 3, sc: .45 }] },
+    robot: { steps: [{ t: 'רובוט! 🤖 גוף קשה-קשה', label: 'מכווצים', s: 4, sc: .6, cls: 'tense' }, { t: 'ספגטי! 🍝 גוף רך-רך', label: 'משחררים', s: 4, sc: 1 }] },
+    wall: { steps: [{ t: 'ידיים על הקיר – ודוחפים חזק-חזק! 💪', label: 'דוחפים', s: 6, sc: 1, cls: 'push' }, { t: 'עוזבים… ונושמים', label: 'נושמים', s: 4, sc: .55 }] },
+    stop: { steps: [{ t: 'עצור ✋', s: 4 }, { t: 'נושם 🌬️', s: 4 }, { t: 'חושב 🤔', s: 4 }, { t: 'בוחר ✅', s: 4 }] }
+  },
+  '13-14': {
+    balloon: { steps: [{ t: 'שאיפה איטית מהאף… הבטן מתרחבת', label: 'שואפים', s: 4, sc: 1 }, { t: 'נשיפה ארוכה מהפה… הכתפיים יורדות', label: 'נושפים', s: 6, sc: .45 }] },
+    candle: { steps: [{ t: 'שאיפה איטית מהאף…', label: 'שואפים', s: 4, sc: 1 }, { t: 'נשיפה ארוכה ושקטה – כמו להזיז להבה בלי לכבות', label: 'נושפים', s: 6, sc: .45 }] },
+    robot: { steps: [{ t: 'מכווצים את כל השרירים – אגרופים, כתפיים, פנים', label: 'מכווצים', s: 5, sc: .6, cls: 'tense' }, { t: 'משחררים הכול – כבד ורפוי', label: 'משחררים', s: 5, sc: 1 }] },
+    wall: { steps: [{ t: 'ידיים על הקיר – ודוחפים בכל הכוח', label: 'דוחפים', s: 10, sc: 1, cls: 'push' }, { t: 'עוזבים… ונושמים עמוק', label: 'נושמים', s: 4, sc: .55 }] }
+  }
+};
+/* the exercise definition for this child; startEx() resolves it once, so a running exercise keeps its timings */
+function exDef(id) {
+  const p = profile(), o = !p.legacy && EXS_BAND[p.band] && EXS_BAND[p.band][id];
+  return o ? Object.assign({}, EXS[id], o) : EXS[id];
+}
+const morningMin = () => profile().band === '4-6' ? 2 : 3;
+const TOOLS_BAND = { '4-6': { box: { sub: '3 – 3 – 3 – 3' }, wall: { sub: '6 שניות בכל הכוח' } } };
+function toolOf(t) { const p = profile(), o = !p.legacy && TOOLS_BAND[p.band] && TOOLS_BAND[p.band][t]; return o ? Object.assign({}, TOOLS[t], o) : TOOLS[t]; }
+/* holding the breath is hard for a furious 4–6-year-old: no box breathing in the red / orange suggestions */
+const MOOD_TOOLS_BAND = { '4-6': { red: ['stop', 'wall', 'balloon'], orange: ['wall', 'balloon', 'robot', 'stop'] } };
+function moodTools(c) { const p = profile(), o = !p.legacy && MOOD_TOOLS_BAND[p.band] && MOOD_TOOLS_BAND[p.band][c]; return o || MOODS[c].tools; }
+
+/* ---------- Today checklist ---------- */
+function checksFor(p) {
+  return CHECKS.map(c => {
+    const r = Object.assign({}, c);
+    if (c.id === 'morning') r.title = `${morningMin()} דקות נשימת בלון`;
+    if (c.id === 'move') { r.title = vary(p, { '4-6': 'שעה של משחק בתנועה', default: c.title }, p.band); r.sub = vary(p, { '4-6': 'ריצה, מגלשות, כדור, קפיצות – פריקת אנרגיה.', '13-14': 'ריצה, אופניים, כדורסל, אימון – פריקת אנרגיה.', default: c.sub }, p.band); }
+    if (c.id === 'one') r.sub = vary(p, { s1: 'רק הוא והורה, בלי האח או האחות. הוא בוחר את הפעילות.', s0: 'רק הוא והורה, בלי טלפונים. הוא בוחר את הפעילות.', default: c.sub }, p.sib);
+    if (c.id === 'bed') r.title = vary(p, { '13-14': '"מה הצלחת היום?" ושיחה קצרה', default: c.title }, p.band);
+    return r;
+  });
+}
+const checkAria = (id, p) => id === 'bed' && !p.legacy && p.band === '13-14' ? 'הסבר: "מה הצלחת היום?" ושיחה קצרה' : CHECK_ARIA[id];
+
+/* ---------- stars: band defaults (onboarding) and suggestions (settings) – never overriding the parent ---------- */
+const STAR_BAND = {
+  '4-6': { need: 8, range: [6, 10], mini: { on: true, every: 3, text: 'מדבקה או עוד סיפור לפני השינה' }, goals: ['שומר על ידיים לעצמו', 'הולך לפינת הרגיעה כשהוא כועס'], reward: 'יציאה לגינה עם אבא או אמא' },
+  '7-9': { need: 12, range: [10, 14] },
+  '10-12': { need: 15, range: [12, 18] },
+  '13-14': { need: 15, range: [12, 20], goals: ['מדבר בכבוד גם כשהוא כועס', 'לוקח הפסקה כשהוא מתעצבן'], reward: 'יציאה או חוויה משותפת שהוא בוחר' }
+};
+const MINI_DEFAULT = { on: false, every: 3, text: 'פרס קטן להיום' };
+
+/* ---------- incident form for an only child (old values stay readable) ---------- */
+function incOpts(p) {
+  if (p.sib !== 's0') return INC;
+  return Object.assign({}, INC, {
+    trigger: INC.trigger.map(x => x === 'אח לקח לו משהו' ? 'ילד אחר לקח לו משהו' : x),
+    target: INC.target.filter(x => x !== 'אח / אחות'),
+    response: INC.response.map(x => x === 'הגנו על האח' ? 'הרחקנו את מי שהיה לידו' : x)
+  });
+}
+
+/* ---------- family-position chapter and the large-family card (guide) ---------- */
+function roleChapter(p) {
+  const s1 = p.sib === 's1';
+  // a middle child with exactly one older (pos 2) or one younger (pos N−1) sibling: that side in the singular
+  const O = p.older === 1 ? 'האח הגדול או האחות הגדולה' : 'הגדולים', Y = p.younger === 1 ? 'האח הקטן או האחות הקטנה' : 'הקטנים';
+  const oneSide = p.older === 1 || p.younger === 1;
+  const T = {
+    eldest: [`👑 הבכור מתוך ${p.n}`, [
+      ['🗓️ זמן אישי קבוע', s1 ? 'זמן קבוע (עדיף יומי) שהוא רק שלו – בלי האח או האחות. כתוב ביומן, ולא מבטלים.' : 'זמן קבוע (עדיף יומי) שהוא רק שלו – בלי אחים. כתוב ביומן, ולא מבטלים.'],
+      ['🙅 בכור ולא שמרטף', s1 ? 'עזרה – כן. אחריות של הורה על האח או האחות – לא.' : 'עזרה – כן. אחריות של הורה על האחים – לא.'],
+      ['🎖️ זכויות של גדול', 'לצד האחריות – זכויות: שעת שינה מאוחרת יותר, יותר בחירה, פעילות שרק גדולים עושים.'],
+      ['🔒 מקום נעול לחפצים שלו', s1 ? 'ארגז או מגירה עם מנעול, שרק הוא פותח. פחות "לקחו לי!".' : 'ארגז או מגירה עם מנעול שהאחים לא נוגעים בהם. פחות "לקחו לי!".'],
+      ['⚖️ לא להשוות', s1 ? 'לא "תראה איך האח או האחות שלך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.' : 'לא "תראה איך אחותך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.'],
+      [s1 ? '🛡️ הגנה והפרדה' : '🛡️ הגנה על האחים והפרדה', 'מזהים מצבים מועדים (מעברים, ערב, מסכים) ומפרידים מראש: חדרים שונים, פעילות נפרדת.'],
+      ['🧭 תפקיד מנהיגות שהוא בוחר', s1 ? 'הוא בוחר מרשימה: מדריך משחק לאח הקטן, אחראי על המוזיקה בנסיעה... מנהיגות חיובית במקום שתלטנות.' : 'הוא בוחר מרשימה: מדריך משחק לקטנים, אחראי על המוזיקה בנסיעה... מנהיגות חיובית במקום שתלטנות.']
+    ]],
+    middle: [`🧩 הילד האמצעי (מקום ${p.pos} מתוך ${p.n})`, [
+      ['🗓️ זמן אישי קבוע', oneSide ? `ילד אמצעי נבלע בקלות בין ${O} לבין ${Y}. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.` : 'ילד אמצעי נבלע בקלות בין הגדולים לקטנים. זמן קבוע שהוא רק שלו – כתוב ביומן, ולא מבטלים.'],
+      ['🪪 משהו שהוא רק שלו', oneSide ? `הוא לא רק "האמצעי": תחביב, תפקיד או פינה שמזוהים רק איתו – לא עם ${O} ולא עם ${Y}.` : 'לא "הגדולים" ולא "הקטנים": תחביב, תפקיד או פינה שמזוהים רק איתו.'],
+      ['⚖️ שיפוט הוגן', `מול ${O} הוא הקטן, ומול ${Y} הוא הגדול. בודקים מה קרה, ולא מניחים מראש מי אשם.`],
+      ['🙅 לא להשוות', 'לא "תראה איך אחיך הגדול..." ולא "אתה כבר גדול, תוותר לקטן" ברגע של כעס.'],
+      ['🔒 מקום לחפצים שלו', `ארגז או מגירה משלו, ש${O} לא לוקחים ו${Y} לא מפרקים.`],
+      ['🛡️ הגנה והפרדה', 'מזהים מצבים מועדים (מעברים, ערב, מסכים) ומפרידים מראש: חדרים שונים, פעילות נפרדת.'],
+      ['🧭 תפקיד שהוא בוחר', 'הוא בוחר מרשימה: מארגן משחק משפחתי, אחראי על המוזיקה בנסיעה… גם הוא מוביל לפעמים.']
+    ]],
+    youngest: [`🌱 הצעיר מתוך ${p.n}`, [
+      ['🗓️ זמן אישי קבוע', s1 ? 'גם לצעיר צריך זמן קבוע רק שלו, בלי האח הגדול או האחות הגדולה. כתוב ביומן, ולא מבטלים.' : 'גם לצעיר צריך זמן קבוע רק שלו, בלי הגדולים. כתוב ביומן, ולא מבטלים.'],
+      ['🌱 לתת לו לעשות לבד', 'לא "התינוק של הבית": משימות ואחריות שמתאימות לגילו, ושבח על כל צעד של עצמאות.'],
+      ['⚖️ לא מגינים עליו אוטומטית', s1 ? 'גם הצעיר יכול להכאיב. בודקים מה קרה, ולא מניחים מראש שהאח הגדול או האחות הגדולה אשמים.' : 'גם הצעיר יכול להכאיב. בודקים מה קרה, ולא מניחים מראש שהגדולים אשמים.'],
+      ['📢 שיהיה לו קול', s1 ? 'בבית עם אח או אחות גדולים קשה להישמע. מקשיבים עד הסוף, ומדי פעם נותנים לו את המילה הראשונה בשיחה משפחתית.' : 'בבית עם ילדים גדולים קשה להישמע. מקשיבים עד הסוף, ומדי פעם נותנים לו את המילה הראשונה בשיחה משפחתית.'],
+      ['🙅 לא להשוות', s1 ? 'לא "בגיל שלך האח או האחות שלך כבר..." ולא "אתה הקטן, תוותר" ברגע של כעס.' : 'לא "בגיל שלך אחותך כבר..." ולא "אתה הקטן, תוותר" ברגע של כעס.'],
+      ['🚧 החינוך – אצל ההורים', s1 ? 'האח הגדול או האחות הגדולה לא מתגרים בו ולא "מחנכים" אותו. גבולות ותוצאות – רק מכם.' : 'האחים הגדולים לא מתגרים בו ולא "מחנכים" אותו. גבולות ותוצאות – רק מכם.'],
+      ['🧭 תפקיד אמיתי', 'תפקיד שבו הוא מוביל: מחלק את הקינוח, בוחר משחק משפחתי, אחראי על האכלת חיית המחמד.']
+    ]],
+    only: ['⭐ ילד יחיד', [
+      ['🗓️ זמן איכות קבוע', 'גם כשההורים זמינים יותר, זמן קבוע ומתוכנן רק בשבילו – בלי טלפון ובלי מטלות – שווה זהב.'],
+      ['🤝 לתרגל עם ילדים אחרים', 'בלי אחים בבית, את התור, השיתוף וההפסד מתרגלים עם חברים, בני דודים ובחוגים. מזמינים חבר אחד בכל פעם.'],
+      ['🎲 להפסיד גם בבית', 'לא מוותרים לו במשחקים. הפסד בבית, ליד מבוגר רגוע, הוא האימון הכי בטוח.'],
+      ['⏳ לחכות לתור', 'בבית עם ילד אחד הכול מגיע מהר. תרגלו המתנה בכוונה: "עוד דקה אחת, ואז נמשיך."'],
+      ['🧒 ילד, לא מבוגר קטן', 'הוא לא שותף לדאגות של המבוגרים ולא שופט בין ההורים.'],
+      ['🙅 לא להשוות', 'לא "תראה איך הבן של השכנים..." ברגע של כעס.'],
+      ['🧭 תפקיד אחריות', 'תפקיד אמיתי בבית שהוא בוחר, כדי שירגיש שהוא תורם ולא רק מקבל.']
+    ]]
+  };
+  const [title, list] = T[p.role];
+  return { title, list };
+}
+const LARGE_FAMILY = [
+  ['📅 לוח תורות קבוע', 'מי בוחר משחק, מי יושב ליד החלון, מי ראשון באמבטיה – כתוב ותלוי במקום שכולם רואים. פחות ויכוחים על "זה לא הוגן!".'],
+  ['🕐 זמן אישי לכל ילד', 'גם 10 דקות בשבוע לכל ילד, בתורנות קבועה בין ההורים, עושות הבדל.'],
+  ['🧭 מעברים מוכנים מראש', 'בוקר, יציאה וערב הם השעות הקשות. מכינים מראש בגדים ותיקים, ומקטינים את מספר הילדים באותו חדר.'],
+  ['🧺 משימה לפי גיל לכל ילד', 'לכל ילד משימה קטנה שמתאימה לגילו, ואף אחד לא "העוזר הקבוע" של ההורים.'],
+  ['🤝 לבקש עזרה', 'סבים, שכנים, חוג או צהרון. כל שעה של עזרה מפנה זמן לילד שזקוק לו עכשיו. לבקש עזרה זה לא כישלון.']
+];
+
+
+/* =========================================================
    State, validation & storage
    ========================================================= */
 const KEY = 'ragua-vehazak-v1';
@@ -669,9 +1535,15 @@ function defaults() {
       goals: [{ id: 'g1', text: 'שומר על ידיים לעצמו' }, { id: 'g2', text: 'משתמש בפינת הרגיעה' }],
       reward: 'בחירת פעילות מיוחדת עם אבא או אמא',
       starsNeeded: 15,
-      onboarded: false
+      onboarded: false,
+      childAge: null,       // 4–14
+      siblingsCount: null,  // 1–12, including him
+      birthOrder: null,     // 1 = eldest … siblingsCount = youngest
+      profileReview: false, // show the one-time Today prompt (migrated installs)
+      profileSet: false,    // the parents saved the profile at least once (else: release-1.0 content)
+      miniReward: { on: false, every: 3, text: 'פרס קטן להיום' }
     },
-    days: {},        // 'YYYY-MM-DD' -> { checks:{id:true}, praises:[{ts,note}] }
+    days: {},        // 'YYYY-MM-DD' -> { checks:{id:true}, praises:[{ts,note}], mini?:true }
     stars: [],       // {goalId, ts}  (never removed)
     celebrated: {},  // program week -> star target that was celebrated in that week
     moods: [],       // {ts, c}
@@ -720,6 +1592,27 @@ function normalize(raw) {
   const need = typeof rs.starsNeeded === 'string' ? parseInt(rs.starsNeeded, 10) : rs.starsNeeded;
   if (typeof need === 'number' && Number.isFinite(need)) st.starsNeeded = clamp(Math.round(need), 1, 200);
   st.onboarded = rs.onboarded === true;
+  // profile (age & family position); invalid → missing. Onboarded installs and backups from before
+  // personalization become 10 / 7 / eldest with the one-time Today prompt, and keep the release content.
+  const toInt = v => (typeof v === 'number' && Number.isInteger(v)) ? v : (typeof v === 'string' && /^\d{1,2}$/.test(v.trim())) ? Number(v) : null;
+  let age = toInt(rs.childAge); if (age === null || age < 4 || age > 14) age = null;
+  let kids = toInt(rs.siblingsCount); if (kids === null || kids < 1 || kids > 12) kids = null;
+  let pos = toInt(rs.birthOrder); if (pos === null || pos < 1) pos = null;
+  if (kids === 1) pos = 1;
+  if (kids !== null && pos !== null && pos > kids) pos = null;      // inconsistent → ask again
+  // a complete, valid profile without the flag (e.g. a hand-edited backup) counts as set: it is applied fully
+  let review = rs.profileReview === true, set = rs.profileSet === true || (rs.profileSet === undefined && age !== null && kids !== null && pos !== null);
+  if (st.onboarded && (age === null || kids === null || pos === null)) {
+    if (age === null) age = 10;
+    if (kids === null) kids = 7;
+    if (pos === null) pos = 1;
+    review = true; set = false;
+  }
+  if (!st.onboarded) set = false;
+  st.childAge = age; st.siblingsCount = kids; st.birthOrder = pos; st.profileReview = review; st.profileSet = set;
+  const mr = isObj(rs.miniReward) ? rs.miniReward : {};
+  const every = toInt(mr.every);
+  st.miniReward = { on: mr.on === true, every: clamp(every === null ? 3 : every, 1, 10), text: (typeof mr.text === 'string' && mr.text.trim()) ? mr.text.trim().slice(0, 60) : 'פרס קטן להיום' };
 
   if (isObj(raw.days)) {
     Object.keys(raw.days).slice(0, 5000).forEach(k => {
@@ -734,6 +1627,7 @@ function normalize(raw) {
         if (ts !== null && note !== null) praises.push({ ts, note });
       });
       d.days[k] = { checks, praises };
+      if (v.mini === true) d.days[k].mini = true;
     });
   }
   if (Array.isArray(raw.stars)) raw.stars.slice(0, 20000).forEach(s => {
@@ -850,8 +1744,9 @@ function renderToday() {
   const raw = weekRaw(), pre = raw < 1, w = clamp(raw, 1, 12);
   const phases = pre ? [] : activePhases(w);
   const d = day();
-  const doneCount = CHECKS.filter(c => d.checks[c.id]).length;
-  const g = gameOfDay();
+  const pf = profile(), checks = checksFor(pf);
+  const doneCount = checks.filter(c => d.checks[c.id]).length;
+  const g = gameOfDay(), gi = info(g.id);
   let title, heroNote;
   if (pre) {
     const n = dayDiff(parseKey(S.settings.startDate), new Date());
@@ -880,11 +1775,19 @@ function renderToday() {
     <div class="weeks" aria-hidden="true">${pips}</div>
     <p>${heroNote}</p>
   </section>
+  ${S.settings.profileReview ? `
+  <div class="card nudge" role="region" aria-labelledby="nudgeT">
+    <div class="spread"><h2 id="nudgeT">✨ התאמה לגיל ולמשפחה</h2>
+      <button type="button" class="x-btn" data-act="nudgeDismiss" aria-label="סגירת ההודעה">${ICON.close}</button></div>
+    <p>עדכנו גיל ומקום במשפחה כדי להתאים את התוכנית.</p>
+    <p class="sub">עד אז התוכנית מותאמת לילד בן 10, הבכור מתוך 7.</p>
+    <button type="button" class="btn small" data-act="openProfile">לעדכון</button>
+  </div>` : ''}
 
   <section class="card">
-    <div class="spread"><h2>📋 סדר היום</h2><span class="pill">${esc(doneCount)}/${CHECKS.length}</span></div>
-    <div class="progress" style="margin-bottom:14px"><span style="width:${esc(doneCount / CHECKS.length * 100)}%"></span></div>
-    ${CHECKS.map(c => {
+    <div class="spread"><h2>📋 סדר היום</h2><span class="pill">${esc(doneCount)}/${checks.length}</span></div>
+    <div class="progress" style="margin-bottom:14px"><span style="width:${esc(doneCount / checks.length * 100)}%"></span></div>
+    ${checks.map(c => {
       const done = !!d.checks[c.id];
       return `
       <div class="check ${done ? 'done' : ''}" data-id="${c.id}">
@@ -896,15 +1799,18 @@ function renderToday() {
             ${c.sub ? `<span class="sub">${esc(c.sub)}</span>` : ''}
           </span>
         </button>
-        ${c.id === 'stop' ? `<div class="check-extra"><div class="game"><b>המשחק של היום: ${esc(g.n)}</b><br>${esc(g.d)}</div></div>` : ''}
-        ${c.id === 'morning' && !done ? `<div class="check-extra"><button type="button" class="btn small" data-act="morningBreath">${ICON.play}התחילו 3 דקות נשימה</button></div>` : ''}
+        ${infoBtn(CHECK_INFO[c.id], 'today', checkAria(c.id, pf))}
+        ${c.id === 'stop' ? `<div class="check-extra"><div class="game"><b>המשחק של היום: ${esc(gi.title)}</b><br>${esc(gi.what)}
+          <br><button type="button" class="info-link" data-act="info" data-info="${g.id}" data-ctx="today" aria-haspopup="dialog" aria-controls="infoSheet" aria-label="איך משחקים ${esc(gi.title)}?">${ICON.info}איך משחקים?</button></div></div>` : ''}
+        ${c.id === 'morning' && !done ? `<div class="check-extra"><button type="button" class="btn small" data-act="morningBreath">${ICON.play}התחילו ${morningMin()} דקות נשימה</button></div>` : ''}
       </div>`;
     }).join('')}
   </section>
 
-  <section class="card">
+  <section class="card has-info">
     <h2>👀 תפסתי ${esc(himName())} מתנהג יפה</h2>
-    <p class="sub">שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאחיך על התור". היעד: 5 ביום.</p>
+    ${infoBtn('praise', 'today', 'מה זה שבח ספציפי?')}
+    <p class="sub">${vary(pf, { s0: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שחיכית בסבלנות לתור שלך". היעד: 5 ביום.', s1: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאח או לאחות שלך על התור". היעד: 5 ביום.', default: 'שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאחיך על התור". היעד: 5 ביום.' }, pf.sib)}</p>
     <label class="sr-only" for="praiseNote">מה ראיתם?</label>
     <input class="input mt3" id="praiseNote" maxlength="120" value="${esc(praiseDraft)}" placeholder="מה ראיתם? (לא חובה)" enterkeyhint="done">
     <button type="button" class="btn praise-btn mt3" data-act="praise"><b class="pname">⭐ תפסתי ${childName() ? 'את ' + esc(childName()) : 'אותו'}!</b> <span class="cnt">(${esc(praises.length)}/5)</span></button>
@@ -925,6 +1831,7 @@ function renderToday() {
       </div>`;
     }).join('')}
     <div class="progress"><span style="width:${esc(Math.min(100, total / need * 100))}%"></span></div>
+    ${miniLine(d)}
     <div class="reward"><span class="gift" aria-hidden="true">🎁</span><span>${left <= 0 ? `<b>${pre ? 'הפרס הורווח!' : 'הפרס הורווח השבוע!'}</b> ` : left === 1 ? 'עוד <b>כוכב אחד</b> לפרס: ' : `עוד <b>${esc(left)}</b> כוכבים לפרס: `}${esc(S.settings.reward)}</span></div>
   </section>
 
@@ -935,17 +1842,30 @@ function renderToday() {
   fixRanges($('#tab-today'));
 }
 
+/* the optional daily mini-reward (never touches the weekly count or the celebration) */
+function starsToday() { const k = todayKey(); return S.stars.filter(s => keyOf(new Date(s.ts)) === k).length; }
+function miniLine(d) {
+  const mr = S.settings.miniReward;
+  if (!mr.on) return '';
+  if (d.mini) return `<p class="mini-line">הפרס הקטן של היום הורווח 🎈</p>`;
+  return `<p class="mini-line">פרס קטן להיום: <b>${esc(Math.min(starsToday(), mr.every))}</b>/${esc(mr.every)} כוכבים</p>`;
+}
+
 /* ---------- Tab 2: Calm ---------- */
 let selMood = null;
-function toolBtn(t, wide) {
-  const x = TOOLS[t];
-  return `<button type="button" class="tool ${wide ? 'wide' : ''}" data-act="ex" data-ex="${t}"><span class="ti" aria-hidden="true">${x.icon}</span><span>${esc(x.name)}<br><small>${esc(x.sub)}</small></span></button>`;
+/* tile + ⓘ are siblings in a cell (a button can't contain a button); a tap on the tile still starts the exercise */
+function toolBtn(t, wide, info = true) {
+  const x = toolOf(t);
+  return `<div class="tool-cell ${wide ? 'wide' : ''} ${info ? 'has-info' : ''}">
+    <button type="button" class="tool ${wide ? 'wide' : ''}" data-act="ex" data-ex="${t}"><span class="ti" aria-hidden="true">${x.icon}</span><span>${esc(x.name)}<br><small>${esc(x.sub)}</small></span></button>
+    ${info ? infoBtn(t, 'calm', `מה זה ${x.name}?`) : ''}
+  </div>`;
 }
 /* 2-column grid without an orphan tile: an odd tile out becomes full width */
-function toolGrid(ids, wideIds = []) {
+function toolGrid(ids, wideIds = [], info = true) {
   const narrow = ids.filter(t => !wideIds.includes(t));
   const extra = narrow.length % 2 ? narrow[narrow.length - 1] : null;
-  return ids.map(t => toolBtn(t, wideIds.includes(t) || t === extra)).join('');
+  return ids.map(t => toolBtn(t, wideIds.includes(t) || t === extra, info)).join('');
 }
 function renderCalm() {
   const todays = S.moods.filter(m => keyOf(new Date(m.ts)) === todayKey());
@@ -972,7 +1892,7 @@ function renderCalm() {
   <section class="card" id="moodTools">
     <div class="mood-msg" style="--mood-c:${moodColor(selMood)};background:color-mix(in srgb, ${moodColor(selMood)} 18%, var(--surface))">${esc(m.msg)}</div>
     <h2>מה יעזור לך עכשיו:</h2>
-    <div class="tools">${toolGrid(m.tools, selMood === 'red' ? ['stop'] : [])}</div>
+    <div class="tools">${toolGrid(moodTools(selMood), selMood === 'red' ? ['stop'] : [], selMood !== 'red')}</div>
   </section>
   <section class="card"><details><summary>🧰 כל הכלים</summary><div class="tools mt3">${toolGrid(all, ['stop'])}</div></details></section>` : `
   <section class="card">
@@ -1000,6 +1920,10 @@ function chipGroup(field, opts, multi) {
 }
 function renderIncident() {
   if (!draft) draft = freshDraft();
+  const opts = incOpts(profile());
+  // values that are no longer offered (e.g. the family is now one child) are dropped from the draft
+  ['trigger', 'target', 'duration'].forEach(f => { if (draft[f] && !opts[f].includes(draft[f])) draft[f] = null; });
+  ['actions', 'response'].forEach(f => { draft[f] = draft[f].filter(v => opts[f].includes(v)); });
   if (!draft.tsEdited) draft.ts = localInputValue(new Date());
   const recent = S.incidents.slice().sort((a, b) => b.ts - a.ts).slice(0, 15);
   $('#tab-incident').innerHTML = `
@@ -1009,11 +1933,11 @@ function renderIncident() {
     <button type="button" class="btn ghost small" data-act="gotoProtocol">🧭 מה עושים ברגע ההתפרצות?</button>
     <label class="lbl" for="incTs">מתי?</label>
     <input class="input" type="datetime-local" id="incTs" value="${esc(draft.ts)}" max="${esc(maxIncidentInput())}">
-    <div class="lbl" id="lbl-trigger">מה קרה לפני?</div>${chipGroup('trigger', INC.trigger, false)}
-    <div class="lbl" id="lbl-target">כלפי מי?</div>${chipGroup('target', INC.target, false)}
-    <div class="lbl" id="lbl-actions">מה הוא עשה? <span class="req">חובה</span> <span class="sub">(אפשר לבחור כמה)</span></div>${chipGroup('actions', INC.actions, true)}
-    <div class="lbl" id="lbl-duration">כמה זמן זה נמשך?</div>${chipGroup('duration', INC.duration, false)}
-    <div class="lbl" id="lbl-response">איך הגבנו? <span class="sub">(אפשר לבחור כמה)</span></div>${chipGroup('response', INC.response, true)}
+    <div class="lbl" id="lbl-trigger">מה קרה לפני?</div>${chipGroup('trigger', opts.trigger, false)}
+    <div class="lbl" id="lbl-target">כלפי מי?</div>${chipGroup('target', opts.target, false)}
+    <div class="lbl" id="lbl-actions">מה הוא עשה? <span class="req">חובה</span> <span class="sub">(אפשר לבחור כמה)</span></div>${chipGroup('actions', opts.actions, true)}
+    <div class="lbl" id="lbl-duration">כמה זמן זה נמשך?</div>${chipGroup('duration', opts.duration, false)}
+    <div class="lbl" id="lbl-response">איך הגבנו? <span class="sub">(אפשר לבחור כמה)</span></div>${chipGroup('response', opts.response, true)}
     <div class="lbl" id="lbl-used">האם הוא השתמש בכלי הרגעה?</div>
     <div class="yn" role="group" aria-labelledby="lbl-used" data-group="used">
       <button type="button" class="chip" data-act="chip" data-field="used" data-multi="0" data-val="yes" aria-pressed="${draft.used === 'yes'}">כן</button>
@@ -1043,26 +1967,33 @@ function renderIncident() {
   fixRanges($('#tab-incident'));
 }
 function protocolHTML(withTitle) {
+  const p = profile();
+  const protect = vary(p, { middle: '<b>קודם להגן על האח שנפגע</b> – להרחיק אותו מהמקום.', youngest: '<b>קודם להגן על האח שנפגע</b> – להרחיק אותו מהמקום.', only: '<b>קודם בטיחות</b> – להרחיק מהמקום את מי שעלול להיפגע, ואת מה שאפשר לזרוק.', default: '<b>קודם להגן על האח הקטן</b> – להרחיק אותו מהמקום.' }, p.role);
+  const after = vary(p, { s1: 'אחרי שנרגע – בפרטיות, לא מול האח או האחות', s0: 'אחרי שנרגע – בפרטיות, בלי קהל', default: 'אחרי שנרגע – בפרטיות, לא מול האחים' }, p.sib);
+  const name = vary(p, p.sib === 's0'
+    ? { '13-14': '"היית ממש כועס כשביקשתי לכבות את המחשב."', default: '"היית ממש כועס כשהיה צריך להפסיק לשחק."' }
+    : { '4-6': '"היית ממש כועס כשהוא לקח לך את הצעצוע."', '13-14': '"היית ממש כועס כשהוא נכנס לך לחדר בלי לשאול."', default: '"היית ממש כועס כשהוא לקח לך את הלגו."' }, p.band);
+  const offer = vary(p, { '13-14': '<b>להציע כלי, בלי לחץ:</b> "רוצה ללכת לקיר?" או "בוא ננשום רגע ביחד".', default: '<b>להציע כלי:</b> "בוא נדחוף את הקיר" או "בוא נעשה ביחד נשימת בלון".' }, p.band);
   return `
     ${withTitle ? '<h2>🧭 מה עושים עכשיו</h2>' : ''}
     <h3><span class="num">1</span> ברגע ההתפרצות</h3>
     <ul class="bullets">
       <li><b>לעצור פיזית ובשקט:</b> "אני לא אתן לך להכות." קול נמוך, גוף רגוע.</li>
-      <li><b>קודם להגן על האח הקטן</b> – להרחיק אותו מהמקום.</li>
+      <li>${protect}</li>
       <li><b>מעט מילים.</b> בלי הטפות ובלי "למה עשית את זה?".</li>
-      <li><b>להציע כלי:</b> "בוא נדחוף את הקיר" או "בוא נעשה ביחד נשימת בלון".</li>
+      <li>${offer}</li>
       <li><b>לחכות שיירגע.</b> להישאר קרוב, בלי להתווכח.</li>
     </ul>
-    <h3><span class="num">2</span> אחרי שנרגע – בפרטיות, לא מול האחים</h3>
+    <h3><span class="num">2</span> ${after}</h3>
     <ul class="bullets">
-      <li><b>לתת שם לרגש:</b> "היית ממש כועס כשהוא לקח לך את הלגו."</li>
+      <li><b>לתת שם לרגש:</b> ${name}</li>
       <li><b>"מותר לכעוס, אסור להכות."</b></li>
       <li><b>לחשוב יחד מה במקום:</b> "מה תוכל לעשות בפעם הבאה?" – משפט העצירה או כלי מהרשימה.</li>
-      <li><b>תיקון מול הנפגע:</b> לא רק "סליחה" – לעזור לבנות מחדש, להביא קרח, לצייר ציור.</li>
+      <li><b>תיקון מול הנפגע:</b>${infoInline('repair', 'מה זה תיקון?')} לא רק "סליחה" – לעזור לבנות מחדש, להביא קרח, לצייר ציור.</li>
     </ul>
     <h3><span class="num">3</span> אחר כך</h3>
     <ul class="bullets">
-      <li><b>תוצאה הגיונית, קצרה וצמודה למעשה</b> – שבר? עוזר לתקן. היכה במשחק? המשחק נגמר להיום.</li>
+      <li><b>תוצאה הגיונית, קצרה וצמודה למעשה</b>${infoInline('consequence', 'מה זה תוצאה הגיונית?')} – שבר? עוזר לתקן. היכה במשחק? המשחק נגמר להיום.</li>
       <li><b>מחר מתחילים דף חדש.</b> לא מזכירים שוב ושוב.</li>
     </ul>
     <div class="callout">💙 וגם לכם: נשימה ארוכה. אתם עושים עבודה קשה וחשובה.</div>`;
@@ -1210,7 +2141,7 @@ function renderProgress() {
   <section class="card pro">
     <h2>🤝 כדאי לפנות לאיש מקצוע</h2>
     <ul class="bullets">${proReasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
-    <p>זה לא כישלון – זו הורות אחראית. אפשר לפנות לשפ״ח (השירות הפסיכולוגי החינוכי) דרך בית הספר, או לרופא הילדים בקופת החולים לקבלת הפניה.</p>
+    <p>זה לא כישלון – זו הורות אחראית. אפשר לפנות לשפ״ח (השירות הפסיכולוגי החינוכי) ${vary(profile(), { '4-6': 'דרך הגן או בית הספר', default: 'דרך בית הספר' }, profile().band)}, או לרופא הילדים בקופת החולים לקבלת הפניה.</p>
     <button type="button" class="btn ghost small" data-act="gotoProHelp">מתי ולמי לפנות</button>
   </section>` : '';
   const legend = `<div class="legend"><span><i class="bar"></i>${mode === 'hits' ? 'אירועי מכות' : 'כל האירועים'}</span>${base ? `<span><i></i>בסיס (שבוע ${esc(base.w)}): ${esc(base.v)}</span><span><i class="tgt"></i>${targetN === 0 ? `יעד: שבוע בלי ${mode === 'hits' ? 'מכות' : 'אירועים'} (ירידה של 70%)` : `יעד: עד ${esc(targetN)} בשבוע (ירידה של 70%)`}</span>` : ''}</div>`;
@@ -1277,7 +2208,55 @@ function renderProgress() {
 
 /* ---------- Tab 5: Guide ---------- */
 function items(list) { return list.map(([t, d]) => `<div class="item"><b>${t}</b>${d}</div>`).join(''); }
+/* one guide row per game in the p3 phase card: the existing lines plus the new games, only games that fit his age */
+const P3_GAME_ROWS = {
+  colorword: ['🎨 צבע-מילה', 'אומרים צבע והוא מבצע תנועה שסוכמה. מחליפים חוקים באמצע – מאמן עצירה וגמישות.'],
+  freeze: ['🧊 תופסת קפואה', 'כשהמוזיקה נעצרת קופאים. מאמן עצירה של הגוף ברגע.'],
+  jenga: ['🧱 ג׳נגה על זמן', 'כל אחד בתורו מוציא לבנה, עם טיימר. סבלנות, תור והפסד בכבוד.'],
+  headshoulders: ['🙃 ראש-כתפיים הפוך', 'אומרים "ראש" – נוגעים בכתפיים. מאמן עצירה של תגובה אוטומטית.'],
+  chess: ['♟️ שחמט ודמקה', 'חושבים לפני שמזיזים. ההורה מדגים הפסד יפה: "אוף, הפסדתי. בפעם הבאה." ומשבחים כל הפסד רגוע.'],
+  delaygame: ['⏳ אתגר דחיית סיפוק', p => vary(p, { '4-6': 'פרס קטן עכשיו או כפול אחרי דקה. מאריכים בהדרגה, עד כמה דקות.', '7-9': 'פרס קטן עכשיו או כפול אחרי 5 דקות. מאריכים בהדרגה, עד 10 דקות.', '13-14': 'משהו קטן עכשיו או גדול יותר בעוד כמה ימים – למשל חיסכון לקנייה.', default: 'פרס קטן עכשיו או כפול אחרי המתנה. מאריכים בהדרגה.' }, p.band)],
+  project: ['🧩 פרויקט איטי', p => vary(p, { '4-6': 'פאזל של 50–100 חלקים או בנייה בקוביות לאורך כמה ימים. מאמן התמדה וסבלנות.', '7-9': 'לגו או פאזל של 200–300 חלקים, שבונים לאורך כמה ימים. מאמן התמדה וסבלנות.', '13-14': 'דגם להרכבה, פאזל 1000 חלקים, או פרויקט בישול או יצירה לאורך כמה ימים. מאמן התמדה וסבלנות.', default: 'לגו גדול או פאזל 500 חלקים שבונים לאורך כמה ימים. מאמן התמדה וסבלנות.' }, p.band)],
+  roleplay: ['🎭 משחק תפקידים', 'מדמים מצב קשה ומתרגלים בקול: "עצור – נושם – חושב – בוחר". מתחלפים בתפקידים.'],
+  turtle: ['🐢 מרוץ צבים', 'מי שמגיע אחרון מנצח. מאמן האטה ושליטה בגוף.'],
+  lions: ['🦁 אריות ישנים', 'שוכבים בלי לזוז כשמנסים להצחיק. מאמן שליטה בדחף.'],
+  target: ['🎯 קליעה עם עצירה', 'עוצרים ונושמים לפני כל זריקה. מאמן חשיבה לפני פעולה.']
+};
+const P3_ORDER = ['colorword', 'freeze', 'jenga', 'headshoulders', 'chess', 'delaygame', 'project', 'roleplay', 'turtle', 'lions', 'target'];
+function guideRows(p) {
+  const sleep = p.legacy ? 'כמה שעות הוא ישן? ילד בן 10 צריך בערך 9–11 שעות. עייפות היא דלק לכעס.'
+    : p.age <= 5 ? `כמה שעות הוא ישן? בגיל ${p.age} צריך בערך 10–13 שעות שינה ביממה, כולל שנת צהריים אם יש. עייפות היא דלק לכעס.`
+    : p.age <= 12 ? `כמה שעות הוא ישן? בגיל ${p.age} צריך בערך 9–12 שעות שינה בלילה. עייפות היא דלק לכעס.`
+    : `כמה שעות הוא ישן? בגיל ${p.age} צריך בערך 8–10 שעות שינה בלילה – ומסכים בחדר בלילה הם גורם נפוץ לחוסר שינה. עייפות היא דלק לכעס.`;
+  const p3 = P3_ORDER.filter(id => id === 'project' || (p.legacy ? !['turtle', 'lions', 'target'].includes(id) : fitsAge(id, p)))
+    .map(id => { const [t, d] = P3_GAME_ROWS[id]; return [t, typeof d === 'function' ? d(p) : d]; });
+  const oneIdeas = p.legacy ? '' : ' רעיונות: ' + info('one').how[2].replace(/^הוא בוחר את הפעילות – (למשל )?/, '');
+  return {
+    sleep,
+    screens: vary(p, {
+      '4-6': 'כמה זמן ביום, ומה קורה כשמכבים? בגיל הזה מומלץ עד בערך שעה ביום של תוכן איכותי, ועדיף ביחד איתכם. מודיעים 5 דקות לפני שמכבים.',
+      '7-9': 'כמה זמן ביום, ומה קורה כשמכבים? קובעים מראש מתי וכמה, והמסך לא בא על חשבון שינה, תנועה וארוחות. בלי מסכים בשעה שלפני השינה.',
+      '10-12': 'כמה זמן ביום, ומה קורה כשמכבים? מסכמים יחד כללים ברורים, ובלילה הטלפון נטען מחוץ לחדר. המעבר ממסך הוא טריגר נפוץ – מודיעים 5 דקות לפני.',
+      '13-14': 'כמה זמן ביום, ומה קורה כשמכבים? קובעים כללים יחד איתו – מתי, כמה, ואיפה הטלפון בלילה – וכך קל לו יותר לעמוד בהם. שימו לב גם למשחקים ולרשתות שמשאירים אותו מתוח.',
+      default: 'כמה זמן ביום, ומה קורה כשמכבים? המעבר ממסך הוא טריגר נפוץ.' }, p.band),
+    energy: vary(p, { '4-6': 'שעה ויותר ביום של משחק בתנועה, עדיף בחוץ: ריצה, מגלשות, כדור, קפיצות. גוף עייף = פחות פיצוצים.', '13-14': '30–60 דקות ביום: ריצה, אופניים, כדורסל, אימון. גוף עייף = פחות פיצוצים.', default: '30–60 דקות תנועה בחוץ: ריצה, אופניים, טיפוס, כדורגל. גוף עייף = פחות פיצוצים.' }, p.band),
+    breath: vary(p, { '4-6': 'נשימת בלון ונר, ונשימת קובייה בגרסה קצרה. מתרגלים כשרגועים – כדי שיעבדו כשכועסים.', default: 'נשימת בלון, נר וקובייה. מתרגלים כשרגועים – כדי שיעבדו כשכועסים.' }, p.band),
+    corner: vary(p, { '13-14': ['🎧 מקום שקט משלו – לא עונש', 'מקום שהוא בוחר: החדר, אוזניות ומוזיקה, כדור לחץ. הולכים אליו כדי להירגע – לא נשלחים אליו כעונש.'], default: ['🛋️ פינת רגיעה – לא פינת עונש', 'מקום נעים שהוא בוחר ומעצב: כרית, שמיכה, כדור לחץ, דפים וצבעים. הולכים אליה כדי להירגע – לא שולחים אליה כעונש.'] }, p.band),
+    p3,
+    choice: vary(p, { '4-6': 'במקום פקודה: "קודם פיג׳מה או קודם צחצוח שיניים?" – שליטה אמיתית, בתוך הגבולות שלכם.', '13-14': 'במקום פקודה: "מתי נוח לך לסדר את החדר – לפני האימון או אחריו?" – שליטה אמיתית, בתוך הגבולות שלכם.', default: 'במקום פקודה: "אתה רוצה להתקלח עכשיו או אחרי הארוחה?" – שליטה אמיתית, בתוך הגבולות שלכם.' }, p.band),
+    duty: vary(p, { '4-6': 'משהו שבאמת חשוב לבית: מסדר את הנעליים בכניסה, עוזר לערוך את השולחן, מאכיל את חיית המחמד עם הורה.', '7-9': 'משהו שבאמת חשוב לבית: אחראי על הצמחים, מוציא את המיחזור, עוזר להכין סלט. לא עבודה שחורה.', '13-14': 'משהו שבאמת חשוב לבית: מכין ארוחה פשוטה פעם בשבוע, אחראי על משימה קבועה, עוזר בתיקונים עם כלים אמיתיים. לא עבודה שחורה.', default: 'משהו שבאמת חשוב לבית: אחראי על המיחזור, עוזר בתיקונים, מטפל בצמחים. לא עבודה שחורה.' }, p.band),
+    one: `15 דקות ביום שבהן הוא מוביל. בלי טלפון, ${vary(p, { s1: 'בלי האח או האחות', s0: 'בלי מטלות', default: 'בלי אחים' }, p.sib)}, בלי ביקורת.${oneIdeas}`,
+    team: vary(p, { '4-6': 'משחקים שיתופיים פשוטים: בונים מגדל ביחד, פאזל משותף – כולם מנצחים או מפסידים יחד.', default: 'משחקי קופסה שיתופיים ואתגרים משפחתיים שבהם כולם מנצחים או מפסידים יחד.' }, p.band),
+    empathy: !p.legacy && p.band === '4-6' ? '"איך הוא הרגיש, לדעתך? שמח? עצוב? כועס?" – בזמן רגוע, ובעזרת ציורים של פרצופים.'
+      : vary(p, { s0: '"איך לדעתך הרגיש החבר שלך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.', s1: '"איך לדעתך הרגיש האח או האחות שלך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.', default: '"איך לדעתך הרגיש אחיך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.' }, p.sib),
+    friend: vary(p, { '4-6': ['🧑‍🤝‍🧑 מפגש משחק עם חבר אחד', 'חבר אחד, כשעה, בבית. פעילות מוכנה מראש והורה ממש קרוב. מסיימים כשעוד טוב.'], '13-14': ['🧑‍🤝‍🧑 מפגש עם חבר', 'חבר אחד או שניים סביב פעילות שהוא בוחר – ספורט, משחק, בישול. הורה בבית אבל לא מעל הראש, ושעת סיום ידועה מראש.'], default: ['🧑‍🤝‍🧑 מפגש משחק עם חבר אחד', 'חבר אחד, שעה–שעתיים, פעילות מתוכננת מראש והורה בסביבה. מסיימים כשעוד טוב.'] }, p.band),
+    praise3: vary(p, { s0: 'שבח ספציפי על התנהגות: "ראיתי שחיכית בסבלנות לתור שלך – זה היה בוגר."', s1: 'שבח ספציפי על התנהגות: "ראיתי שוויתרת לאח או לאחות שלך על התור – זה היה בוגר."', default: 'שבח ספציפי על התנהגות: "ראיתי שוויתרת לאחיך על התור – זה היה בוגר."' }, p.sib),
+    school: vary(p, { '4-6': 'קשיים במסגרת החינוכית (גן, חוגים).', default: 'קשיים במסגרת החינוכית (בית ספר, חוגים).' }, p.band),
+    via: vary(p, { '4-6': 'דרך הגן או בית הספר', default: 'דרך בית הספר' }, p.band)
+  };
+}
 function renderGuide() {
+  const pf = profile(), G = guideRows(pf), role = roleChapter(pf);
   const raw = weekRaw(), w = clamp(raw, 1, 12);
   const act = raw < 1 ? [] : activePhases(w);
   const cur = new Set(act.map(p => p.id));
@@ -1286,44 +2265,35 @@ function renderGuide() {
   const body = {
     p1: `<p><b>השבוע רק מתעדים – לא משנים.</b> רושמים כל אירוע בלשונית "אירוע". הנתונים של השבוע הזה הם קו הבסיס שממנו נמדוד את ההתקדמות.</p>
       <h3>מה בודקים:</h3>${items([
-        ['😴 שינה', 'כמה שעות הוא ישן? ילד בן 10 צריך בערך 9–11 שעות. עייפות היא דלק לכעס.'],
+        ['😴 שינה', esc(G.sleep)],
         ['🍎 ארוחות', 'האם התפרצויות קורות כשהוא רעב? ארוחה או חטיף קבועים בשעות המועדות.'],
-        ['📱 מסכים', 'כמה זמן ביום, ומה קורה כשמכבים? המעבר ממסך הוא טריגר נפוץ.'],
+        ['📱 מסכים', esc(G.screens)],
         ['🏃 תנועה', 'כמה פריקת אנרגיה יש לו ביום? ילד חסר מנוחה צריך הרבה.']
       ])}`,
     p2: items([
-      ['🏃 פריקת אנרגיה יומית', '30–60 דקות תנועה בחוץ: ריצה, אופניים, טיפוס, כדורגל. גוף עייף = פחות פיצוצים.'],
-      ['🎈 תרגילי נשימה', 'נשימת בלון, נר וקובייה. מתרגלים כשרגועים – כדי שיעבדו כשכועסים.'],
+      ['🏃 פריקת אנרגיה יומית', esc(G.energy)],
+      ['🎈 תרגילי נשימה', esc(G.breath)],
       ['🌡️ מדחום רגשות', 'כמה פעמים ביום שואלים "איפה אתה במדחום?". לומדים לזהות צהוב לפני שמגיעים לאדום.'],
-      ['🛋️ פינת רגיעה – לא פינת עונש', 'מקום נעים שהוא בוחר ומעצב: כרית, שמיכה, כדור לחץ, דפים וצבעים. הולכים אליה כדי להירגע – לא שולחים אליה כעונש.']
+      [esc(G.corner[0]), esc(G.corner[1])]
     ]),
-    p3: items([
-      ['🎨 צבע-מילה', 'אומרים צבע והוא מבצע תנועה שסוכמה. מחליפים חוקים באמצע – מאמן עצירה וגמישות.'],
-      ['🧊 תופסת קפואה', 'כשהמוזיקה נעצרת קופאים. מאמן עצירה של הגוף ברגע.'],
-      ['🧱 ג׳נגה על זמן', 'כל אחד בתורו מוציא לבנה, עם טיימר. סבלנות, תור והפסד בכבוד.'],
-      ['🙃 ראש-כתפיים הפוך', 'אומרים "ראש" – נוגעים בכתפיים. מאמן עצירה של תגובה אוטומטית.'],
-      ['♟️ שחמט ודמקה', 'חושבים לפני שמזיזים. ההורה מדגים הפסד יפה: "אוף, הפסדתי. בפעם הבאה." ומשבחים כל הפסד רגוע.'],
-      ['⏳ אתגר דחיית סיפוק', 'פרס קטן עכשיו או כפול אחרי המתנה. מאריכים בהדרגה.'],
-      ['🧩 פרויקט איטי', 'לגו גדול או פאזל 500 חלקים שבונים לאורך כמה ימים. מאמן התמדה וסבלנות.'],
-      ['🎭 משחק תפקידים', 'מדמים מצב קשה ומתרגלים בקול: "עצור – נושם – חושב – בוחר". מתחלפים בתפקידים.']
-    ]),
+    p3: items(G.p3.map(([t, d]) => [esc(t), esc(d)])),
     p4: `<div class="steps-card">${protocolHTML(false)}</div>`,
     p5: items([
-      ['✌️ בחירה בין שתיים', 'במקום פקודה: "אתה רוצה להתקלח עכשיו או אחרי הארוחה?" – שליטה אמיתית, בתוך הגבולות שלכם.'],
-      ['🔑 תפקיד אחריות אמיתי', 'משהו שבאמת חשוב לבית: אחראי על המיחזור, עוזר בתיקונים, מטפל בצמחים. לא עבודה שחורה.'],
-      ['💙 זמן אחד-על-אחד', '15 דקות ביום שבהן הוא מוביל. בלי טלפון, בלי אחים, בלי ביקורת.'],
+      ['✌️ בחירה בין שתיים', esc(G.choice)],
+      ['🔑 תפקיד אחריות אמיתי', esc(G.duty)],
+      ['💙 זמן אחד-על-אחד', esc(G.one)],
       ['👑 תור למנהיג', 'סבב שבו כל אחד בתורו מחליט (איזה משחק, מה לארוחה). לומדים להוביל וגם להיות מובל.'],
       ['🤝 משא ומתן', '"מה אתה רוצה? מה הוא רוצה? מה הפתרון ששניכם מרוויחים?" ומשבחים כל פשרה.'],
-      ['⚽ משחקי צוות', 'משחקי קופסה שיתופיים ואתגרים משפחתיים שבהם כולם מנצחים או מפסידים יחד.'],
-      ['💭 שאלות אמפתיה', '"איך לדעתך הרגיש אחיך כש...?" – בזמן רגוע, לא מיד אחרי אירוע.'],
-      ['🧑‍🤝‍🧑 מפגש משחק עם חבר אחד', 'חבר אחד, שעה–שעתיים, פעילות מתוכננת מראש והורה בסביבה. מסיימים כשעוד טוב.']
+      ['⚽ משחקי צוות', esc(G.team)],
+      ['💭 שאלות אמפתיה', esc(G.empathy)],
+      [esc(G.friend[0]), esc(G.friend[1])]
     ])
   };
   const weeksLabel = p => p.from === p.to ? `שבוע ${p.from}` : `שבועות ${p.from}–${p.to}`;
   $('#tab-guide').innerHTML = `
   <section class="card">
     <h2>📖 מדריך להורה</h2>
-    <p class="sub">${raw < 1 ? `התוכנית מתחילה ב-${esc(fmtFullDate(S.settings.startDate))}. אפשר כבר לקרוא ולהתכונן.` : 'השלב הנוכחי פתוח ומודגש. השלבים חופפים מעט – זה מכוון.'}</p>
+    <p class="sub">${raw < 1 ? `התוכנית מתחילה ב-${esc(fmtFullDate(S.settings.startDate))}. אפשר כבר לקרוא ולהתכונן.` : 'השלב הנוכחי פתוח ומודגש. השלבים חופפים מעט – זה מכוון.'} בסוף המדריך: מילון של כל הכלים, המשחקים והמושגים.</p>
   </section>
   ${PHASES.map(p => {
     const on = cur.has(p.id), main = p.id === latest;
@@ -1336,20 +2306,38 @@ function renderGuide() {
     </section>`;
   }).join('')}
 
-  <section class="card phase-card">
+  ${INFO_GROUPS.map(g => {
+    const ids = g.id === 'games' ? (pf.legacy ? LEGACY_GAMES.map(x => x.id) : g.ids.filter(id => fitsAge(id, pf))) : g.ids;
+    const others = g.id === 'games' && !pf.legacy ? g.ids.filter(id => !fitsAge(id, pf)) : [];
+    const entry = (id, muted) => { const e = info(id); return `
+        <details class="dict-item" id="info-${id}">
+          <summary><span class="di-ic" aria-hidden="true">${esc(e.icon)}</span><span class="di-t">${esc(e.title)}</span>${muted ? `<span class="age-pill">גילים ${esc(e.ages[0])}–${esc(e.ages[1])}</span>` : ''}</summary>
+          <div class="dict-body">${infoContent(id, 'guide')}${infoActionBtn(id, 'guide', 'btn small')}</div>
+        </details>`; };
+    return `
+  <section class="card phase-card dict" id="dict-${g.id}">
     <details>
-      <summary><span><span class="wk">פרק מיוחד</span>👑 הבכור מתוך 7</span></summary>
-      <div class="body">${items([
-        ['🗓️ זמן אישי קבוע', 'זמן קבוע (עדיף יומי) שהוא רק שלו – בלי אחים. כתוב ביומן, ולא מבטלים.'],
-        ['🙅 בכור ולא שמרטף', 'עזרה – כן. אחריות של הורה על האחים – לא.'],
-        ['🎖️ זכויות של גדול', 'לצד האחריות – זכויות: שעת שינה מאוחרת יותר, יותר בחירה, פעילות שרק גדולים עושים.'],
-        ['🔒 מקום נעול לחפצים שלו', 'ארגז או מגירה עם מנעול שהאחים לא נוגעים בהם. פחות "לקחו לי!".'],
-        ['⚖️ לא להשוות', 'לא "תראה איך אחותך..." ולא "אתה הגדול, תהיה דוגמה" ברגע של כעס.'],
-        ['🛡️ הגנה על האחים והפרדה', 'מזהים מצבים מועדים (מעברים, ערב, מסכים) ומפרידים מראש: חדרים שונים, פעילות נפרדת.'],
-        ['🧭 תפקיד מנהיגות שהוא בוחר', 'הוא בוחר מרשימה: מדריך משחק לקטנים, אחראי על המוזיקה בנסיעה... מנהיגות חיובית במקום שתלטנות.']
-      ])}</div>
+      <summary><span><span class="wk">מילון כלים ומושגים</span>${g.icon} ${esc(g.title)} <span class="dict-count">${ids.length}</span></span></summary>
+      <div class="body">${ids.map(id => entry(id, false)).join('')}
+        ${others.length ? `<h3 class="dict-others">למשחקים בגילים אחרים</h3>${others.map(id => entry(id, true)).join('')}` : ''}
+      </div>
+    </details>
+  </section>`;
+  }).join('')}
+
+  <section class="card phase-card" id="roleChapter">
+    <details>
+      <summary><span><span class="wk">פרק מיוחד</span>${esc(role.title)}</span></summary>
+      <div class="body">${items(role.list.map(([t, d]) => [esc(t), esc(d)]))}</div>
     </details>
   </section>
+  ${pf.large && !pf.legacy ? `
+  <section class="card phase-card" id="largeFamily">
+    <details>
+      <summary><span><span class="wk">פרק מיוחד</span>👨‍👩‍👧‍👦 משפחה גדולה (${esc(pf.n)} ילדים)</span></summary>
+      <div class="body">${items(LARGE_FAMILY.map(([t, d]) => [esc(t), esc(d)]))}</div>
+    </details>
+  </section>` : ''}
 
   <section class="card phase-card">
     <details>
@@ -1357,7 +2345,7 @@ function renderGuide() {
       <div class="body">${items([
         ['1. קודם אתם רגועים', 'ילד נרגע ליד מבוגר רגוע. נושמים, מנמיכים את הקול ורק אז מגיבים.'],
         ['2. ביטחון לפני חינוך', 'ברגע ההתפרצות רק עוצרים ומגינים. מלמדים אחר כך.'],
-        ['3. 5 שבחים ביום', 'שבח ספציפי על התנהגות: "ראיתי שוויתרת לאחיך על התור – זה היה בוגר."'],
+        ['3. 5 שבחים ביום', esc(G.praise3)],
         ['4. 3 חוקי בית בלבד', `מעט חוקים, ברורים, שכולם מכירים${rules.length ? ': ' + rules.map(esc).join(' · ') : '.'}`],
         ['5. להאריך את הנשימה', 'שינוי לוקח שבועות. יש עליות וירידות – מה שקובע הוא המגמה.']
       ])}</div>
@@ -1372,10 +2360,10 @@ function renderGuide() {
           <li>אין שיפור אחרי 6–8 שבועות.</li>
           <li>פגיעה בעצמו או בבעלי חיים.</li>
           <li>התפרצויות ארוכות מ-20–30 דקות, או כמעט כל יום.</li>
-          <li>קשיים במסגרת החינוכית (בית ספר, חוגים).</li>
+          <li>${esc(G.school)}</li>
           <li>חשד לבעיית קשב וריכוז.</li>
         </ul>
-        <div class="callout">אפשר לפנות לשפ״ח (השירות הפסיכולוגי החינוכי) דרך בית הספר, או לרופא הילדים בקופת החולים. פנייה לעזרה היא צעד של הורות אחראית.</div>
+        <div class="callout">אפשר לפנות לשפ״ח (השירות הפסיכולוגי החינוכי) ${esc(G.via)}, או לרופא הילדים בקופת החולים. פנייה לעזרה היא צעד של הורות אחראית.</div>
       </div>
     </details>
   </section>`;
@@ -1416,9 +2404,9 @@ function exTotalRemain() {
   return r + (EX.cycles - EX.cycle - 1) * per;
 }
 function startEx(id, opts = {}) {
-  const def = EXS[id]; if (!def) return;
+  const def = EXS[id] && exDef(id); if (!def) return;
   stopEx(true);
-  EX = { id, def, step: 0, cycle: 0, cycles: opts.cycles || def.cycles, remain: def.steps[0].s, stepEnd: Date.now() + def.steps[0].s * 1000, paused: false, onDone: opts.onDone, returnTo: opts.returnTo || 'calm', timer: null };
+  EX = { id, def, step: 0, cycle: 0, cycles: opts.cycles || def.cycles, remain: def.steps[0].s, stepEnd: Date.now() + def.steps[0].s * 1000, paused: false, onDone: opts.onDone, returnTo: opts.returnTo || 'calm', morning: !!opts.morning, timer: null };
   $('#exInner').innerHTML = `
     <div class="sheet-head" style="width:100%"><span></span><button type="button" class="icon-btn" data-act="exClose" aria-label="סגירה">${ICON.close}</button></div>
     <h2 id="exTitle" tabindex="-1">${esc(def.title)}</h2>
@@ -1502,35 +2490,44 @@ function pauseEx() {
 }
 function finishEx() {
   clearTimeout(EX.timer);
-  const cb = EX.onDone, back = EX.returnTo;
+  const cb = EX.onDone, back = EX.returnTo, morning = EX.morning;
   EX = null;
+  const BACK = { calm: 'חזרה למדחום', today: 'חזרה להיום', guide: 'חזרה למדריך', incident: 'חזרה לרישום אירוע', progress: 'חזרה להתקדמות' };
   vibrate(HAPTIC.done);
   $('#exInner').innerHTML = `
     <div class="sheet-head" style="width:100%"><span></span><button type="button" class="icon-btn" data-act="exClose" aria-label="סגירה">${ICON.close}</button></div>
     <div class="done">
       <div class="done-face" aria-hidden="true">🌟</div>
       <h2 id="exTitle" tabindex="-1">כל הכבוד!</h2>
-      ${back === 'today'
-        ? `<p class="ex-text">סיימתם 3 דקות נשימה. המשימה סומנה בסדר היום.</p>`
-        : `<p class="ex-text">הגוף שלך יודע להירגע. איך אתה מרגיש עכשיו?</p>
-           <div class="done-moods" role="group" aria-label="איך אתה מרגיש עכשיו?">${MOOD_ORDER.map(c => `<button type="button" class="mood-dot" data-act="doneMood" data-c="${c}" style="background:var(--${c})" aria-label="${MOODS[c].name} – ${MOODS[c].label}">${MOODS[c].face}</button>`).join('')}</div>`}
-      <button type="button" class="btn big block" data-act="exClose" data-goto="${back === 'today' ? 'today' : 'calm'}">${back === 'today' ? 'חזרה להיום' : 'חזרה למדחום'}</button>
+      ${morning
+        ? `<p class="ex-text">סיימתם ${morningMin()} דקות נשימה. המשימה סומנה בסדר היום.</p>`
+        : back === 'calm'
+        ? `<p class="ex-text">הגוף שלך יודע להירגע. איך אתה מרגיש עכשיו?</p>
+           <div class="done-moods" role="group" aria-label="איך אתה מרגיש עכשיו?">${MOOD_ORDER.map(c => `<button type="button" class="mood-dot" data-act="doneMood" data-c="${c}" style="background:var(--${c})" aria-label="${MOODS[c].name} – ${MOODS[c].label}">${MOODS[c].face}</button>`).join('')}</div>`
+        : `<p class="ex-text">עכשיו אתם מכירים את התרגיל מבפנים – וקל יותר ללמד אותו.</p>`}
+      <button type="button" class="btn big block" data-act="exClose" data-goto="${esc(BACK[back] ? back : 'calm')}">${BACK[back] || BACK.calm}</button>
     </div>`;
   $('#exTitle').focus();
   if (cb) cb();
 }
 function stopEx(silent) {
   if (EX) { clearTimeout(EX.timer); EX = null; }
-  if (!silent) $('#exOverlay').hidden = true;
+  if (!silent) { $('#exOverlay').hidden = true; syncOverlays(); }
 }
 
 /* =========================================================
    Overlays: focus, inert background, scroll lock, back button
    ========================================================= */
-const OVERLAY_ORDER = ['#dlg', '#celOverlay', '#exOverlay', '#setOverlay'];   // top-most first
+const OVERLAY_ORDER = ['#dlg', '#infoSheet', '#celOverlay', '#exOverlay', '#setOverlay'];   // top-most first
 const openers = new Map();
 let openSet = new Set();
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([type=hidden]):not([disabled]), select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+/* the control that replaced `el` after a re-render (same action and data) */
+function twinOf(el) {
+  if (!el.dataset || !el.dataset.act) return null;
+  const sel = ['act', 'info', 'id', 'ex', 'ctx', 'tab'].filter(k => el.dataset[k] != null).map(k => `[data-${k}="${CSS.escape(el.dataset[k])}"]`).join('');
+  return $(sel);
+}
 function topOverlay() { for (const s of OVERLAY_ORDER) { const el = $(s); if (!el.hidden) return el; } return null; }
 function focusables(root) { return $$(FOCUSABLE, root).filter(e => e.offsetParent !== null || e === document.activeElement); }
 function syncOverlays() {
@@ -1549,7 +2546,8 @@ function syncOverlays() {
   });
   openSet.forEach(el => {
     if (now.has(el)) return;
-    const back = openers.get(el); openers.delete(el);
+    let back = openers.get(el); openers.delete(el);
+    if (back && !back.isConnected) back = twinOf(back);    // re-rendered meanwhile (e.g. at midnight): same control
     const t = topOverlay();
     if (back && back.isConnected && (!t || t.contains(back)) && !back.closest('[inert]')) back.focus({ preventScroll: true });
     else if (t && !t.contains(document.activeElement)) { const f = focusables(t)[0]; if (f) f.focus({ preventScroll: true }); }
@@ -1574,11 +2572,12 @@ function restartAnim(el, cls) {
   const tok = guardTok[el.id] = (guardTok[el.id] || 0) + 1;
   setTimeout(() => { if (guardTok[el.id] === tok) el.classList.remove(cls); }, 450);
 }
-['#dlg', '#tapShield'].forEach(s => $(s).addEventListener('animationend', e => {
-  if (e.animationName === 'tapGuard') e.currentTarget.classList.remove(e.currentTarget.id === 'dlg' ? 'arm' : 'on');
+['#dlg', '#infoSheet', '#tapShield'].forEach(s => $(s).addEventListener('animationend', e => {
+  if (e.animationName === 'tapGuard') e.currentTarget.classList.remove(e.currentTarget.id === 'tapShield' ? 'on' : 'arm');
 }));
 /* the sheet accepts activation only once its 400 ms arming cover is gone */
-const dlgArmed = () => { const d = $('#dlg'); return !d.hidden && (!d.classList.contains('arm') || getComputedStyle(d, '::before').visibility === 'hidden'); };
+const sheetArmed = d => !d.hidden && (!d.classList.contains('arm') || getComputedStyle(d, '::before').visibility === 'hidden');
+const dlgArmed = () => sheetArmed($('#dlg'));
 /* after a sheet is closed by a tap, swallow the second tap of a double tap so it never reaches the screen behind */
 const shieldTaps = () => restartAnim($('#tapShield'), 'on');
 function ask({ title, body = '', ok = 'אישור', cancel = 'ביטול', danger = false, swap = false }) {
@@ -1604,6 +2603,7 @@ function closeCelebration() { $('#celOverlay').hidden = true; $$('.confetti').fo
    Returns true when something was closed/handled, false to let the app go to the background. */
 function androidBack() {
   if (!$('#dlg').hidden) { if (dlgDone) dlgDone(false); else $('#dlg').hidden = true; return true; }
+  if (!$('#infoSheet').hidden) { closeInfo(); return true; }
   if (!$('#exOverlay').hidden) { stopEx(); return true; }
   if (!$('#celOverlay').hidden) { closeCelebration(); return true; }
   if (!$('#setOverlay').hidden) { if (S.settings.onboarded) { closeSettings(); return true; } return false; }
@@ -1613,10 +2613,120 @@ function androidBack() {
 window.__androidBack = () => { try { return androidBack() === true; } catch (e) { return false; } };
 
 /* =========================================================
+   Explanations: ⓘ buttons, the explanation sheet, the guide dictionary
+   ========================================================= */
+const infoAttrs = (id, ctx) => `data-act="info" data-info="${esc(id)}" data-ctx="${esc(ctx)}" aria-haspopup="dialog" aria-controls="infoSheet"`;
+function infoBtn(id, ctx, label) { return `<button type="button" class="info-btn" ${infoAttrs(id, ctx)} aria-label="${esc(label)}">${ICON.info}</button>`; }
+function infoInline(id, label) { return `<button type="button" class="info-inline" ${infoAttrs(id, 'today')} aria-label="${esc(label)}">${ICON.info}</button>`; }
+/* the four fixed sections (+ child line and "ראו גם" for parents); ctx 'calm' = the child's simple version */
+function infoContent(id, ctx) {
+  const e = info(id);
+  const secs = `
+    <div class="info-sec"><h3>מה זה</h3><p>${esc(e.what)}</p></div>
+    <div class="info-sec"><h3>למה זה עוזר</h3><p>${esc(e.why)}</p></div>
+    <div class="info-sec"><h3>${esc(e.howLabel)}</h3><ol class="info-steps">${e.how.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+    <div class="info-tip"><span aria-hidden="true">💡</span><p><b>טיפ:</b> ${esc(e.tip)}</p></div>`;
+  if (ctx === 'calm') return `<p class="info-kid">${esc(e.kid || e.what)}</p><details class="info-parents"><summary>להורים: מה זה ואיך מלמדים</summary>${secs}</details>`;
+  return secs +
+    (e.kid ? `<div class="info-say"><b>איך להסביר לו</b><p>${esc(e.kid)}</p></div>` : '') +
+    (e.related && e.related.length ? `<div class="info-related"><b>ראו גם</b>${e.related.filter(r => INFO[r]).map(r => `<button type="button" class="chip" data-act="info" data-info="${esc(r)}" data-ctx="${esc(ctx)}">${esc(info(r).icon)} ${esc(info(r).title)}</button>`).join('')}</div>` : '');
+}
+/* "בוא ננסה" (child, Calm) / "נסו עכשיו" (parents) / the morning breathing while it is not done yet */
+function infoActionBtn(id, ctx, cls) {
+  const e = info(id);
+  let label = '';
+  if (e.ex) label = ctx === 'calm' ? 'בוא ננסה' : 'נסו עכשיו';
+  else if (e.act === 'morningBreath' && !day().checks.morning) label = `התחילו ${morningMin()} דקות נשימה`;
+  return label ? `<button type="button" class="${cls}" data-act="infoAction" data-info="${esc(id)}" data-ctx="${esc(ctx)}">${ICON.play}${label}</button>` : '';
+}
+function openInfo(id, ctx) {
+  const e = info(id); if (!e) return;
+  const sh = $('#infoSheet'), reopen = !sh.hidden;
+  $('#infoIcon').textContent = e.icon;
+  $('#infoTitle').textContent = e.title;
+  $('#infoBody').innerHTML = infoContent(id, ctx) + (ctx === 'calm' ? '' : `<div class="info-more"><button type="button" class="info-link" data-act="infoToGuide" data-info="${esc(id)}">${ICON.info}כל הכלים והמושגים במדריך</button></div>`);
+  $('#infoFoot').innerHTML = infoActionBtn(id, ctx, 'btn block');
+  sh.dataset.ctx = ctx;
+  fixRanges(sh);
+  $('#toast').classList.remove('show');
+  sh.hidden = false;
+  $('#infoBody').scrollTop = 0;
+  restartAnim(sh, 'arm');                     // same 400 ms tap guard as the confirm sheet
+  if (reopen) $('#infoTitle').focus({ preventScroll: true });
+}
+function closeInfo() { $('#infoSheet').hidden = true; syncOverlays(); }   // sync now: focus may move right after
+/* a tap on ✕ / the scrim: ignored while arming; closes with the tap shield */
+function infoTapClose() { const sh = $('#infoSheet'); if (!sheetArmed(sh)) return; shieldTaps(); closeInfo(); }
+$('#infoSheet').addEventListener('click', e => { if (e.target === e.currentTarget) infoTapClose(); });
+function openDictEntry(id) {
+  const e = INFO[id]; if (!e) return;
+  const grp = $('#dict-' + e.group), item = $('#info-' + id);
+  if (!grp || !item) return;
+  grp.querySelector(':scope > details').open = true;
+  item.open = true;
+  item.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  item.querySelector('summary').focus({ preventScroll: true });
+}
+let lastInfoId = null;
+function startMorning(returnTo = 'today') {
+  startEx('balloon', { cycles: profile().band === '4-6' ? 17 : 18, returnTo, morning: true, onDone: () => { day().checks.morning = true; save(); rerender(); } });
+}
+
+/* =========================================================
    Settings, import/export
    ========================================================= */
+/* the profile fields while the form is open: { age, n, pos, moved, welcome } */
+let pfForm = null;
+const pfBand = age => age <= 6 ? '4-6' : age <= 9 ? '7-9' : age <= 12 ? '10-12' : '13-14';
+function posLabel(i, n) { return i === 1 ? 'הבכור' : i === n ? 'הצעיר' : String(i); }
+function posAria(i, n) { return i === 1 ? 'הבכור' : i === n ? 'הצעיר' : `מקום ${i} מתוך ${n}`; }
+function profileFieldsHTML() {
+  const f = pfForm, chips = (field, vals, label, aria) => `<div class="chips num" role="group" aria-labelledby="${field}Lbl" data-group="${field}">${vals.map(v => `<button type="button" class="chip" data-act="pfChip" data-field="${field}" data-val="${v}" aria-pressed="${f[field] === v}"${aria ? ` aria-label="${esc(aria(v))}"` : ''}><span>${esc(label(v))}</span></button>`).join('')}</div>`;
+  const ages = Array.from({ length: 11 }, (_, i) => i + 4), counts = Array.from({ length: 12 }, (_, i) => i + 1);
+  const roleOf = (pos, n) => n === 1 ? 'only' : pos === 1 ? 'eldest' : pos === n ? 'youngest' : 'middle';
+  const caption = f.n === 1 ? 'ילד יחיד' : f.pos ? `מקום ${f.pos} מתוך ${f.n} – ${ROLE_LABEL[roleOf(f.pos, f.n)]}` : '';
+  const done = f.age && f.n && (f.n === 1 || f.pos);
+  return `
+      <div class="lbl" id="ageLbl"><span id="sProfile">בן כמה הוא?</span></div>${chips('age', ages, v => v)}
+      <div class="lbl" id="nLbl">כמה ילדים יש במשפחה (כולל אותו)?</div>${chips('n', counts, v => v)}
+      ${f.n && f.n > 1 ? `<div class="lbl" id="posLbl">מה המקום שלו?</div>
+        ${f.moved ? '<p class="sub help pf-moved">המקום שלו השתנה – בחרו שוב</p>' : ''}
+        ${chips('pos', Array.from({ length: f.n }, (_, i) => i + 1), v => posLabel(v, f.n), v => posAria(v, f.n))}` : ''}
+      <p class="sub help" aria-live="polite" id="pfCaption">${esc(caption)}</p>
+      ${done ? `<p class="sub help pf-line" id="pfLine">התוכנית תותאם לגיל ${esc(bandLabel(pfBand(f.age)))}, ${esc(ROLE_LABEL[roleOf(f.n === 1 ? 1 : f.pos, f.n)])}${f.n >= 5 ? ', משפחה גדולה' : ''}.</p>` : ''}`;
+}
+function renderProfileFields(focusSel) {
+  $('#pfBlock').innerHTML = profileFieldsHTML();
+  fixRanges($('#pfBlock'));
+  if (focusSel) refocus(focusSel);
+}
+/* star suggestions by age: shown in settings only when the current value is outside the suggested range */
+function updateNeedHint() {
+  const h = $('#needHint'); if (!h) return;
+  const b = pfForm.age ? STAR_BAND[pfBand(pfForm.age)] : null, v = parseInt($('#sNeed').value, 10);
+  const show = !pfForm.welcome && b && Number.isFinite(v) && (v < b.range[0] || v > b.range[1]);
+  h.hidden = !show;
+  if (show) { h.querySelector('span').textContent = `מומלץ לגיל הזה: ${b.range[0]}–${b.range[1]} כוכבים בשבוע`; fixRanges(h); }
+}
+/* onboarding: an age choice fills every star field the parent hasn't touched with the band defaults */
+function applyStarDefaults() {
+  if (!pfForm.welcome || !pfForm.age) return;
+  const b = STAR_BAND[pfBand(pfForm.age)], dflt = defaults().settings;
+  const set = (sel, v, prop = 'value') => { const el = $(sel); if (el && !el.dataset.dirty) el[prop] = v; };
+  set('#sNeed', b.need);
+  const goals = b.goals || dflt.goals.map(g => g.text);
+  set('#sGoal0', goals[0]); set('#sGoal1', goals[1]); set('#sGoal2', '');
+  set('#sReward', b.reward || dflt.reward);
+  const mini = b.mini || MINI_DEFAULT;
+  set('#sMiniOn', mini.on, 'checked'); set('#sMiniEvery', mini.every); set('#sMiniText', mini.text);
+  syncMiniFields();
+}
+function syncMiniFields() { const on = $('#sMiniOn'); if (on) $('#miniFields').hidden = !on.checked; }
 function openSettings(welcome) {
   const st = S.settings;
+  // posPicked: the position was chosen by the parents (a saved profile, or a tap); only then may it survive a count change
+  pfForm = welcome && !st.onboarded ? { age: null, n: null, pos: null, moved: false, posPicked: false, welcome: true }
+    : { age: st.childAge, n: st.siblingsCount, pos: st.siblingsCount === 1 ? 1 : st.birthOrder, moved: false, posPicked: !isLegacy() && st.siblingsCount > 1, welcome: !!welcome };
   const undo = welcome ? null : undoInfo();
   const rulesHTML = [0, 1, 2].map(i => `<input class="input" id="sRule${i}" maxlength="60" value="${esc(st.rules[i] || '')}" placeholder="חוק ${i + 1}" aria-label="חוק ${i + 1}" style="margin-bottom:8px">`).join('');
   const goalsHTML = [0, 1, 2].map(i => { const g = st.goals[i]; return `<input class="input" id="sGoal${i}" data-goal-id="${esc(g ? g.id : '')}" maxlength="50" value="${esc(g ? g.text : '')}" placeholder="יעד ${i + 1}${i === 2 ? ' (לא חובה)' : ''}" aria-label="יעד ${i + 1}${i === 2 ? ' (לא חובה)' : ''}" style="margin-bottom:8px">`; }).join('');
@@ -1630,6 +2740,18 @@ function openSettings(welcome) {
         <button type="button" class="btn ghost" data-act="needStep" data-d="-1" aria-label="כוכב אחד פחות">${ICON.minus}</button>
         <input class="input" type="number" inputmode="numeric" min="1" max="200" step="1" id="sNeed" value="${esc(st.starsNeeded)}">
         <button type="button" class="btn ghost" data-act="needStep" data-d="1" aria-label="כוכב אחד יותר">${ICON.plus}</button>
+      </div>
+      <div class="need-hint" id="needHint" hidden><span></span><button type="button" class="btn ghost small" data-act="applyNeed">להחיל</button></div>
+      <label class="switch-row" for="sMiniOn"><span>פרס קטן יומי</span><input type="checkbox" id="sMiniOn" class="switch" ${st.miniReward.on ? 'checked' : ''}></label>
+      <div id="miniFields" ${st.miniReward.on ? '' : 'hidden'}>
+        <label class="lbl" for="sMiniEvery">כל כמה כוכבים ביום?</label>
+        <div class="stepper">
+          <button type="button" class="btn ghost" data-act="miniStep" data-d="-1" aria-label="כוכב אחד פחות">${ICON.minus}</button>
+          <input class="input" type="number" inputmode="numeric" min="1" max="10" step="1" id="sMiniEvery" value="${esc(st.miniReward.every)}">
+          <button type="button" class="btn ghost" data-act="miniStep" data-d="1" aria-label="כוכב אחד יותר">${ICON.plus}</button>
+        </div>
+        <label class="lbl" for="sMiniText">מה הפרס הקטן?</label>
+        <input class="input" id="sMiniText" maxlength="60" value="${esc(st.miniReward.text)}" placeholder="מדבקה, עוד סיפור, 10 דקות משחק">
       </div>`;
   $('#setInner').innerHTML = `
     <div class="sheet-head"><h2 id="setTitle" tabindex="-1">${welcome ? 'ברוכים הבאים ל״רגוע וחזק״' : '⚙️ הגדרות'}</h2>
@@ -1638,6 +2760,7 @@ function openSettings(welcome) {
     <div class="card">
       <label class="lbl" for="sName">איך קוראים לילד?</label>
       <input class="input" id="sName" maxlength="30" value="${esc(st.childName)}" placeholder="למשל: יוסי" autocomplete="off">
+      <div id="pfBlock">${profileFieldsHTML()}</div>
       <label class="lbl" for="sStart">מתי מתחילים?</label>
       <input class="input" type="date" id="sStart" value="${esc(st.startDate)}" aria-describedby="sStartHelp">
       <p class="sub help" id="sStartHelp">שבוע 1 מתחיל בתאריך הזה. אפשר לבחור גם תאריך שכבר עבר.</p>
@@ -1678,6 +2801,7 @@ function openSettings(welcome) {
   $('#setOverlay').hidden = false;
   $('#setOverlay').scrollTop = 0;
   fixRanges($('#setInner'));
+  updateNeedHint();
 }
 function closeSettings() { $('#setOverlay').hidden = true; }
 /* after the start date moves, every star bucket (incl. week 0) that already holds ≥ target stars counts as celebrated */
@@ -1688,8 +2812,12 @@ function rebuildCelebrated() {
   weeks.forEach(w => { if (weekStars(w).length >= need) S.celebrated[w] = need; });
 }
 function saveSettings() {
-  const st = S.settings;
+  const st = S.settings, f = pfForm;
   // validate everything first; nothing changes unless the whole form is valid
+  const need1 = (msg, field) => { toast(msg); refocus(`#pfBlock [data-field=${field}]`); };
+  if (!f.age) { need1('בחרו בן כמה הוא', 'age'); return; }
+  if (!f.n) { need1('בחרו כמה ילדים יש במשפחה', 'n'); return; }
+  if (f.n > 1 && !f.pos) { need1('בחרו את המקום שלו במשפחה', 'pos'); return; }
   const seen = new Set(), goals = [];
   [0, 1, 2].forEach(i => {
     const el = $('#sGoal' + i), t = el.value.trim();
@@ -1713,6 +2841,10 @@ function saveSettings() {
   st.goals = goals;
   st.reward = $('#sReward').value.trim().slice(0, 80) || 'פרס שבחרנו יחד';
   st.starsNeeded = clamp(Math.round(need), 1, 200);
+  st.childAge = f.age; st.siblingsCount = f.n; st.birthOrder = f.n === 1 ? 1 : f.pos;
+  st.profileReview = false; st.profileSet = true;
+  const ev = parseInt($('#sMiniEvery').value, 10);
+  st.miniReward = { on: $('#sMiniOn').checked, every: clamp(Number.isFinite(ev) ? ev : 3, 1, 10), text: $('#sMiniText').value.trim().slice(0, 60) || 'פרס קטן להיום' };
   if (startMoved) rebuildCelebrated();   // week numbers moved: rewards already earned must not fire again
   st.onboarded = true;
   save(); closeSettings(); rerender(); toast('נשמר ✓');
@@ -1877,8 +3009,29 @@ const ACT = {
     const again = $(`#tab-today .check-hit[data-id="${id}"]`); if (again && document.activeElement === document.body) again.focus({ preventScroll: true });
     if (d.checks[id] && CHECKS.every(c => d.checks[c.id])) toast('כל סדר היום הושלם! 🌟');
   },
-  morningBreath() {
-    startEx('balloon', { cycles: 18, returnTo: 'today', onDone: () => { day().checks.morning = true; save(); renderToday(); } });
+  morningBreath() { startMorning('today'); },
+  info(el) {
+    const id = el.dataset.info;
+    if (!INFO[id]) return;
+    if (el.closest('#infoSheet') && !sheetArmed($('#infoSheet'))) return;
+    if (el.closest('.dict-body')) { openDictEntry(id); return; }           // "ראו גם" inside the guide
+    openInfo(id, el.dataset.ctx === 'calm' ? 'calm' : el.dataset.ctx || 'today');
+  },
+  infoClose: infoTapClose,
+  infoAction(el) {
+    const e = INFO[el.dataset.info]; if (!e) return;
+    const inSheet = !!el.closest('#infoSheet');
+    if (inSheet && !sheetArmed($('#infoSheet'))) return;
+    const back = el.dataset.ctx === 'calm' ? 'calm' : S.ui.tab;
+    lastInfoId = el.dataset.info;
+    if (inSheet) closeInfo();
+    if (e.ex) startEx(e.ex, { returnTo: back });
+    else if (e.act === 'morningBreath') startMorning(back === 'guide' ? 'guide' : 'today');
+  },
+  infoToGuide(el) {
+    if (!sheetArmed($('#infoSheet'))) return;
+    const id = el.dataset.info;
+    closeInfo(); showTab('guide', false); openDictEntry(id);
   },
   praise() {
     const input = $('#praiseNote');
@@ -1901,8 +3054,11 @@ const ACT = {
     const w = starWeek(), need = S.settings.starsNeeded;
     S.stars.push({ goalId: id, ts: now }); vibrate(HAPTIC.success);
     const total = weekStars(w).length;
-    if (total >= need && !(S.celebrated[w] >= need)) { S.celebrated[w] = need; save(); renderToday(); celebrate(w); }
-    else { save(); renderToday(); toast('⭐ כוכב נוסף!'); }
+    const mr = S.settings.miniReward, d = day();
+    const mini = mr.on && !d.mini && starsToday() >= mr.every;   // daily mini-reward: once a day, no overlay
+    if (mini) d.mini = true;
+    if (total >= need && !(S.celebrated[w] >= need)) { S.celebrated[w] = need; save(); renderToday(); celebrate(w); if (mini) toast(`🎈 הגיע הזמן לפרס הקטן: ${mr.text}!`); }
+    else { save(); renderToday(); toast(mini ? `🎈 הגיע הזמן לפרס הקטן: ${mr.text}!` : '⭐ כוכב נוסף!'); }
   },
   mood(el) {
     selMood = el.dataset.c;
@@ -1917,7 +3073,12 @@ const ACT = {
   },
   ex: el => startEx(el.dataset.ex),
   exPause: pauseEx,
-  exClose(el) { stopEx(); if (el.dataset.goto) showTab(el.dataset.goto); },
+  exClose(el) {
+    stopEx();
+    if (!el.dataset.goto) return;
+    showTab(el.dataset.goto);
+    if (el.dataset.goto === 'guide' && lastInfoId) openDictEntry(lastInfoId);   // back to the entry the parent was reading
+  },
   chip(el) {
     const f = el.dataset.field, v = el.dataset.val, multi = el.dataset.multi === '1';
     if (multi) { const a = draft[f]; const i = a.indexOf(v); i >= 0 ? a.splice(i, 1) : a.push(v); }
@@ -1961,7 +3122,26 @@ const ACT = {
   openSettings: () => openSettings(false),
   closeSettings,
   saveSettings,
-  needStep(el) { const i = $('#sNeed'), v = parseInt(i.value, 10); i.value = clamp((Number.isFinite(v) ? v : S.settings.starsNeeded) + Number(el.dataset.d), 1, 200); },
+  needStep(el) { const i = $('#sNeed'), v = parseInt(i.value, 10); i.value = clamp((Number.isFinite(v) ? v : S.settings.starsNeeded) + Number(el.dataset.d), 1, 200); i.dataset.dirty = '1'; updateNeedHint(); },
+  miniStep(el) { const i = $('#sMiniEvery'), v = parseInt(i.value, 10); i.value = clamp((Number.isFinite(v) ? v : 3) + Number(el.dataset.d), 1, 10); i.dataset.dirty = '1'; },
+  applyNeed() { const b = STAR_BAND[pfBand(pfForm.age)]; $('#sNeed').value = b.need; updateNeedHint(); refocus('#sNeed'); },
+  pfChip(el) {
+    const f = pfForm, field = el.dataset.field, v = +el.dataset.val, prevN = f.n;
+    f[field] = v;
+    if (field === 'n') {
+      if (v === 1) { f.pos = 1; f.posPicked = false; f.moved = false; }          // implicit: never carried over
+      else if (f.pos && (!f.posPicked || f.pos > v)) { f.moved = f.posPicked || prevN > 1; f.pos = null; f.posPicked = false; }
+    }
+    if (field === 'pos') { f.moved = false; f.posPicked = true; }
+    renderProfileFields(`#pfBlock [data-field=${field}][data-val="${v}"]`);
+    if (field === 'age') { applyStarDefaults(); updateNeedHint(); }
+  },
+  openProfile() {
+    openSettings(false);
+    const t = $('#sProfile'); t.scrollIntoView({ block: 'center' });
+    refocus('#pfBlock [data-field=age]');
+  },
+  nudgeDismiss() { S.settings.profileReview = false; save(); rerender(); },
   export: exportData,
   import: () => $('#importFile').click(),
   undoImport,
@@ -1989,6 +3169,12 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter' && e.target.id === 'praiseNote') { e.preventDefault(); ACT.praise(); }
 });
+/* onboarding: a star field the parent has touched is never replaced by the age defaults */
+document.addEventListener('input', e => {
+  if (e.target.closest && e.target.closest('#setInner') && /^s(Need|Goal\d|Reward|MiniOn|MiniEvery|MiniText)$/.test(e.target.id)) e.target.dataset.dirty = '1';
+  if (e.target.id === 'sNeed') updateNeedHint();
+});
+document.addEventListener('change', e => { if (e.target.id === 'sMiniOn') { e.target.dataset.dirty = '1'; syncMiniFields(); } });
 document.addEventListener('input', e => {
   if (e.target.id === 'praiseNote') praiseDraft = e.target.value;
   if (!draft) return;
