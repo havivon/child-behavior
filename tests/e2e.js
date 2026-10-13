@@ -2414,6 +2414,123 @@ for (const scheme of ['light', 'dark']) {
   });
 }
 
+/* ================================================================== *
+ * 22. Round-4 QA: explanations – coverage gaps (content = spec, guide protocol, all games, focus)
+ * ================================================================== */
+/** parse docs/explanations-spec.md §1 (the client-reviewed Hebrew) into entries */
+function specEntries() {
+  const md = fs.readFileSync(path.resolve(__dirname, '..', 'docs', 'explanations-spec.md'), 'utf8').split('## 2. Data model')[0];
+  const out = {};
+  for (const b of md.split(/\n#### /).slice(1)) {
+    const head = b.split('\n')[0], id = (head.match(/`(\w+)`/) || [])[1];
+    const f = k => { const mm = b.match(new RegExp('- \\*\\*' + k + ':\\*\\* (.*)')); return mm ? mm[1].trim() : undefined; };
+    const how = b.match(/- \*\*(איך מלמדים|איך עושים|איך משחקים):\*\*\n((?:\s+\d+\. .*\n?)+)/);
+    const act = f('פעולה'), rel = f('קשור');
+    out[id] = { icon: head.split(' ')[0], title: head.replace(/^\S+\s+/, '').replace(/\s*·\s*`\w+`.*/, '').trim(), kid: f('לילד'), what: f('מה זה'), why: f('למה זה עוזר'),
+      howLabel: how && how[1], how: how ? how[2].trim().split('\n').map(l => l.replace(/^\s*\d+\.\s*/, '').trim()) : [], tip: f('טיפ'),
+      related: rel ? [...rel.matchAll(/`(\w+)`/g)].map(x => x[1]) : [], ex: act && act.startsWith('`ex:') ? act.slice(4, -1) : undefined, act: act && act.startsWith('`act:') ? act.slice(5, -1) : undefined };
+  }
+  return out;
+}
+test('info content: every INFO entry is word-for-word the client-reviewed Hebrew of the spec, rendered without escaping artifacts', 'explanations §1 / Appendix A', async t => {
+  const spec = specEntries();
+  eq(Object.keys(spec).length, 27, 'spec parsed: 27 entries');
+  const page = await t.open();
+  const info = await page.evaluate(() => JSON.parse(JSON.stringify(INFO)));
+  const diffs = [];
+  for (const [id, a] of Object.entries(spec)) {
+    const b = info[id];
+    if (!b) { diffs.push(id + ': missing'); continue; }
+    for (const k of ['icon', 'title', 'kid', 'what', 'why', 'howLabel', 'tip', 'ex', 'act']) if ((a[k] || undefined) !== (b[k] || undefined)) diffs.push(`${id}.${k}: "${b[k]}" ≠ spec "${a[k]}"`);
+    for (const k of ['how', 'related']) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) diffs.push(`${id}.${k} differs from the spec`);
+  }
+  Object.keys(info).filter(id => !spec[id]).forEach(id => diffs.push('not in spec: ' + id));
+  assert(!diffs.length, diffs.join('\n      '));
+  const art = await page.evaluate(() => Object.keys(INFO).flatMap(id => ['today', 'calm'].flatMap(ctx => { openInfo(id, ctx); document.querySelectorAll('#infoBody details').forEach(d => { d.open = true; }); return (document.querySelector('#infoSheet').innerText.match(/&quot;|&#39;|&amp;|&lt;|\\"|undefined/g) || []).map(x => `${id}/${ctx}: ${x}`); })));
+  await page.evaluate(() => closeInfo());
+  eq(art, [], 'no escaping artifacts in the rendered sheets');
+});
+test('info: the game-of-the-day link opens that day\'s game on 10 consecutive days (all 10 games)', 'explanations §3.4', async t => {
+  const page = await t.open();
+  const seen = new Set();
+  for (let d = 0; d < 10; d++) {
+    await page.clock.setSystemTime(NOW + d * DAY);
+    await reload(page);
+    const box = (await txt(page, '#tab-today .game b')).replace('המשחק של היום: ', '').trim();
+    await page.click('#tab-today .game .info-link'); await sheetOpen(page);
+    eq(await txt(page, '#infoTitle'), box, `day ${d}: link opens the game shown in the box`);
+    seen.add(box);
+    await page.keyboard.press('Escape'); await sheetClosed(page);
+  }
+  eq(seen.size, 10, 'all 10 games appear over 10 days');
+});
+test('info: the protocol ⓘ for תוצאה הגיונית / תיקון also works on the guide (anger-management phase)', 'explanations §5.4', async t => {
+  const page = await t.open({ state: makeState({ settings: { startDate: startForWeek(6) } }) });
+  await go(page, 'guide');
+  for (const [id, title] of [['consequence', 'תוצאה הגיונית'], ['repair', 'תיקון']]) {
+    const b = page.locator(`#tab-guide .info-inline[data-info=${id}]`);
+    eq(await b.count(), 1, id + ': ⓘ in the guide protocol');
+    assert(await b.isVisible(), id + ': visible in the open phase card');
+    await b.click(); await sheetOpen(page);
+    eq(await txt(page, '#infoTitle'), title, 'guide protocol → ' + title);
+    await page.keyboard.press('Escape'); await sheetClosed(page);
+  }
+});
+test('info: double and triple taps on any Calm ⓘ open the sheet only (never start an exercise or reach the screen behind)', 'explanations §4.4 (tap guard)', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  for (const id of INFO_TOOLS) {
+    const sel = `#tab-calm .tool-cell:has([data-ex=${id}]) .info-btn`;
+    await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
+    const [x, y] = await center(page, sel);
+    for (const gap of [0, 120, 150]) { if (gap) await page.waitForTimeout(gap); await page.touchscreen.tap(x, y); }
+    await page.waitForTimeout(150);
+    assert(await visible(page, '#infoSheet') && await page.locator('#exOverlay').isHidden(), `${id}: sheet open, no exercise`);
+    eq(await page.evaluate(() => S.ui.tab), 'calm', `${id}: still on Calm`);
+    await page.keyboard.press('Escape'); await sheetClosed(page);
+    await page.waitForTimeout(450);
+  }
+});
+test('info: "נסו עכשיו" from a Today sheet ends with the parent screen (no mood dots) and "חזרה להיום"', 'explanations §4.3', async t => {
+  const page = await t.open();
+  await page.click('#tab-today .check[data-id=morning] > .info-btn'); await sheetOpen(page);
+  await page.waitForTimeout(450);
+  await page.click('#infoSheet .info-related [data-info=balloon]');
+  await page.waitForTimeout(450);
+  await page.click('#infoFoot [data-act=infoAction]');
+  await page.clock.runFor(61e3);
+  const done = await txt(page, '#exInner');
+  assert(done.includes('מכירים את התרגיל') && done.includes('חזרה להיום'), 'parent completion: ' + done);
+  eq(await page.locator('#exInner [data-act=doneMood]').count(), 0, 'no mood dots for a parent');
+  await page.click('#exInner [data-goto=today]');
+  eq((await getState(page)).moods, [], 'no mood logged');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=morning]', 'aria-checked'), 'false', 'a normal balloon practice does not tick the morning item');
+});
+test('info focus: after "כל הכלים והמושגים במדריך" and after "חזרה למדריך", keyboard focus is on the guide entry', 'explanations §4.4 / §5.3 ("move focus to its summary")', async t => {
+  const page = await t.open();
+  const where = () => page.evaluate(() => { const a = document.activeElement; return a === document.body ? 'BODY' : (a.closest('.dict-item') ? a.closest('.dict-item').id : a.tagName); });
+  await page.click('#tab-today .check[data-id=move] > .info-btn'); await sheetOpen(page);
+  await page.waitForTimeout(450);
+  await page.click('#infoBody [data-act=infoToGuide]');
+  eq(await where(), 'info-move', 'focus after opening the entry from the sheet');
+  await page.evaluate(() => { document.querySelector('#dict-calm > details').open = true; document.querySelector('#info-wall').open = true; });
+  await page.click('#info-wall [data-act=infoAction]');
+  await page.clock.runFor(15e3);
+  await page.click('#exInner [data-goto=guide]');
+  eq(await where(), 'info-wall', 'focus after returning from the practice');
+});
+test('info focus: closing an exercise started from the sheet returns focus to the Calm tile, not to the page body', 'explanations §4.4 / a11y', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  await page.click('#tab-calm .tool-cell:has([data-ex=box]) .info-btn'); await sheetOpen(page);
+  await page.waitForTimeout(450);
+  await page.click('#infoFoot [data-act=infoAction]');
+  await page.keyboard.press('Escape');
+  assert(await page.locator('#exOverlay').isHidden(), 'exercise closed');
+  const f = await page.evaluate(() => { const a = document.activeElement; return a === document.body ? 'BODY' : (a.closest('.tool-cell') ? 'tile:' + a.closest('.tool-cell').querySelector('[data-ex]').dataset.ex : a.tagName); });
+  eq(f, 'tile:box', 'focus lands on the box tile (or its ⓘ)');
+});
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */
