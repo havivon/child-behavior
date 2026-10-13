@@ -95,7 +95,7 @@ body{
 main,.overlay,.toast,.modal{overflow-wrap:anywhere}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
-h1,h2,h3{margin:0;line-height:var(--lh-tight)}
+h1,h2,h3{margin:0;line-height:var(--lh-tight);text-wrap:balance}
 p{margin:.4em 0}
 a{color:var(--accent-strong)}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
@@ -135,6 +135,7 @@ main{max-width:560px;margin:0 auto;padding:var(--sp-2) 16px calc(var(--nav-h) + 
 .spread > h2{margin-bottom:0}
 .spread + .progress,.spread + p{margin-top:var(--sp-3)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+.stack{display:grid;gap:var(--sp-3);margin-top:var(--sp-3)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent-strong);font-weight:700;font-size:var(--fs-sm);font-variant-numeric:tabular-nums;white-space:nowrap;flex:0 0 auto}
 .pill.blue{background:var(--blue-soft);color:var(--blue-strong)}
 .muted{color:var(--muted)}
@@ -291,6 +292,7 @@ details[open] > summary::after{transform:rotate(-135deg);margin-bottom:0;margin-
 .kpi em.good-t{background:var(--good-soft)}
 .bad-t{color:var(--muted)}
 .chart{width:100%;height:auto;display:block;direction:ltr}
+.spread + .chart{margin-top:var(--sp-3)}
 .chart text{font-family:inherit}
 .chart rect[data-act]:focus-visible{outline:2px solid var(--focus)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:var(--fs-xs);color:var(--muted);margin-top:6px}
@@ -548,13 +550,15 @@ const CHECK_SVG = '<svg viewBox="0 0 24 24" class="ic" style="stroke-width:3.2" 
 function fixRanges(root) {
   if (!root) return;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: n => /\d–\d/.test(n.data) && !(n.parentElement && n.parentElement.closest('.rng, svg, script, style')) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    acceptNode: n => /\d–\d| – /.test(n.data) && !(n.parentElement && n.parentElement.closest('.rng, svg, script, style')) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
   });
   const nodes = [];
   let n;
   while ((n = walker.nextNode())) nodes.push(n);
   nodes.forEach(node => {
-    const s = node.data, re = /\d+–\d+/g, frag = document.createDocumentFragment();
+    // a spaced dash ("… טיפוס – פריקת …") stays with the word before it, so no line starts with "–"
+    const s = node.data.replace(/ – /g, '\u00a0– '), re = /\d+–\d+/g, frag = document.createDocumentFragment();
+    if (!/\d–\d/.test(s)) { node.data = s; return; }
     let last = 0, m;
     while ((m = re.exec(s))) {
       if (m.index > last) frag.append(s.slice(last, m.index));
@@ -627,6 +631,7 @@ const INC = {
    Legacy stored buckets "5–15 דקות" / "15–30 דקות" are displayed as stored and do not count as long. */
 const LONG_DUR = ['20–30 דקות', 'יותר מ-30 דקות'];
 const isHit = i => i.actions.includes('מכה');
+const keepSlash = s => esc(s).replace(/ \/ /g, '&nbsp;/&nbsp;');   // "אח / אחות" never wraps at the slash
 
 /* =========================================================
    State, validation & storage
@@ -962,7 +967,7 @@ const maxIncidentInput = () => localInputValue(new Date(Date.now() + FUTURE_TOL)
 function chipGroup(field, opts, multi) {
   return `<div class="chips" role="group" aria-labelledby="lbl-${field}" data-group="${field}">${opts.map(o => {
     const on = multi ? draft[field].includes(o) : draft[field] === o;
-    return `<button type="button" class="chip" data-act="chip" data-field="${field}" data-multi="${multi ? 1 : 0}" data-val="${esc(o)}" aria-pressed="${on}">${esc(o)}</button>`;
+    return `<button type="button" class="chip" data-act="chip" data-field="${field}" data-multi="${multi ? 1 : 0}" data-val="${esc(o)}" aria-pressed="${on}"><span>${esc(o)}</span></button>`;
   }).join('')}</div>`;
 }
 function renderIncident() {
@@ -999,8 +1004,8 @@ function renderIncident() {
       ${recent.length ? recent.map(i => `
         <div class="inc-item">
           <div>
-            <b>${esc(relDay(i.ts))} · ${esc(fmtTime(i.ts))}</b> – ${esc(i.actions.join(', '))}${i.target ? ` כלפי ${esc(i.target)}` : ''}
-            <div class="sub">${i.trigger ? esc(i.trigger) + ' · ' : ''}${i.duration ? esc(i.duration) + ' · ' : ''}${i.used === 'yes' ? '✅ השתמש בכלי הרגעה' : i.used === 'no' ? 'בלי כלי הרגעה' : ''}</div>
+            <b>${esc(relDay(i.ts))} · ${esc(fmtTime(i.ts))}</b> – ${esc(i.actions.join(', '))}${i.target ? ` כלפי ${keepSlash(i.target)}` : ''}
+            <div class="sub">${i.trigger ? keepSlash(i.trigger) + ' · ' : ''}${i.duration ? esc(i.duration) + ' · ' : ''}${i.used === 'yes' ? '✅ השתמש בכלי הרגעה' : i.used === 'no' ? 'בלי כלי הרגעה' : ''}</div>
             ${i.note ? `<div class="sub">${esc(i.note)}</div>` : ''}
           </div>
           <button type="button" class="x-btn" data-act="delIncident" data-id="${esc(i.id)}" aria-label="מחיקת האירוע">${ICON.trash}</button>
@@ -1202,7 +1207,7 @@ function renderProgress() {
       </div>` : ''}
     </div>
     ${totalInc ? `
-      <div class="mt3">${barChart({ id: 'inc', vals, max, cur: raw > 12 ? 0 : cw, last: cw, pick: chartPick.inc, describe: w => pickInfo('inc', w), refs: base ? [{ v: base.v, color: 'var(--muted)', dash: true }, { v: target, color: 'var(--good)' }] : [] })}</div>
+      ${barChart({ id: 'inc', vals, max, cur: raw > 12 ? 0 : cw, last: cw, pick: chartPick.inc, describe: w => pickInfo('inc', w), refs: base ? [{ v: base.v, color: 'var(--muted)', dash: true }, { v: target, color: 'var(--good)' }] : [] })}
       ${legend}
       <div class="chart-info ${chartPick.inc ? '' : 'idle'}">${esc(pickInfo('inc', chartPick.inc))}</div>
       ${noBaseNote}${preNote}
@@ -1398,6 +1403,7 @@ function startEx(id, opts = {}) {
       <button type="button" class="btn ghost" data-act="exPause" id="exPauseBtn">${ICON.pause}<span>השהיה</span></button>
       <button type="button" class="btn ghost" data-act="exClose">סיום</button>
     </div>`;
+  fixRanges($('#exInner'));
   $('#exOverlay').hidden = false;
   $('#exOverlay').scrollTop = 0;
   const c = $('#exCircle');
@@ -1417,7 +1423,7 @@ function applyStep() {
     c.className = 'circle' + (st.cls ? ' ' + st.cls : '');
     $('.ex .stage').className = 'stage' + (st.cls ? ' ' + st.cls : '');
     setBreath(c, Math.max(0, EX.stepEnd - Date.now()) / 1000, st.sc);
-    $('#exText').textContent = st.t;
+    $('#exText').textContent = st.t.replace(/ – /g, '\u00a0– ');
     $('#exPhase').textContent = st.label || '';
   } else {
     $$('.stopwords div').forEach(d => d.classList.toggle('on', +d.dataset.i === EX.step));
@@ -1606,9 +1612,9 @@ function openSettings(welcome) {
     <div class="card">
       <h2>💾 גיבוי נתונים</h2>
       <p class="sub">הנתונים נשמרים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם.</p>
-      <div class="grid2">
-        <button type="button" class="btn ghost" data-act="export">${ICON.download}ייצוא גיבוי</button>
-        <button type="button" class="btn ghost" data-act="import">${ICON.upload}ייבוא מגיבוי</button>
+      <div class="stack">
+        <button type="button" class="btn ghost block" data-act="export">${ICON.download}ייצוא גיבוי</button>
+        <button type="button" class="btn ghost block" data-act="import">${ICON.upload}ייבוא מגיבוי</button>
       </div>
       ${hasPrev ? `<button type="button" class="btn ghost block mt3" data-act="undoImport">${ICON.undo}החזרת הנתונים שלפני הייבוא האחרון</button>` : ''}
     </div>

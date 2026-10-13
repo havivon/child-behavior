@@ -156,8 +156,10 @@ const fileFrom = (name, content) => ({ name, mimeType: 'application/json', buffe
 async function answer(page, ok) {
   await page.waitForSelector('#dlg:not([hidden])');
   page.dialogs.push((await page.textContent('#dlgTitle')) + ' | ' + (await page.textContent('#dlgBody')));
+  const title = await page.textContent('#dlgTitle');
   await page.click(ok ? '#dlgOk' : '#dlgCancel');
-  await page.waitForSelector('#dlg', { state: 'hidden' });
+  // closed, or replaced by a follow-up confirmation (reset asks twice)
+  await page.waitForFunction(tt => document.querySelector('#dlg').hidden || document.querySelector('#dlgTitle').textContent !== tt, title);
 }
 /** tap "add star" like a person would: the app ignores a repeat tap on the same star button within 800 ms
  *  (double-tap guard, QA #10), and the suite's clock is paused, so advance it a little before every tap */
@@ -1080,7 +1082,11 @@ test('robustness: 500 incidents still render progress quickly', 'התקדמות 
   const ms = Date.now() - t0;
   assert(ms < 1500, `progress render took ${ms} ms`);
   const sum = await page.locator('#tab-progress table.wk tbody tr td:nth-child(2)').evaluateAll(tds => tds.reduce((a, td) => a + +td.textContent, 0));
-  eq(sum, 500, 'all incidents counted');
+  // the fixture also spreads incidents over the rest of the current week (i.e. in the future); future-dated
+  // incidents can no longer be logged and are not counted in the weekly stats (QA #6)
+  const past = I.filter(x => x.ts <= NOW).length;
+  assert(past < 500, 'fixture has future incidents');
+  eq(sum, past, 'all (non-future) incidents counted');
   const t1 = Date.now();
   await go(page, 'incident');
   assert(Date.now() - t1 < 1000, 'incident tab fast with 500 incidents');
@@ -1427,6 +1433,398 @@ test('smoke: full tour with rich data, no console errors or page errors', 'כל�
   await page.click('#tab-progress [data-mode=hits]');
   await page.locator('#tab-progress svg.chart >> nth=1').locator('rect[data-w="3"]').click({ force: true });
   // harness asserts page.errors is empty
+});
+
+/* ================================================================== *
+ * 16. Release round: behaviour added for the team-lead rulings, the QA bugs and the design review
+ * ================================================================== */
+test('dialog: deletes use the in-app confirm sheet (focus inside, Escape and scrim cancel, danger style)', 'ruling 4 / design P1-3: no native confirm()', async t => {
+  const st = makeState({ incidents: [inc(NOW - 3600e3)] });
+  const page = await t.open({ state: st });
+  await go(page, 'incident');
+  await page.click('#tab-incident details summary');
+  await page.click('#tab-incident [data-act=delIncident]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  eq(await txt(page, '#dlgTitle'), 'למחוק את האירוע?', 'title');
+  assert((await txt(page, '#dlgBody')).includes('מהגרפים'), 'body');
+  eq(await page.getAttribute('#dlg', 'role'), 'alertdialog', 'role');
+  assert(await page.evaluate(() => document.querySelector('#dlg').contains(document.activeElement) && document.activeElement.id === 'dlgCancel'), 'focus starts on cancel');
+  assert((await page.getAttribute('#dlgOk', 'class')).includes('danger-solid'), 'destructive confirm is styled as danger');
+  eq(await page.evaluate(() => document.querySelector('main').inert), true, 'background is inert while the sheet is open');
+  await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
+  assert(await page.evaluate(() => document.querySelector('#dlg').contains(document.activeElement)), 'Tab stays inside the sheet');
+  await page.keyboard.press('Escape');
+  assert(await page.locator('#dlg').isHidden(), 'Escape closes the sheet');
+  eq((await getState(page)).incidents.length, 1, 'Escape = cancel');
+  await page.click('#tab-incident [data-act=delIncident]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  await page.mouse.click(20, 40); // tap on the scrim above the sheet
+  assert(await page.locator('#dlg').isHidden(), 'tap on the scrim closes the sheet');
+  eq((await getState(page)).incidents.length, 1, 'scrim = cancel');
+  eq(await page.evaluate(() => document.querySelector('main').inert), false, 'background usable again');
+});
+test('back button: window.__androidBack follows the priority dialog → exercise → celebration → settings → tab → exit', 'ruling 1 (android/README.md contract)', async t => {
+  const page = await t.open({ state: makeState({ settings: { starsNeeded: 1 } }) });
+  const back = () => page.evaluate(() => window.__androidBack());
+  eq(await back(), false, 'on Today with nothing open: not handled (app goes to background)');
+  eq(typeof await back(), 'boolean', 'returns a plain boolean');
+  await go(page, 'guide');
+  eq(await back(), true, 'non-home tab: handled');
+  assert(await page.locator('#tab-today.active').count() === 1, '…and goes to Today');
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=reset]');
+  await page.waitForSelector('#dlg:not([hidden])');
+  eq(await back(), true, 'dialog: handled');
+  assert(await page.locator('#dlg').isHidden() && await visible(page, '#setOverlay'), 'closes only the dialog first (cancel)');
+  eq(await back(), true, 'settings: handled');
+  assert(!(await visible(page, '#setOverlay')), 'settings closed');
+  await go(page, 'calm');
+  await page.click('#tab-calm [data-ex=box]');
+  eq(await back(), true, 'exercise: handled');
+  eq(await page.evaluate(() => [document.querySelector('#exOverlay').hidden, EX]), [true, null], 'exercise stopped');
+  assert(await page.locator('#tab-calm.active').count() === 1, 'stays on the Calm tab');
+  await go(page, 'today');
+  await addStar(page, 'g1');
+  assert(await visible(page, '#celOverlay'), 'celebration open');
+  eq(await page.evaluate(() => document.body.style.overflow), 'hidden', 'celebration locks background scroll (QA #28)');
+  eq(await back(), true, 'celebration: handled');
+  assert(!(await visible(page, '#celOverlay')), 'celebration closed');
+  eq(await back(), false, 'nothing left: not handled');
+  // onboarding cannot be dismissed with back
+  const fresh = await t.open({ state: null });
+  eq(await fresh.evaluate(() => window.__androidBack()), false, 'onboarding: not handled');
+  assert(await visible(fresh, '#setOverlay'), 'onboarding still shown');
+});
+test('android bridge: export goes through AndroidBridge.saveFile and __androidSaveResult shows a toast', 'ruling 2 (android/README.md)', async t => {
+  const init = () => {
+    window.__calls = [];
+    window.AndroidBridge = { saveFile: (n, m, c) => { window.__calls.push(['saveFile', n, m, c]); }, vibrate: ms => { window.__calls.push(['vibrate', ms]); }, getAppVersion: () => '1.0.0' };
+  };
+  const page = await t.open({ state: richState(3), init });
+  let downloads = 0; page.on('download', () => downloads++);
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=export]');
+  const calls = (await page.evaluate(() => window.__calls)).filter(c => c[0] === 'saveFile');
+  eq(calls.length, 1, 'saveFile called once');
+  eq([calls[0][1], calls[0][2]], [`ragua-vehazak-${TODAY}.json`, 'application/json'], 'file name and mime type');
+  eq(JSON.parse(calls[0][3]), await getState(page), 'content = stored state');
+  eq(await page.evaluate(() => typeof window.__androidSaveResult), 'function', '__androidSaveResult defined');
+  await page.evaluate(() => window.__androidSaveResult(true));
+  assert((await toastText(page)).includes('נשמר'), 'success toast: ' + await toastText(page));
+  await page.evaluate(() => window.__androidSaveResult(false));
+  assert((await toastText(page)).includes('לא נשמר'), 'failure toast: ' + await toastText(page));
+  await page.waitForTimeout(300);
+  eq(downloads, 0, 'no blob download inside the app');
+});
+test('android bridge: haptics use AndroidBridge.vibrate (patterns summed, clamped to 1000 ms), not navigator.vibrate', 'ruling 2', async t => {
+  const init = () => {
+    window.__vib = []; window.__nav = 0;
+    window.AndroidBridge = { saveFile() {}, vibrate: ms => window.__vib.push(ms) };
+    try { Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, value: () => { window.__nav++; return true; } }); } catch (e) { /* ignore */ }
+  };
+  const page = await t.open({ state: makeState({ settings: { starsNeeded: 1 } }), init });
+  await page.click('#tab-today .check-hit[data-id=move]');
+  eq(await page.evaluate(() => window.__vib), [20], 'single pulse for a check');
+  await addStar(page, 'g1'); // success [30,40,30] → 60, then the celebration pattern [80,60,80,60,200] → 360
+  eq(await page.evaluate(() => window.__vib.slice(1)), [60, 360], 'patterns become one pulse of their total "on" time');
+  await page.evaluate(() => vibrate([900, 50, 900]));
+  eq(await page.evaluate(() => window.__vib.pop()), 1000, 'clamped to 1000 ms');
+  eq(await page.evaluate(() => window.__nav), 0, 'navigator.vibrate not used when the bridge exists');
+  const web = await t.open({ init: () => { window.__nav = []; try { Object.defineProperty(Navigator.prototype, 'vibrate', { configurable: true, value: p => { window.__nav.push(p); return true; } }); } catch (e) { /* ignore */ } } });
+  await web.click('#tab-today .check-hit[data-id=move]');
+  eq(await web.evaluate(() => window.__nav), [20], 'web: navigator.vibrate keeps working');
+});
+test('export (web): cancelling the share sheet does not trigger a download; other share errors fall back to download', 'QA #19 / ruling 2', async t => {
+  for (const [errName, expectDownload] of [['AbortError', false], ['NotAllowedError', true]]) {
+    const ctxInit = name => {
+      Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 (Linux; Android 14) Mobile' });
+      navigator.canShare = () => true;
+      navigator.share = () => { window.__shared = (window.__shared || 0) + 1; return Promise.reject(new DOMException('x', name)); };
+    };
+    const page = await t.open({ state: richState(2), init: `(${ctxInit})(${JSON.stringify(errName)})` });
+    let downloads = 0; page.on('download', () => downloads++);
+    await page.click('.topbar [data-act=openSettings]');
+    await page.click('#setOverlay [data-act=export]');
+    await page.waitForTimeout(400);
+    eq(await page.evaluate(() => window.__shared), 1, errName + ': share sheet opened');
+    eq(downloads > 0, expectDownload, `${errName}: download fallback`);
+  }
+});
+test('import safety: a backup that fails to render is rolled back; the previous data is kept in -prev and can be restored', 'ruling 5 / QA #1', async t => {
+  const page = await t.open({ state: richState(3) });
+  const before = await getState(page);
+  await page.click('.topbar [data-act=openSettings]');
+  // simulate a screen that cannot render the imported data
+  await page.evaluate(() => { window.__realProgress = RENDER.progress; RENDER.progress = () => { if (S.settings.childName === 'BOOM') throw new Error('render failed'); return window.__realProgress(); }; });
+  const bad = richState(5); bad.settings.childName = 'BOOM';
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(bad)));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#toast').textContent.includes('לא הצלחנו'));
+  eq(await getState(page), before, 'stored data unchanged');
+  eq(await page.evaluate(() => S.settings.childName), 'דני', 'in-memory data restored');
+  eq(await page.evaluate(k => localStorage.getItem(k + '-prev'), KEY), null, 'nothing committed');
+  await page.evaluate(() => { RENDER.progress = window.__realProgress; });
+  // a good import keeps the previous state under -prev, and "undo import" brings it back
+  const good = richState(6); good.settings.childName = 'רותי';
+  await page.setInputFiles('#importFile', fileFrom('g.json', JSON.stringify(good)));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  eq((await getState(page)).settings.childName, 'רותי', 'imported');
+  eq(JSON.parse(await page.evaluate(k => localStorage.getItem(k + '-prev'), KEY)).settings.childName, 'דני', 'previous data kept under ragua-vehazak-v1-prev');
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=undoImport]');
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  const s = await getState(page);
+  eq([s.settings.childName, s.incidents.length], ['דני', before.incidents.length], 'previous data restored');
+});
+test('import safety: normalize() deep-validates and sanitizes every field', 'ruling 5 / QA #1, #2', async t => {
+  const page = await t.open();
+  const r = await page.evaluate(now => {
+    const n = normalize({
+      settings: { childName: 'א'.repeat(99), startDate: '2026-02-31', rules: [1, null, {}, 'extra'], goals: [{ id: 'g<1>"', text: 'יעד' }, { id: 'g<1>"', text: 'שני' }, { id: 5, text: 7 }, null, { text: '' }], reward: 3, starsNeeded: '0', onboarded: 'yes' },
+      days: { '2026-10-12': { checks: { move: 'x', one: true, evil: true }, praises: [{ ts: now, note: 5 }, { ts: now, note: 'ok' }, { ts: 'yesterday' }] }, 'bad-key': {}, '2026-13-01': {} },
+      stars: [{ goalId: 'g"1', ts: now }, { goalId: 'g2', ts: 'x' }, null],
+      celebrated: { 1: true, 2: 7, x: true, 3: 'a' },
+      moods: [{ ts: now, c: 'red' }, { ts: now, c: '"><img>' }, { ts: -5, c: 'green' }],
+      incidents: [{ id: 'a b<', ts: now, actions: 'מכה', response: [1, 'הפרדנו'], used: 'maybe', note: null }, { id: 'a b<', ts: now, actions: ['צעקה'] }, { ts: now, note: {} }, { ts: NaN }],
+      ui: { tab: 'constructor', chartMode: 'x' }, __proto__: { polluted: true }
+    });
+    return { n, polluted: ({}).polluted };
+  }, NOW);
+  const n = r.n;
+  eq(r.polluted, undefined, 'no prototype pollution');
+  eq(n.settings.childName.length, 30, 'name capped at 30');
+  eq(n.settings.startDate, TODAY, 'invalid date → today');
+  eq(n.settings.rules, ['1', '', ''], 'exactly 3 string rules');
+  eq(n.settings.goals.map(g => g.text), ['יעד', 'שני', '7'], 'goals: objects with text only');
+  assert(n.settings.goals.every(g => /^[A-Za-z0-9_-]+$/.test(g.id)) && new Set(n.settings.goals.map(g => g.id)).size === 3, 'goal ids sanitized and unique: ' + JSON.stringify(n.settings.goals));
+  eq([n.settings.reward, n.settings.starsNeeded, n.settings.onboarded], ['בחירת פעילות מיוחדת עם אבא או אמא', 1, false], 'reward default, target ≥ 1, boolean onboarded');
+  eq(Object.keys(n.days), ['2026-10-12'], 'only valid day keys');
+  eq(n.days['2026-10-12'], { checks: { one: true }, praises: [{ ts: NOW, note: 'ok' }] }, 'checks booleans of known items; praises with a numeric ts and a string note');
+  eq(n.stars, [{ goalId: 'g1', ts: NOW }], 'stars: valid ts, sanitized goal id');
+  eq(n.celebrated, { 1: 1, 2: 7 }, 'celebrated: legacy true → current target; numbers kept');
+  eq(n.moods, [{ ts: NOW, c: 'red' }], 'moods: known colors and valid ts only');
+  eq(n.incidents.length, 2, 'incidents with bad ts or non-string note dropped');
+  eq([n.incidents[0].actions, n.incidents[0].response, n.incidents[0].used, n.incidents[0].note], [['מכה'], ['הפרדנו'], null, ''], 'incident fields coerced');
+  assert(n.incidents.every(i => /^[A-Za-z0-9_-]+$/.test(i.id)) && n.incidents[0].id !== n.incidents[1].id, 'incident ids sanitized and unique');
+  eq(n.ui, { tab: 'today', chartMode: 'all' }, 'ui values whitelisted');
+});
+test('storage: corrupt stored JSON is copied to ragua-vehazak-v1-corrupt and the user is told', 'ruling 5 / QA #20', async t => {
+  const bad = '{"v":1,"settings":{"childName":"דני"';
+  const page = await t.open({ state: bad });
+  eq(await page.evaluate(k => localStorage.getItem(k + '-corrupt'), KEY), bad, 'raw string kept aside');
+  assert((await toastText(page)).includes('עותק'), 'toast explains: ' + await toastText(page));
+  assert(await visible(page, '#setOverlay'), 'app usable (onboarding)');
+});
+test('onboarding: offers "restore from backup" and keeps the form short (rules & stars collapsed)', 'QA #21 / design P2-29', async t => {
+  const page = await t.open({ state: null });
+  assert(await page.locator('#setOverlay [data-act=import]').isVisible(), 'restore button on the welcome screen');
+  eq(await page.locator('#setOverlay details.card').evaluate(d => d.open), false, 'customisation collapsed');
+  const backup = richState(4); backup.settings.childName = 'רותי'; backup.settings.onboarded = true;
+  await page.setInputFiles('#importFile', fileFrom('b.json', JSON.stringify(backup)));
+  await answer(page, true);
+  await page.waitForFunction(() => document.querySelector('#setOverlay').hidden);
+  assert((await txt(page, '.hero .eyebrow')).includes('רותי'), 'restored without filling the onboarding form');
+});
+test('before the start date: data is not counted in week 1, stars use a pre-start bucket, Progress explains', 'ruling 8 / QA #18, #27', async t => {
+  const start = addDaysKey(TODAY, 2); // program starts on Wednesday
+  const st = makeState({ settings: { startDate: start, starsNeeded: 2 }, incidents: [inc(NOW - 3600e3, { actions: ['מכה'] }), inc(NOW - DAY, { actions: ['מכה'] })] });
+  const page = await t.open({ state: st });
+  assert((await txt(page, '.hero h1')).includes('בעוד יומיים'), 'countdown');
+  await addStar(page, 'g1');
+  assert((await txt(page, '#tab-today .pill.blue')).includes('1/2'), 'pre-start stars counted in their own bucket');
+  await addStar(page, 'g2');
+  assert(await visible(page, '#celOverlay'), 'reaching the target before the start still celebrates');
+  assert(!(await txt(page, '#celInner')).includes('השבוע'), 'no "this week" wording before the start');
+  await page.click('#celOverlay [data-act=celClose]');
+  await go(page, 'progress');
+  const p = await txt(page, '#tab-progress');
+  assert(p.includes('התוכנית מתחילה ב-') && p.includes('לא נספרים בקו הבסיס'), 'progress explains: ' + p.slice(0, 200));
+  await go(page, 'incident');
+  await page.click('#tab-incident details summary');
+  eq(await page.locator('#tab-incident .inc-item').count(), 2, 'pre-start incidents stay in the list');
+  // three days later = week 1: the pre-start data is not week 1
+  await page.clock.setSystemTime(NOW + 3 * DAY);
+  await page.reload();
+  await go(page, 'today');
+  assert((await txt(page, '.hero h1')).replace(/\s+/g, ' ').includes('שבוע 1 מתוך 12'), 'week 1 after the start');
+  assert((await txt(page, '#tab-today .pill.blue')).includes('0/2'), 'week 1 stars start at 0');
+  await go(page, 'progress');
+  eq(await page.locator('#tab-progress table.wk tbody tr').evaluateAll(trs => trs.map(tr => tr.cells[1].textContent)), ['0'], 'week 1 has 0 incidents');
+  assert((await txt(page, '#tab-progress')).includes('לפני תחילת התוכנית'), 'note about the pre-start incidents');
+});
+test('progress: partial current week is never compared; the last completed week is', 'ruling 6 / QA #4', async t => {
+  const start = startForWeek(3);
+  const I = [...Array(10)].map((_, i) => inc(tsIn(start, 1, i % 7))).concat([...Array(3)].map((_, i) => inc(tsIn(start, 2, i))));
+  const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: I }) }); // week 3, day 1, no incident yet
+  await go(page, 'progress');
+  const kpi = (await page.locator('#tab-progress .kpi').allInnerTexts()).map(k => k.replace(/\s+/g, ' '));
+  assert(kpi[0].includes('0') && kpi[0].includes('השבוע עד עכשיו'), 'current week = count so far: ' + kpi[0]);
+  assert(kpi[1].includes('70%') && kpi[1].includes('שבוע 2'), 'change uses week 2 (3 vs 10 = −70%): ' + kpi[1]);
+  const enc = await txt(page, '#tab-progress .encourage');
+  assert(enc.includes('הגעתם ליעד') && enc.includes('בשבוע 2') && enc.includes('70%'), 'goal message names the completed week: ' + enc);
+  // week 1: no comparison at all
+  const p1 = await t.open({ state: makeState({ incidents: [inc(NOW - 3600e3)] }) });
+  await go(p1, 'progress');
+  eq(await p1.locator('#tab-progress .kpi').count(), 3, 'week 1: no comparison KPI');
+  assert(!(await txt(p1, '#tab-progress')).includes('%  לעומת'), 'no percentage comparison');
+});
+test('progress: baseline = first week with incidents (and first week with hits in "hits only" mode)', 'ruling 7 / QA #13, #25', async t => {
+  const start = startForWeek(4);
+  const I = [...Array(6)].map((_, i) => inc(tsIn(start, 2, i), { actions: ['צעקה'] }))
+    .concat([...Array(4)].map((_, i) => inc(tsIn(start, 3, i), { actions: i < 2 ? ['מכה'] : ['צעקה'] })));
+  const page = await t.open({ state: makeState({ settings: { startDate: start }, incidents: I }) });
+  await go(page, 'progress');
+  let legend = await txt(page, '#tab-progress .legend');
+  assert(legend.includes('בסיס (שבוע 2): 6'), 'all mode: baseline week 2: ' + legend);
+  assert((await txt(page, '#tab-progress')).includes('בשבוע 1 לא נרשמו אירועים'), 'explains why the baseline is week 2');
+  const kpi = (await page.locator('#tab-progress .kpi').allInnerTexts()).map(k => k.replace(/\s+/g, ' '));
+  assert(kpi[1].includes('שבוע 3') && kpi[1].includes('(שבוע 2)') && kpi[1].includes('33%'), 'change vs the baseline week: ' + kpi[1]);
+  await page.click('#tab-progress [data-act=chartMode][data-mode=hits]');
+  legend = await txt(page, '#tab-progress .legend');
+  assert(legend.includes('בסיס (שבוע 3): 2'), 'hits mode: first week with hits: ' + legend);
+  eq(await page.locator('#tab-progress .kpi').count(), 3, 'hits mode: week 3 is the baseline, nothing completed after it to compare');
+  // hits mode with incidents but no hits at all: accurate message
+  const p2 = await t.open({ state: makeState({ settings: { startDate: startForWeek(2) }, incidents: [inc(tsIn(startForWeek(2), 1, 1))], ui: { chartMode: 'hits' } }) });
+  await go(p2, 'progress');
+  const msg = await txt(p2, '#tab-progress');
+  assert(msg.includes('עוד לא נרשמו אירועי מכות') && !msg.includes('כשיהיו אירועים רשומים בשבוע 1'), 'hits-mode message: ' + msg.slice(0, 300));
+});
+test('progress: future weeks are not tappable; tapping a table row selects the week', 'QA #26 / design P3-11', async t => {
+  const page = await t.open({ state: progressFixture() });
+  await go(page, 'progress');
+  eq(await page.locator('#tab-progress svg.chart').first().locator('rect[data-act=bar]').evaluateAll(rs => rs.map(r => r.dataset.w)), ['1', '2', '3', '4'], 'only elapsed weeks have tap targets');
+  assert(await page.locator('#tab-progress svg.chart rect[data-w="1"]').first().getAttribute('aria-label') !== null, 'bars have accessible names');
+  await page.click('#tab-progress table.wk tbody tr:nth-child(3)');
+  assert((await txt(page, '#tab-progress .chart-info')).includes('שבוע 3: 4 אירועים'), 'row tap selects the week in the chart');
+  // RTL: week 1 is the right-most bar
+  const xs = await page.evaluate(() => [...document.querySelector('#tab-progress svg.chart').querySelectorAll('rect[data-act=bar]')].map(r => +r.getAttribute('x')));
+  assert(xs.every((x, i) => i === 0 || x < xs[i - 1]), 'week 1 on the right, later weeks to the left: ' + xs);
+});
+test('incident: duration buckets and the 20-minute long-outburst rule', 'ruling 9 / QA #17; spec: "התפרצויות ארוכות מ-20–30 דקות"', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  eq(await page.locator('#tab-incident [data-group=duration] .chip').evaluateAll(els => els.map(e => e.dataset.val)), ['פחות מדקה', '1–5 דקות', '5–10 דקות', '10–20 דקות', '20–30 דקות', 'יותר מ-30 דקות'], 'duration buckets');
+  const cases = [[['10–20 דקות', '15–30 דקות', '5–15 דקות'], 0], [['20–30 דקות', '10–20 דקות'], 0], [['20–30 דקות', 'יותר מ-30 דקות', '15–30 דקות'], 2]];
+  for (const [durs, longN] of cases) {
+    const p = await t.open({ state: makeState({ settings: { startDate: startForWeek(2) }, incidents: durs.map((d, i) => inc(NOW - (i * 3 + 1) * DAY, { duration: d })) }) });
+    await go(p, 'progress');
+    const pro = await p.locator('#tab-progress .pro').count() ? await txt(p, '#tab-progress .pro') : '';
+    if (longN) assert(pro.includes(`בשבועיים האחרונים היו ${longN} התפרצויות שנמשכו 20 דקות ויותר`), 'long-outburst reason: ' + pro);
+    else eq(pro, '', `no card for ${durs.join(', ')} (legacy "15–30" is not long)`);
+    if (durs.includes('5–15 דקות')) { await go(p, 'incident'); await p.click('#tab-incident details summary'); assert((await txt(p, '#tab-incident details')).includes('5–15 דקות'), 'legacy value displayed as stored'); }
+  }
+});
+test('incident: times more than 5 minutes ahead are rejected with a message; the field has a max', 'ruling 11 / QA #6', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  eq(await page.getAttribute('#incTs', 'max'), TODAY + 'T10:05', 'datetime max = now + 5 min');
+  await page.click('#tab-incident [data-field=actions][data-val="מכה"]');
+  await page.fill('#incTs', TODAY + 'T10:10');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  assert((await toastText(page)).includes('עוד לא הגיעה'), 'message: ' + await toastText(page));
+  eq((await getState(page)).incidents.length, 0, 'not saved');
+  await page.fill('#incTs', TODAY + 'T10:04');
+  await page.click('#tab-incident [data-act=saveIncident]');
+  eq((await getState(page)).incidents.length, 1, 'within 5 minutes is accepted (clock skew)');
+});
+test('incident: the automatic time shown in the form stays current while the tab is open', 'ruling 12 / QA #3, #5', async t => {
+  const page = await t.open();
+  await go(page, 'incident');
+  await page.clock.runFor(2 * 60e3 + 500);
+  eq(await page.inputValue('#incTs'), TODAY + 'T10:02', 'refreshed by the 60 s tick');
+  await page.fill('#incTs', TODAY + 'T09:00');
+  await page.clock.runFor(2 * 60e3);
+  eq(await page.inputValue('#incTs'), TODAY + 'T09:00', 'an edited time is never overwritten');
+});
+test('stars: double-tap guard ignores a repeat within 800 ms only', 'ruling 10 / QA #10', async t => {
+  const page = await t.open();
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  await page.clock.runFor(500);
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  eq((await getState(page)).stars.length, 1, 'second tap after 500 ms ignored');
+  await page.click('#tab-today [data-act=star][data-id=g2]');
+  eq((await getState(page)).stars.length, 2, 'another goal is not blocked');
+  await page.clock.runFor(400);
+  await page.click('#tab-today [data-act=star][data-id=g1]');
+  eq((await getState(page)).stars.length, 3, 'accepted after 900 ms');
+});
+test('stars: goal ids are stable – editing keeps the id, a new slot gets a new id, removed goals stay in the total', 'ruling 10 / QA #9', async t => {
+  const page = await t.open({ state: makeState({ settings: { goals: [{ id: 'g1', text: 'A' }, { id: 'g2', text: 'B' }] }, stars: [{ goalId: 'g1', ts: NOW - 3000 }, { goalId: 'g2', ts: NOW - 2000 }] }) });
+  await setSettings(page, { sGoal0: 'A – מנוסח מחדש', sGoal2: 'C חדש' });
+  let s = await getState(page);
+  eq(s.settings.goals.slice(0, 2).map(g => g.id), ['g1', 'g2'], 'edited goal keeps its id');
+  assert(!['g1', 'g2', 'g3'].includes(s.settings.goals[2].id), 'new slot gets a new unique id: ' + s.settings.goals[2].id);
+  const read = () => page.locator('#tab-today .goal').evaluateAll(gs => gs.map(g => g.querySelectorAll('.s').length));
+  eq(await read(), [1, 1, 0], 'stars stay with their goals');
+  await setSettings(page, { sGoal1: '' });
+  eq(await read(), [1, 0], 'removed goal no longer shown');
+  assert((await txt(page, '#tab-today .pill.blue')).includes('2/'), 'its star still counts in the weekly total');
+  s = await getState(page);
+  eq(s.stars.length, 2, 'no star deleted');
+});
+test('exercise: completion after the morning breathing returns to Today; after a tool, mood dots log a feeling', 'QA #16 / design P2-18, P3-3', async t => {
+  const page = await t.open();
+  await page.click('#tab-today [data-act=morningBreath]');
+  await page.clock.runFor(180e3);
+  assert((await txt(page, '#exInner')).includes('חזרה להיום'), 'button says "back to Today"');
+  await page.click('#exInner [data-goto=today]');
+  assert(await page.locator('#tab-today.active').count() === 1, 'returns to Today');
+  await go(page, 'calm');
+  await page.click('#tab-calm [data-ex=wall]');
+  await page.clock.runFor(15e3);
+  await page.click('#exInner [data-act=doneMood][data-c=green]');
+  assert(await page.locator('#tab-calm.active').count() === 1, 'on Calm');
+  eq(await page.getAttribute('#tab-calm .mood[data-c=green]', 'aria-pressed'), 'true', 'feeling selected');
+  eq((await getState(page)).moods.map(m => m.c), ['green'], 'feeling logged');
+});
+test('exercise: pausing mid-second does not drift (wall-clock timer)', 'QA #24', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=wall]');
+  await page.clock.runFor(1500);            // 8.5 s left in the 10 s step
+  await page.click('#exPauseBtn');
+  await page.clock.runFor(10300);
+  await page.click('#exPauseBtn');
+  await page.clock.runFor(400);
+  eq(await txt(page, '#exNum'), '9', 'still 9 just before the next whole second');
+  await page.clock.runFor(200);
+  eq(await txt(page, '#exNum'), '8', 'decrements 0.5 s after resuming, not earlier');
+});
+test('ranges render left-to-right (bidi) without changing stored values', 'ruling 13 / design P1-2', async t => {
+  const page = await t.open();
+  const r = await page.evaluate(() => [...document.querySelectorAll('#tab-today .rng')].map(s => [s.textContent, s.dir, getComputedStyle(s).whiteSpace]));
+  assert(r.some(([x, d, ws]) => x === '30–60' && d === 'ltr' && ws === 'nowrap'), 'checklist range isolated: ' + JSON.stringify(r));
+  await go(page, 'incident');
+  const chip = await page.evaluate(() => { const c = document.querySelector('[data-field=duration][data-val="1–5 דקות"]'); return [c.dataset.val, !!c.querySelector('.rng')]; });
+  eq(chip, ['1–5 דקות', true], 'chip value unchanged, display isolated');
+});
+test('fonts: Heebo is embedded (data: URL, Hebrew + Latin) and the app makes no network requests', 'ruling 3 / ruling 14; spec: "פונט עברי קריא (Heebo)", "עובד גם אופליין"', async t => {
+  const page = await t.open({ offline: true, state: richState(4) });
+  const r = await page.evaluate(async () => {
+    const faces = await document.fonts.load('700 20px Heebo', 'שלום abc');
+    const all = [...document.fonts].filter(f => f.family.replace(/["']/g, '') === 'Heebo');
+    return { loaded: faces.length, status: all.map(f => f.status), ranges: all.map(f => f.unicodeRange), body: getComputedStyle(document.body).fontFamily, html: document.documentElement.outerHTML.includes('fonts.googleapis') };
+  });
+  assert(r.loaded >= 1 && r.status.every(s => s === 'loaded' || s === 'unloaded') && r.status.includes('loaded'), 'Heebo faces load offline: ' + JSON.stringify(r.status));
+  assert(r.ranges.some(x => /U\+590-5FF/i.test(x)) && r.ranges.some(x => /U\+0?0-FF/i.test(x)), 'hebrew + latin subsets: ' + r.ranges);
+  assert(/^"?Heebo/.test(r.body), 'body uses Heebo first');
+  eq(r.html, false, 'no Google Fonts reference left');
+  for (const tab of ['today', 'calm', 'incident', 'progress', 'guide']) await go(page, tab);
+  await page.click('.topbar [data-act=openSettings]');
+  eq(t.remote, [], 'no remote request while using the app');
+});
+test('install: icon is the designer\'s stones icon (teal → blue gradient, light stones in the middle)', 'ruling 14 / design §6', async t => {
+  const page = await t.open();
+  const px = await page.evaluate(() => new Promise(res => {
+    const i = new Image();
+    i.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d'); x.drawImage(i, 0, 0); const at = (a, b) => [...x.getImageData(a, b, 1, 1).data]; res({ tl: at(4, 4), br: at(507, 507), mid: at(256, 270) }); };
+    i.src = JSON.parse(atob(document.querySelector('link[rel=manifest]').href.split(',')[1].replace(/\s/g, ''))).icons.find(x => x.sizes === '512x512').src;
+  }));
+  assert(px.tl[1] > px.tl[0] && px.tl[1] > 120, 'teal top-left: ' + px.tl);
+  assert(px.br[2] > px.br[1] - 10, 'blue-ish bottom-right: ' + px.br);
+  assert(px.mid[0] > 200 && px.mid[1] > 200 && px.mid[2] > 200, 'light stone in the centre: ' + px.mid);
 });
 
 /* ------------------------------------------------------------------ *

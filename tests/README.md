@@ -19,8 +19,11 @@ The script prints one `PASS`/`FAIL` line per test. A failing test also prints th
 - **Seeding.** `open(t, { state })` writes a state object into `localStorage['ragua-vehazak-v1']` with `addInitScript`. A sessionStorage guard makes this happen only once, so data written by the app survives `page.reload()`. Pass `state: null` to start with empty storage (first run), or a string to seed corrupt data.
 - **Time.** Each test installs `page.clock` and pauses it at Monday 12 Oct 2026, 10:00 (Jerusalem time). Tests move time with `clock.runFor` (exercise timers, midnight), `clock.setSystemTime` (next day, next program week) and `tsJ()` (local wall-clock times, including across DST).
 - **Errors.** A test fails on any `console.error` or uncaught page error. In the offline test, network-load errors are expected and do not count.
-- **Dialogs.** The test answers `confirm()` from `page.dialogAnswer` (default: accept) and records each message in `page.dialogs`.
+- **Dialogs.** The app uses an in-app confirm sheet (`#dlg`) instead of `confirm()`. Tests answer it with `answer(page, ok)`, which records each title and body in `page.dialogs`. A native `alert()`/`confirm()` fails the test.
+- **Stars.** The app ignores a repeat tap on the same star button within 800 ms (double-tap guard), so tests add stars with `addStar(page, id)`, which advances the paused clock by 1 s before each tap.
+- **Network.** Every remote request is recorded in `t.remote`; the font is embedded, so the app is expected to make none.
 - Each test's `spec:` string names the line of `docs/spec.md` that it verifies.
 
 ## Current status
-When written, the suite had 86 tests: 70 passed and 16 failed. All 16 failures are real app bugs and are meant to fail until they are fixed. `docs/qa-report.md` describes each one.
+When written, the suite had 86 tests: 70 passed and 16 failed (real app bugs, described in `docs/qa-report.md`).
+After the release fixes it has 109 tests (86 original, some updated to assert the new intended behaviour, plus 23 new ones in section 16), and all of them pass.
