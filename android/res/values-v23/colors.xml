@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- API 23+: dark status-bar icons are available, so blend into the top bar (CSS var bg-grad). -->
+<!-- API 23+: dark status-bar icons are available, so blend into the top bar
+     (CSS var bg-grad, same as the page's light theme-color meta). -->
 <resources>
-    <color name="status_bar">#dcedf3</color>
+    <color name="status_bar">#e0f0f3</color>
 </resources>

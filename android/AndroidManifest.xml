@@ -13,7 +13,7 @@
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
 
     <!-- The only permission: haptic feedback via AndroidBridge.vibrate(). No INTERNET:
-         all content is bundled; remote font requests simply fail and fall back. -->
+         everything, including the Heebo fonts, is embedded in index.html. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- allowBackup=false: the app promises the data stays on this phone only.

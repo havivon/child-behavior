@@ -114,23 +114,30 @@ Details:
 - **`alert()` / `confirm()`** show native RTL dialogs with "אישור" / "ביטול". Back counts as "ביטול" for `confirm()`. These are only a safety net. In-app modals look better.
 - **External links** (`http(s):`, `mailto:`, `tel:`, `sms:`, `whatsapp:`) open in the system browser or app. The WebView never navigates away from the bundled page.
 
-### Safety-net shims (injected by native code after each page load)
+### No injected shims
 
-So that today's `index.html` already works in the app, `MainActivity` injects a small script
-(`SHIM_JS`). It is idempotent and does nothing if `window.AndroidBridge` is missing:
-
-- `navigator.vibrate(ms | pattern)` → `AndroidBridge.vibrate(...)`. A pattern becomes a single pulse lasting the total "on" time, capped at 1000 ms.
-- clicking `<a download href="blob:...">` (the classic blob-download export, which WebView can't handle) → `AndroidBridge.saveFile(name, blob.type, text)`.
-
-Code that calls `AndroidBridge` directly is unaffected. Prefer calling it directly. Note that
-`navigator.share` doesn't exist in Android WebView.
+The page calls the bridge directly: `vibrate()` uses `AndroidBridge.vibrate` whenever it exists,
+and `exportData()` uses `AndroidBridge.saveFile` and returns before the blob-download path.
+Native code therefore injects **no** JavaScript. An earlier build injected a fallback that patched
+`navigator.vibrate`, `URL.createObjectURL` and `<a download>` clicks. It was removed once the page
+integrated the bridge, because it no longer did anything and patching globals is a risk with no benefit.
+Keep calling `AndroidBridge` directly. Android WebView has no `navigator.vibrate` or `navigator.share`
+and cannot download `blob:` URLs, and the WebView blocks any navigation away from the bundled page.
 
 ## WebView behavior
 
 - JavaScript and DOM storage are on. `localStorage` persists in the app's private data directory across restarts and updates, and is removed on uninstall. File access is on (needed for `file://`), but universal/file-URL cross access is off and mixed content is blocked.
 - Text zoom is fixed at 100%, so the system font size doesn't break the px-based layout. Pinch zoom is disabled and there is no overscroll glow.
 - Rotation (the app is locked to portrait anyway), keyboard, dark-mode, font-scale and locale changes are handled in place (`configChanges`), so the page is never reloaded. If Android does recreate the activity (for example after the process was killed in the background), the WebView state is restored.
-- Colors match the page: the window and WebView background are `#eaf6f4` (light) / `#0d1b1e` (dark), so there's no white flash. In light mode the status bar is `#dcedf3` with dark icons (on API 21–22, which can't draw dark icons, it is teal `#21958a`). The navigation bar is white with dark icons on API 26+ (`#16343a` below that). In dark mode the status bar is `#10232a` and the navigation bar `#16292d`.
+- Colors match the page's design tokens, so there's no seam at the top or bottom and no white flash on launch:
+
+  | | Light | Dark |
+  |---|---|---|
+  | Window and WebView background (`--bg`) | `#eef7f6` | `#0d1b1e` |
+  | Status bar = top bar (`--bg-grad`, also the `theme-color` meta) | `#e0f0f3`, dark icons (API 23+) | `#10232a` |
+  | Navigation bar = bottom nav (`--surface`) | `#ffffff`, dark icons (API 26+) | `#16292d` |
+
+  Older Android can't draw dark system-bar icons. On API 21–22 the light status bar is the accent `#1a7f76` (white icons), and on API 21–25 the light navigation bar is `#12313a` (`--text`). If the tokens change, update `res/values*/colors.xml`.
 - The page's `prefers-color-scheme` follows the app theme (`values` / `values-night`). With targetSdk 33+, WebView derives it from the theme's `isLightTheme`.
 - Opening the app from the installer and then from the launcher would normally stack a second instance on top. That second instance closes itself immediately, so two pages never write the same `localStorage`.
 - `android:windowSoftInputMode="adjustResize"`: the keyboard resizes the page instead of covering inputs.

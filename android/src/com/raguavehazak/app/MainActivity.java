@@ -70,33 +70,6 @@ public class MainActivity extends Activity {
     private static final int FLAG_LIGHT_STATUS_BAR = 0x00002000;
     private static final int FLAG_LIGHT_NAVIGATION_BAR = 0x00000010;
 
-    /**
-     * Safety-net shims injected after every page load (idempotent). They only kick in for code
-     * paths that do not use AndroidBridge directly:
-     *  - navigator.vibrate(ms | pattern) -> AndroidBridge.vibrate (WebView has no Vibration API);
-     *    a pattern becomes one pulse of its total "on" time.
-     *  - <a download href="blob:..."> clicks (the classic blob-download export) ->
-     *    AndroidBridge.saveFile, because WebView cannot download blob: URLs.
-     */
-    private static final String SHIM_JS =
-            "(function(){"
-            + "if(window.__androidShim||!window.AndroidBridge)return;window.__androidShim=true;"
-            + "try{Object.defineProperty(navigator,'vibrate',{configurable:true,writable:true,value:function(p){"
-            + "var ms=0;if(typeof p==='number'){ms=p;}else if(p&&typeof p.length==='number'){"
-            + "for(var i=0;i<p.length;i+=2){ms+=(+p[i])||0;}}"
-            + "ms=Math.max(0,Math.min(1000,Math.round(ms)));if(ms>0){AndroidBridge.vibrate(ms);}return true;}});}catch(e){}"
-            + "try{var blobs={};var oc=URL.createObjectURL,orv=URL.revokeObjectURL;"
-            + "URL.createObjectURL=function(o){var u=oc.apply(URL,arguments);if(o instanceof Blob){blobs[u]=o;}return u;};"
-            + "URL.revokeObjectURL=function(u){delete blobs[u];return orv.apply(URL,arguments);};"
-            + "document.addEventListener('click',function(ev){"
-            + "var a=ev.target&&ev.target.closest?ev.target.closest('a[download]'):null;if(!a)return;"
-            + "var b=blobs[a.href]||blobs[a.getAttribute('href')];if(!b)return;"
-            + "ev.preventDefault();var name=a.getAttribute('download')||'download';"
-            + "var r=new FileReader();r.onload=function(){AndroidBridge.saveFile(name,b.type||'application/octet-stream',String(r.result));};"
-            + "r.onerror=function(){window.__androidSaveResult&&window.__androidSaveResult(false);};"
-            + "r.readAsText(b);},true);}catch(e){}"
-            + "})();";
-
     private WebView webView;
     private Handler mainHandler;
     private Vibrator vibrator;
@@ -567,12 +540,6 @@ public class MainActivity extends Activity {
                 openExternal(uri);
             }
             return true; // never navigate the app's WebView away from the bundled page
-        }
-
-        @Override
-        public void onPageFinished(WebView view, String url) {
-            super.onPageFinished(view, url);
-            if (url != null && url.startsWith(ASSET_PREFIX)) view.evaluateJavascript(SHIM_JS, null);
         }
     }
 

@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark palette (matches index.html prefers-color-scheme: dark). "night" outranks "-vNN"
-     in resource selection, so these win over values-v23 / values-v26 in dark mode. -->
+<!-- Dark palette, synced with index.html prefers-color-scheme: dark tokens. "night" outranks
+     the API-version qualifier in resource selection, so these win over values-v23 / values-v26. -->
 <resources>
+    <!-- CSS var bg -->
     <color name="app_bg">#0d1b1e</color>
+    <!-- CSS var bg-grad (top bar; also the page's dark theme-color meta) -->
     <color name="status_bar">#10232a</color>
+    <!-- CSS var surface (bottom nav) -->
     <color name="nav_bar">#16292d</color>
 </resources>
