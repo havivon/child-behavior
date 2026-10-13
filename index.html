@@ -250,7 +250,11 @@ textarea.input{min-height:80px;resize:vertical}
 .tool .ti{font-size:36px;line-height:1}
 .tool small{font-weight:400;color:var(--muted);font-size:var(--fs-xs)}
 .tool:active{transform:scale(.97)}
-.tool.wide{grid-column:1 / -1;flex-direction:row;min-height:76px;gap:12px}
+.tool.wide{flex-direction:row;min-height:76px;gap:12px}
+.tool-cell{position:relative;display:flex;min-width:0}
+.tool-cell.wide{grid-column:1 / -1}
+.tool-cell > .tool{flex:1;min-width:0}
+.tool-cell.has-info > .tool.wide{padding-inline:40px}   /* keep the centred row clear of the ⓘ */
 .tool[data-ex=stop]{background:linear-gradient(135deg,var(--danger-soft),var(--warn-soft))}
 .vent{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}
 .vent li{display:flex;align-items:center;gap:8px;padding:var(--sp-2) var(--sp-1);font-weight:700;font-size:var(--fs-sm)}
@@ -416,6 +420,54 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
 .confetti{position:fixed;top:-20px;width:10px;height:14px;z-index:60;pointer-events:none;border-radius:2px;animation:fall linear forwards}
 @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
 
+/* ⓘ explanations */
+.info-btn{position:absolute;top:0;inset-inline-end:0;z-index:1;width:44px;height:44px;display:grid;place-items:center;padding:0;border:none;background:none;color:var(--accent-strong);border-radius:var(--r-md)}
+.info-btn .ic{width:22px;height:22px}
+.info-btn:active,.info-link:active,.info-inline:active{background:rgba(26,127,118,.14);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.check{position:relative}
+.check-hit{padding-inline-end:52px}
+.check > .info-btn{top:6px;inset-inline-end:6px}
+.card.has-info{position:relative}
+.card.has-info > h2{padding-inline-end:40px}
+.card.has-info > .info-btn{top:14px;inset-inline-end:12px}
+.info-link{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin-top:2px;margin-inline-start:-8px;padding:0 8px;border:none;background:none;color:var(--accent-strong);font-weight:700;font-size:var(--fs-sm);border-radius:var(--r-sm)}
+.info-link .ic{width:20px;height:20px}
+.info-inline{display:inline-grid;place-items:center;width:44px;height:44px;margin:-12px -6px;padding:0;border:none;background:none;color:var(--accent-strong);border-radius:var(--r-md);vertical-align:middle}
+.info-inline .ic{width:20px;height:20px}
+#dlg{z-index:81}
+.info-card{display:flex;flex-direction:column;max-width:560px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px - env(safe-area-inset-top));padding:0;overflow:hidden}
+.modal-card.info-card p{color:var(--text);margin:0}   /* beats .modal-card p (muted + margin) */
+.info-head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) var(--sp-5);padding-inline-end:var(--sp-4);border-bottom:1px solid var(--line)}
+.info-head h2{flex:1;min-width:0;margin:0;font-size:var(--fs-md)}
+.info-ic{font-size:28px;line-height:1;flex:0 0 auto}
+.info-body{overflow-y:auto;overscroll-behavior:contain;padding:var(--sp-4) var(--sp-5) var(--sp-5)}
+.info-foot{padding:var(--sp-3) var(--sp-5) var(--sp-4);border-top:1px solid var(--line)}
+.info-foot:empty{display:none}
+.info-sec + .info-sec{margin-top:var(--sp-4)}
+.info-sec h3{margin:0 0 var(--sp-1);font-size:var(--fs-sm);font-weight:800;color:var(--accent-strong)}
+.info-steps{margin:0;padding-inline-start:1.3em}
+.info-steps li{margin:4px 0;padding-inline-start:2px}
+.info-steps li::marker{font-weight:800;color:var(--accent-strong)}
+.info-tip{display:flex;gap:var(--sp-2);margin-top:var(--sp-4);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-md);background:var(--warn-soft)}
+.info-kid{margin:0 0 var(--sp-4);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-lg);background:var(--accent-soft);font-size:var(--fs-md);font-weight:700}
+.info-say{margin-top:var(--sp-4);padding-inline-start:var(--sp-3);border-inline-start:4px solid var(--accent)}
+.info-say b{display:block;font-size:var(--fs-xs);color:var(--muted)}
+.info-related{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);margin-top:var(--sp-4)}
+.info-related > b{font-size:var(--fs-sm);color:var(--muted);width:100%}
+.info-related .chip{min-height:44px;font-size:var(--fs-sm)}
+.info-more{margin-top:var(--sp-3)}
+.info-parents{margin-top:var(--sp-2)}
+.info-parents > summary{font-size:var(--fs-base)}
+.info-parents[open] > summary{margin-bottom:var(--sp-3)}
+.dict-count{display:inline-block;margin-inline-start:6px;padding:0 8px;border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent-strong);font-size:var(--fs-xs);font-weight:800;vertical-align:middle}
+.dict-item{border-top:1px solid var(--line)}
+.dict-item > summary{min-height:52px;padding:var(--sp-2) 0;font-size:var(--fs-base);font-weight:700;justify-content:flex-start;gap:var(--sp-3)}
+.dict-item > summary .di-ic{flex:0 0 28px;font-size:22px;text-align:center}
+.dict-item > summary .di-t{flex:1;min-width:0}
+.dict-item[open] > summary{color:var(--accent-strong)}
+.dict-body{padding:0 0 var(--sp-4);padding-inline-start:calc(28px + var(--sp-3))}
+.dict-body .btn{margin-top:var(--sp-3)}
+
 /* confirm sheet */
 .modal{position:fixed;inset:0;z-index:80;display:grid;place-items:end center;padding:var(--sp-4) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom));background:var(--scrim);animation:fadeIn .2s ease}
 .modal[hidden]{display:none}
@@ -503,6 +555,19 @@ details.card[open] > summary{margin-bottom:var(--sp-2)}
   </div>
 </div>
 
+<!-- explanation sheet (ⓘ) -->
+<div id="infoSheet" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+  <div class="modal-card info-card">
+    <div class="info-head">
+      <span class="info-ic" id="infoIcon" aria-hidden="true"></span>
+      <h2 id="infoTitle" tabindex="-1"></h2>
+      <button type="button" class="icon-btn" data-act="infoClose" aria-label="סגירה"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="info-body" id="infoBody"></div>
+    <div class="info-foot" id="infoFoot"></div>
+  </div>
+</div>
+
 <div id="tapShield" aria-hidden="true"></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -556,7 +621,8 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>',
   download: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   upload: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>',
-  undo: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-3"/></svg>'
+  undo: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-3"/></svg>',
+  info: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6v.01" stroke-width="2.6"/></svg>'
 };
 const CHECK_SVG = '<svg viewBox="0 0 24 24" class="ic" style="stroke-width:3.2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
@@ -598,18 +664,475 @@ const PHASES = [
   { id: 'p4', from: 6, to: 9, name: 'ניהול כעס', tip: 'פרוטוקול תגובה רגוע: עוצרים, מגינים ומדברים רק אחרי שהוא נרגע.' },
   { id: 'p5', from: 8, to: 12, name: 'שתלטנות וחברה', tip: 'בחירות, אחריות אמיתית, תור למנהיג ומפגשי משחק עם חבר.' }
 ];
-const GAMES = [
-  { n: 'צבע-מילה', d: 'אומרים צבע והוא עושה תנועה שסיכמתם (אדום = קופץ, כחול = קופא, ירוק = מסתובב). באמצע מחליפים את החוקים!' },
-  { n: 'תופסת קפואה', d: 'רצים ורוקדים עם מוזיקה. כשהמוזיקה נעצרת – קופאים כמו פסל. מי שזז מחכה סיבוב אחד.' },
-  { n: 'ג׳נגה על זמן', d: 'כל אחד מוציא לבנה בתורו עם טיימר של 10 שניות. מתרגלים סבלנות, תור והפסד בכבוד.' },
-  { n: 'ראש-כתפיים הפוך', d: 'כשאומרים "ראש" נוגעים בכתפיים, וכשאומרים "כתפיים" נוגעים בראש. מאיצים בהדרגה.' },
-  { n: 'רמזור', d: 'ירוק – הולכים, צהוב – לאט מאוד, אדום – עוצרים במקום. ההורה מחליף מהר ולפעמים מנסה לבלבל.' },
-  { n: 'שמעון אומר', d: 'מבצעים רק כשנאמר "שמעון אומר". בסבב השני הוא מוביל – ומתרגל להוביל בהגינות.' },
-  { n: 'תיפוף ועצירה', d: 'מתופפים על השולחן לפי הקצב של ההורה, ועוצרים בדיוק ברגע שההורה עוצר.' },
-  { n: 'שחמט או דמקה', d: 'משחק אחד בלי למהר. לפני כל מהלך אומרים בשקט: "עצור, חושב, בוחר". מסיימים בלחיצת יד.' },
-  { n: 'אתגר דחיית סיפוק', d: 'פרס קטן עכשיו, או כפול אם מחכים 10 דקות. מאריכים את זמן ההמתנה בהדרגה.' },
-  { n: 'משחק תפקידים: משפט העצירה', d: 'מדמים מצב (אח לוקח משהו, מפסידים במשחק) ומתרגלים "עצור – נושם – חושב – בוחר". מתחלפים בתפקידים.' }
+/* Explanations: one source of truth for the ⓘ sheets, the guide chapter and the Today game box
+   (docs/explanations-spec.md, Appendix A). */
+const INFO = {
+  balloon: {
+    group: "calm",
+    icon: "🎈",
+    title: "נשימת בלון",
+    kid: "אתה מנפח את הבטן כמו בלון ומרוקן אותה לאט – והגוף שלך נרגע.",
+    what: "נשימה עמוקה לבטן: שואפים מהאף ומרגישים את הבטן מתנפחת כמו בלון, ואז נושפים לאט מהפה עד שהבלון מתרוקן.",
+    why: "כשהנשיפה איטית וארוכה יותר מהשאיפה, הגוף מקבל אות להאט: הלב נרגע והשרירים משתחררים. הדימוי של בלון עוזר להתרכז בבטן ולא בכעס.",
+    howLabel: "איך מלמדים",
+    how: [
+      "יושבים או עומדים בנוח, יד אחת על הבטן.",
+      "שואפים מהאף 4 שניות – היד עולה כשהבטן מתנפחת.",
+      "נושפים לאט מהפה 6 שניות – היד יורדת כשהבלון מתרוקן.",
+      "חוזרים 6 פעמים, בערך דקה. בבוקר – 3 דקות.",
+      "באפליקציה העיגול גדל בשאיפה וקטן בנשיפה, ואפשר פשוט לנשום איתו."
+    ],
+    tip: "כשהוא שוכב, הניחו לו בובה קטנה על הבטן ותנו לו לראות אותה עולה ויורדת.",
+    related: ["morning", "candle", "thermo"],
+    ex: "balloon"
+  },
+  candle: {
+    group: "calm",
+    icon: "🕯️",
+    title: "נשימת נר",
+    kid: "אתה מריח פרח ונושף על נר בעדינות – שהלהבה תזוז ולא תכבה.",
+    what: "נשימה עם דמיון: שואפים לאט מהאף כאילו מריחים פרח, ונושפים בעדינות מהפה כאילו מזיזים להבה של נר – בלי לכבות אותה.",
+    why: "הנר \"מבקש\" נשיפה איטית ורכה, וזו בדיוק הנשיפה שמרגיעה את הגוף. הדמיון נותן לילד משימה פשוטה שמסיטה את תשומת הלב מהכעס.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מרימים אצבע מול הפה – זה הנר.",
+      "מריחים פרח: שואפים לאט מהאף, 4 שניות.",
+      "נושפים על הנר בעדינות, 6 שניות – שהלהבה רק תרקוד.",
+      "חוזרים 6 פעמים."
+    ],
+    tip: "בפעם הראשונה החזיקו פיסת טישו מול הפה שלו – המטרה שהיא תזוז, לא שתעוף.",
+    related: ["balloon", "box"],
+    ex: "candle"
+  },
+  box: {
+    group: "calm",
+    icon: "🟦",
+    title: "נשימת קובייה",
+    kid: "אתה נושם בארבעה צעדים של 4: שואף, מחזיק, נושף ומחכה – כמו לצייר ריבוע.",
+    what: "נשימה בארבעה שלבים שווים של 4 שניות: שואפים, מחזיקים, נושפים ומחכים – כמו לצייר ריבוע עם הנשימה.",
+    why: "הספירה הקבועה נותנת לראש משהו להתמקד בו, והקצב האחיד מאט את הנשימה. היא מתאימה במיוחד כשהמחשבות רצות מהר.",
+    howLabel: "איך מלמדים",
+    how: [
+      "שואפים מהאף וסופרים לאט עד 4.",
+      "מחזיקים את האוויר – עד 4.",
+      "נושפים מהפה – עד 4.",
+      "מחכים רגע בלי לנשום – עד 4.",
+      "עושים 4 סבבים, בערך דקה. אפשר לצייר באצבע ריבוע באוויר תוך כדי."
+    ],
+    tip: "החזקת האוויר צריכה להיות נוחה, בלי מאמץ. אם קשה לו, תרגלו קודם בלי האפליקציה, בספירה של 3.",
+    related: ["balloon", "robot"],
+    ex: "box"
+  },
+  robot: {
+    group: "calm",
+    icon: "🤖",
+    title: "רובוט וספגטי",
+    kid: "קודם אתה רובוט קשוח ומכווץ, ואז ספגטי רך ורפוי – והמתח יוצא מהגוף.",
+    what: "משחק הרפיה: 5 שניות \"רובוט\" – מכווצים את כל הגוף חזק, ואז 5 שניות \"ספגטי\" – משחררים הכול ונהיים רכים ורפויים. 3 סבבים.",
+    why: "אחרי כיווץ חזק קל יותר לשרירים להשתחרר, והילד לומד להרגיש את ההבדל בין גוף מתוח לגוף רגוע. זה מתאים במיוחד לילד שקשה לו לשבת בשקט ולנשום.",
+    howLabel: "איך מלמדים",
+    how: [
+      "עומדים או יושבים.",
+      "\"רובוט!\" – אגרופים קפוצים, כתפיים למעלה, פנים מכווצות, 5 שניות.",
+      "\"ספגטי!\" – משחררים הכול: ידיים רפויות, כתפיים למטה, 5 שניות.",
+      "חוזרים 3 פעמים."
+    ],
+    tip: "עשו את זה יחד איתו ותגזימו – רובוט קשוח וספגטי מתנדנד. צחוק קטן הוא חלק מההרגעה.",
+    related: ["wall", "corner"],
+    ex: "robot"
+  },
+  wall: {
+    group: "calm",
+    icon: "🧱",
+    title: "לדחוף את הקיר",
+    kid: "אתה דוחף את הקיר בכל הכוח 10 שניות, ואז עוזב ונושם עמוק. הכעס יוצא, ואף אחד לא נפגע.",
+    what: "עומדים מול קיר, ידיים ישרות על הקיר, ודוחפים בכל הכוח 10 שניות. אחר כך עוזבים ונושמים עמוק.",
+    why: "כעס מגיע עם הרבה אנרגיה בגוף. דחיפה חזקה מוציאה אותה דרך השרירים בדרך בטוחה, ואחרי מאמץ חזק הגוף נוטה להשתחרר. זה כלי טוב במיוחד בכתום ובאדום.",
+    howLabel: "איך מלמדים",
+    how: [
+      "עומדים מול קיר, רגל אחת קצת מאחור.",
+      "מניחים כפות ידיים על הקיר בגובה הכתפיים, ידיים ישרות.",
+      "דוחפים בכל הכוח 10 שניות – כאילו מזיזים את הקיר.",
+      "עוזבים, מנערים את הידיים ונושמים עמוק.",
+      "אם צריך – עוד סבב."
+    ],
+    tip: "בחרו מראש \"קיר כעס\" קבוע בבית. כשאתם רואים כתום, מספיק להציע: \"בוא לקיר\".",
+    related: ["robot", "thermo"],
+    ex: "wall"
+  },
+  stop: {
+    group: "calm",
+    icon: "✋",
+    title: "משפט העצירה",
+    kid: "כשהכעס עולה, אתה עוצר, נושם, חושב – ובוחר מה לעשות.",
+    what: "ארבע מילים שעוצרות רגע לפני מעשה: עצור (הגוף קופא), נושם (נשימה אחת עמוקה), חושב (מה יקרה אם…?), בוחר (דרך מותרת).",
+    why: "בכעס הגוף פועל מהר יותר מהמחשבה. המשפט יוצר הפסקה קצרה בין הדחף למעשה, ובהפסקה הזו אפשר לבחור אחרת. קל לזכור מילים קבועות גם כשקשה.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מלמדים בזמן רגוע, לא באמצע התפרצות.",
+      "אומרים יחד בקול, מילה אחרי מילה, עם תנועה: יד עוצרת, נשימה, אצבע לרקה, אגודל למעלה.",
+      "באפליקציה כל מילה נדלקת ל-3 שניות, בשני סבבים.",
+      "מתרגלים במשחק תפקידים, ורק אז משתמשים ברגע אמת – בשקט ובקצרה."
+    ],
+    tip: "השתמשו במשפט גם בעצמכם, בקול, כשאתם מתעצבנים. ילדים לומדים הכי הרבה ממה שהם רואים.",
+    related: ["roleplay", "stopgame"],
+    ex: "stop"
+  },
+  morning: {
+    group: "routine",
+    icon: "🌅",
+    title: "נשימת בוקר ושאלת המדחום",
+    what: "פותחים את היום ב-3 דקות של נשימת בלון ביחד, ואז שואלים: \"איפה אתה במדחום?\" – ירוק, צהוב, כתום או אדום.",
+    why: "תרגול בזמן רגוע הופך את הנשימה להרגל, כך שהיא זמינה גם ברגע קשה. השאלה על המדחום מלמדת אותו לשים לב למה שהוא מרגיש לפני שהכעס גדל.",
+    howLabel: "איך עושים",
+    how: [
+      "בוחרים רגע קבוע, למשל לפני ארוחת הבוקר.",
+      "לוחצים \"התחילו 3 דקות נשימה\" ונושמים יחד: 4 שניות שאיפה, 6 שניות נשיפה.",
+      "שואלים: \"איפה אתה במדחום עכשיו?\" ומקבלים כל תשובה בלי ויכוח.",
+      "אם הוא בצהוב, בכתום או באדום – שואלים בעדינות מה קרה ומציעים כלי.",
+      "בסוף הנשימה המשימה מסומנת בסדר היום מעצמה."
+    ],
+    tip: "גם \"אדום\" בבוקר הוא תשובה טובה – הוא זיהה את מה שהוא מרגיש. אמרו לו: \"תודה שסיפרת\".",
+    related: ["balloon", "thermo"],
+    act: "morningBreath"
+  },
+  move: {
+    group: "routine",
+    icon: "🏃",
+    title: "תנועה בחוץ",
+    what: "30–60 דקות של תנועה פעילה בחוץ בכל יום: ריצה, אופניים, כדור, טיפוס או קפיצה בחבל.",
+    why: "ילד חסר מנוחה צובר הרבה אנרגיה. כשהיא יוצאת במשחק ובתנועה, נשאר פחות \"דלק\" להתפרצויות, ולרוב גם השינה טובה יותר.",
+    howLabel: "איך עושים",
+    how: [
+      "קובעים זמן קבוע, עדיף אחר הצהריים – לפני השעות המועדות.",
+      "נותנים לו לבחור פעילות מתוך 2–3 אפשרויות.",
+      "מכוונים למאמץ שגורם להזיע ולהתנשף, לא רק להליכה איטית.",
+      "אפשר לחלק: 20 דקות אחרי בית הספר ועוד 20 לפני הערב."
+    ],
+    tip: "הצטרפו מדי פעם. מסירות כדור או מרוץ קצר הם גם זמן איכות איתו.",
+    related: ["stopgame"]
+  },
+  bed: {
+    group: "routine",
+    icon: "🌙",
+    title: "\"מה הצלחת היום?\" וסיפור",
+    what: "לפני השינה שואלים: \"מה הצלחת היום?\", מוצאים יחד לפחות הצלחה אחת, ומסיימים בסיפור.",
+    why: "גם אחרי יום קשה, הדבר האחרון שהוא שומע הוא משהו טוב שהוא עשה. זה בונה אצלו תחושה של \"אני מסוגל\", והטקס הקבוע עוזר להירגע לקראת השינה.",
+    howLabel: "איך עושים",
+    how: [
+      "שואלים בקול רך: \"מה הצלחת היום?\"",
+      "אם הוא לא מוצא – עוזרים לו: \"ראיתי שהבוקר חיכית לתור שלך.\"",
+      "אפשר להיעזר בשבחים שנרשמו היום ב\"תפסתי אותו מתנהג יפה\".",
+      "לא מדברים עכשיו על האירועים הקשים של היום – יש לזה זמן אחר.",
+      "מסיימים בסיפור, גם קצר."
+    ],
+    tip: "ספרו גם אתם על הצלחה קטנה שלכם מהיום – כך זו שיחה ולא מבחן.",
+    related: ["praise"]
+  },
+  colorword: {
+    group: "games",
+    icon: "🎨",
+    title: "צבע-מילה",
+    what: "אומרים צבע, והוא עושה תנועה שסיכמתם מראש – למשל אדום = קופץ, כחול = קופא, ירוק = מסתובב. באמצע מחליפים את החוקים!",
+    why: "הוא צריך להקשיב, לזכור את החוק ולעצור את התגובה הישנה כשהחוקים משתנים. זה אימון לגמישות ולעצירה.",
+    howLabel: "איך משחקים",
+    how: [
+      "מסכימים על 3 צבעים ו-3 תנועות.",
+      "קוראים צבעים בקצב איטי, ואז מהר יותר.",
+      "אחרי כמה סבבים מחליפים חוק: עכשיו אדום = קופא.",
+      "מתחלפים – הוא קורא ואתם זזים."
+    ],
+    tip: "כשהוא מתבלבל, צחקו יחד. הטעויות הן חלק מהכיף ומהאימון.",
+    related: ["stopgame", "headshoulders"]
+  },
+  freeze: {
+    group: "games",
+    icon: "🧊",
+    title: "תופסת קפואה",
+    what: "רוקדים ומתרוצצים עם מוזיקה. כשהמוזיקה נעצרת – קופאים כמו פסל. מי שזז מחכה סיבוב אחד.",
+    why: "לעצור את הגוף באמצע תנועה ובשיא ההתרגשות – זה בדיוק מה שצריך גם ברגע של כעס.",
+    howLabel: "איך משחקים",
+    how: [
+      "מפעילים מוזיקה קצבית.",
+      "עוצרים אותה ברגעים לא צפויים.",
+      "כולם קופאים, ומי שזז מחכה סיבוב אחד בצד.",
+      "מאריכים בהדרגה את זמן הקפיאה."
+    ],
+    tip: "שתפו גם את האחים הקטנים, ותנו לו להיות זה שמפעיל את המוזיקה.",
+    related: ["stopgame", "traffic"]
+  },
+  jenga: {
+    group: "games",
+    icon: "🏗️",
+    title: "ג׳נגה על זמן",
+    what: "ג׳נגה רגילה, אבל לכל תור יש 10 שניות. כל אחד בתורו מוציא לבנה ומניח אותה למעלה.",
+    why: "צריך לחכות לתור, לפעול בזהירות תחת לחץ קטן ולהתמודד עם הרגע שבו המגדל נופל. זה תרגול של סבלנות ושל הפסד בכבוד.",
+    howLabel: "איך משחקים",
+    how: [
+      "בונים את המגדל יחד.",
+      "מפעילים טיימר של 10 שניות לכל תור.",
+      "מי שהפיל אומר \"אוף, בפעם הבאה\", ובונים מחדש."
+    ],
+    tip: "הפילו גם אתם את המגדל מדי פעם, והדגימו הפסד רגוע.",
+    related: ["stopgame", "chess"]
+  },
+  headshoulders: {
+    group: "games",
+    icon: "🙃",
+    title: "ראש-כתפיים הפוך",
+    what: "כשאומרים \"ראש\" נוגעים בכתפיים, וכשאומרים \"כתפיים\" נוגעים בראש. מאיצים בהדרגה.",
+    why: "הגוף רוצה לעשות את מה שהוא שומע. לעשות הפוך מאמן לעצור תגובה אוטומטית – כמו לעצור יד שרוצה להכות.",
+    howLabel: "איך משחקים",
+    how: [
+      "מתחילים לאט, עם שתי מילים בלבד: ראש וכתפיים.",
+      "מאיצים בהדרגה.",
+      "מוסיפים זוג חדש: ברכיים ובהונות.",
+      "מתחלפים – הוא נותן את ההוראות."
+    ],
+    tip: "התחילו לאט מספיק כדי שיצליח. הצלחה בהתחלה נותנת חשק להמשיך.",
+    related: ["stopgame", "colorword"]
+  },
+  traffic: {
+    group: "games",
+    icon: "🚦",
+    title: "רמזור",
+    what: "ירוק – הולכים, צהוב – לאט מאוד, אדום – עוצרים במקום. ההורה מחליף צבעים מהר, ולפעמים מנסה לבלבל.",
+    why: "המשחק מאמן להאט ולעצור את הגוף לפי סימן, והצבעים מזכירים את מדחום הרגשות.",
+    howLabel: "איך משחקים",
+    how: [
+      "משחקים במסדרון או בחצר.",
+      "קוראים צבעים, או מרימים דפים צבעוניים.",
+      "מחליפים מהר יותר ככל שהוא מצליח.",
+      "מי שזז באדום חוזר כמה צעדים אחורה."
+    ],
+    tip: "אחרי המשחק אפשר לקשר: \"גם בכעס יש צהוב – זה הרגע להאט.\"",
+    related: ["thermo", "freeze"]
+  },
+  simon: {
+    group: "games",
+    icon: "🗣️",
+    title: "שמעון אומר",
+    what: "מבצעים הוראה רק אם היא מתחילה ב\"שמעון אומר\". בסבב השני הוא מוביל – ומתרגל להוביל בהגינות.",
+    why: "צריך להקשיב עד הסוף לפני שפועלים, בדיוק ההפך מתגובה מהירה בלי מחשבה. ההובלה נותנת לו תפקיד חיובי.",
+    howLabel: "איך משחקים",
+    how: [
+      "נותנים הוראות: \"שמעון אומר: קפוץ!\" – קופצים. \"קפוץ!\" – לא זזים.",
+      "מגבירים את הקצב.",
+      "בסבב השני הוא שמעון.",
+      "בסוף שואלים: מה היה קשה? מה עזר לך לעצור?"
+    ],
+    tip: "כשהוא מוביל, שבחו הובלה הוגנת: \"נתת לכולם הזדמנות – ככה נראה מנהיג טוב.\"",
+    related: ["stopgame"]
+  },
+  drum: {
+    group: "games",
+    icon: "🥁",
+    title: "תיפוף ועצירה",
+    what: "מתופפים על השולחן לפי הקצב של ההורה, ועוצרים בדיוק ברגע שההורה עוצר.",
+    why: "הוא צריך להקשיב, לעקוב ולעצור ברגע. זה אימון קצר לשליטה בתנועה, שגם פורק אנרגיה.",
+    howLabel: "איך משחקים",
+    how: [
+      "מתופפים קצב פשוט, והוא מחקה.",
+      "עוצרים פתאום – והוא עוצר מיד.",
+      "משנים קצב: מהר, לאט, חזק, חלש.",
+      "מתחלפים בתפקידים."
+    ],
+    tip: "אפשר לתופף גם על הברכיים – בהמתנה לאוטובוס או לפני ארוחה.",
+    related: ["stopgame"]
+  },
+  chess: {
+    group: "games",
+    icon: "♟️",
+    title: "שחמט או דמקה",
+    what: "משחק אחד בלי למהר. לפני כל מהלך אומרים בשקט: \"עצור, חושב, בוחר\". מסיימים בלחיצת יד.",
+    why: "משחקי חשיבה מלמדים לעצור ולחשוב לפני שזזים, ולהפסיד בלי להתפרץ. ההפסד קורה בתוך משחק – מקום בטוח לתרגל אותו.",
+    howLabel: "איך משחקים",
+    how: [
+      "בוחרים משחק שהוא מכיר, או לומדים יחד את החוקים.",
+      "לפני כל מהלך אומרים: \"עצור, חושב, בוחר\".",
+      "בסוף לוחצים ידיים, לא משנה מי ניצח.",
+      "משבחים כל הפסד רגוע."
+    ],
+    tip: "הדגימו הפסד יפה בקול: \"אוף, הפסדתי. היה משחק טוב – בפעם הבאה.\"",
+    related: ["stop", "jenga"]
+  },
+  delaygame: {
+    group: "games",
+    icon: "🍬",
+    title: "אתגר דחיית סיפוק",
+    what: "מציעים בחירה: פרס קטן עכשיו, או כפול אם מחכים 10 דקות. מאריכים את זמן ההמתנה בהדרגה.",
+    why: "הוא מתאמן להחזיק דחף ולבחור ב\"אחר כך\" – אותה יכולת שעוזרת לו לעצור כשהוא כועס.",
+    howLabel: "איך משחקים",
+    how: [
+      "בוחרים פרס קטן ואהוב: ממתק, מדבקה או 5 דקות משחק.",
+      "מציעים: \"אחד עכשיו, או שניים אם תחכה 10 דקות.\"",
+      "מפעילים טיימר שהוא רואה, ונותנים לו משהו לעשות בינתיים.",
+      "עומדים בהבטחה מיד כשהטיימר מצלצל."
+    ],
+    tip: "אם הוא בחר \"עכשיו\" – זה בסדר. בלי ביקורת; מנסים שוב מחר.",
+    related: ["delay"]
+  },
+  roleplay: {
+    group: "games",
+    icon: "🎭",
+    title: "משחק תפקידים: משפט העצירה",
+    what: "מדמים מצב מעצבן – אח לוקח משהו, מפסידים במשחק – ומתרגלים \"עצור – נושם – חושב – בוחר\". מתחלפים בתפקידים.",
+    why: "אחרי שמתרגלים רגע קשה כמה פעמים בזמן רגוע, קל יותר לבחור נכון גם ברגע אמת – כמו חזרה לפני הצגה.",
+    howLabel: "איך משחקים",
+    how: [
+      "בוחרים מצב אמיתי שקורה בבית.",
+      "אתם משחקים את האח, והוא מתרגל לעצור, לנשום, לחשוב ולבחור.",
+      "מתחלפים: הוא משחק את האח, ואתם מראים בחירה טובה – או בחירה גרועה ומצחיקה שהוא מתקן.",
+      "בסוף שואלים יחד: איזו בחירה עבדה הכי טוב?"
+    ],
+    tip: "שמרו על אווירה קלילה ומצחיקה, ואל תתרגלו מיד אחרי אירוע אמיתי.",
+    related: ["stop"]
+  },
+  thermo: {
+    group: "concepts",
+    icon: "🌡️",
+    title: "מדחום הרגשות",
+    what: "סולם של ארבעה צבעים שעוזר לילד לתאר כמה הרגש חזק: ירוק – רגוע, צהוב – מתעצבן, כתום – כועס, אדום – עומד להתפוצץ.",
+    why: "קשה לעצור כעס כשהוא כבר באדום. כשהילד לומד לזהות \"צהוב\", אפשר להשתמש בכלי בזמן, לפני הפיצוץ. הצבעים נותנים לכם שפה משותפת, בלי מילים מסובכות.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מסבירים את ארבעת הצבעים בזמן רגוע, עם דוגמאות מהחיים שלו.",
+      "שואלים כמה פעמים ביום: \"איפה אתה במדחום?\"",
+      "מדגימים בעצמכם: אומרים בקול כשאתם בצהוב, ומה אתם עושים כדי להירגע.",
+      "בלשונית \"רגיעה\" הוא בוחר צבע ומקבל כלים שמתאימים לו."
+    ],
+    tip: "אין צבע \"רע\". גם אדום הוא מידע – שבחו אותו על כך שזיהה.",
+    related: ["balloon", "corner"]
+  },
+  corner: {
+    group: "concepts",
+    icon: "🛋️",
+    title: "פינת רגיעה",
+    what: "פינה נעימה בבית שהילד בוחר ומעצב, ואליה הוא הולך כדי להירגע. זו לא פינת עונש: לא שולחים אליה – מזמינים אליה.",
+    why: "מקום שקט ומוכר עוזר לגוף להירגע מהר יותר. כשזו בחירה שלו ולא עונש, הוא לומד שלהירגע זה כוח, לא השפלה.",
+    howLabel: "איך עושים",
+    how: [
+      "בוחרים מקום יחד: פינה בחדר, מתחת לשולחן, ליד חלון.",
+      "ממלאים אותה יחד: כרית, שמיכה, כדור לחץ, דפים וצבעים, ספר אהוב.",
+      "מתרגלים ללכת אליה כשהוא בירוק, כדי שתהיה מוכרת.",
+      "ברגע קשה מציעים: \"רוצה ללכת לפינה שלך?\" – ולא \"לך לפינה!\".",
+      "הוא חוזר כשהוא מוכן, ואז משבחים אותו."
+    ],
+    tip: "אחד היעדים בטבלת הכוכבים יכול להיות \"משתמש בפינת הרגיעה\" – כוכב על כל פעם שהלך אליה בעצמו.",
+    related: ["thermo", "robot"]
+  },
+  stopgame: {
+    group: "concepts",
+    icon: "🛑",
+    title: "משחק עצירה",
+    what: "משחק קצר ומצחיק שבו צריך לעצור, לחכות או לעשות הפוך ממה שהגוף רוצה – כמו תופסת קפואה או רמזור. בכל יום האפליקציה מציעה משחק אחר.",
+    why: "עצירה היא מיומנות שמתחזקת באימון, כמו שריר. כשמתרגלים אותה בכיף ובלי לחץ, קל יותר להשתמש בה גם בכעס.",
+    howLabel: "איך עושים",
+    how: [
+      "מקדישים 10–15 דקות, עדיף באותה שעה בכל יום.",
+      "משחקים את \"המשחק של היום\" מכרטיס \"סדר היום\", או כל משחק אחר מהרשימה.",
+      "מתחילים לאט וקל, ומקשים בהדרגה.",
+      "משבחים כל עצירה מוצלחת: \"וואו, קפאת בדיוק בזמן!\"",
+      "כשמפסידים – מתרגלים גם הפסד בכבוד."
+    ],
+    tip: "תנו לו להוביל סבב. ילדים שאוהבים לשלוט נהנים להיות \"השופט\" – וזה מלמד להוביל בהגינות.",
+    related: ["freeze", "roleplay"]
+  },
+  one: {
+    group: "concepts",
+    icon: "💙",
+    title: "זמן אחד-על-אחד",
+    what: "15 דקות ביום שבהן הורה נמצא רק איתו – בלי אחים ובלי טלפון – והוא בוחר מה עושים.",
+    why: "בבית עם שבעה ילדים קשה לקבל תשומת לב חיובית. זמן קבוע שהוא רק שלו נותן לו אותה בדרך טובה, ומפחית את הצורך להשיג אותה בהתנהגות קשה.",
+    howLabel: "איך עושים",
+    how: [
+      "קובעים שעה קבועה ומכריזים: \"זה הזמן שלנו\".",
+      "מכבים טלפונים ומרחיקים את האחים – הורה שני או בייביסיטר יכולים לעזור.",
+      "הוא בוחר את הפעילות, בתוך גבולות סבירים.",
+      "משתתפים, מתארים ומתלהבים – בלי לתקן, בלי שאלות מבחן ובלי ביקורת.",
+      "מסיימים בזמן ובחיוך: \"נהניתי איתך. מחר נמשיך.\""
+    ],
+    tip: "לא מבטלים את הזמן הזה כעונש. הוא קורה גם אחרי יום קשה – ודווקא אז.",
+    related: ["praise"]
+  },
+  consequence: {
+    group: "concepts",
+    icon: "⚖️",
+    title: "תוצאה הגיונית",
+    what: "תגובה של ההורה למעשה לא מקובל, שקשורה ישירות למעשה, קצרה ובגודל מתאים. למשל: שבר – עוזר לתקן; היכה במשחק – המשחק נגמר להיום.",
+    why: "כשהתוצאה קשורה למעשה, הילד מבין את הקשר בין מה שעשה למה שקרה, ולא מרגיש שמענישים אותו סתם. תוצאה קצרה מאפשרת גם להתחיל מחדש מהר.",
+    howLabel: "איך עושים",
+    how: [
+      "מחכים שכולם יירגעו – לא קובעים תוצאה בשיא הכעס.",
+      "בודקים: זה קשור למעשה? זה קצר? זה הוגן?",
+      "אומרים בקול רגוע ובקצרה: \"זרקת את המשחק, אז המשחק נגמר להיום.\"",
+      "עומדים במה שאמרתם, בלי הרצאה ובלי להוסיף.",
+      "למחרת מתחילים דף חדש."
+    ],
+    tip: "אם קשה לחשוב על תוצאה ברגע, אפשר לומר \"אחשוב על זה ואגיד לך אחר כך\" – ולחזור כשאתם רגועים.",
+    related: ["repair"]
+  },
+  repair: {
+    group: "concepts",
+    icon: "🔧",
+    title: "תיקון",
+    what: "אחרי שפגע במישהו או בחפץ, הילד עושה משהו שמתקן – לא רק אומר \"סליחה\": עוזר לבנות מחדש, מביא קרח, מצייר ציור, מחזיר את מה שלקח.",
+    why: "תיקון מלמד אחריות בלי בושה: \"טעיתי, ואני יכול לתקן\". הוא גם עוזר לאח שנפגע להרגיש שרואים אותו, ומחזיר את השקט בין האחים.",
+    howLabel: "איך עושים",
+    how: [
+      "מחכים שיירגע, ומדברים בפרטיות – לא מול האחים.",
+      "שואלים: \"מה יכול לעזור לו עכשיו להרגיש טוב יותר?\"",
+      "נותנים לו לבחור דרך לתקן – אפשר להציע 2–3 רעיונות.",
+      "מלווים אותו כשהוא מתקן, ומשבחים את המעשה."
+    ],
+    tip: "אל תכריחו \"סליחה\" מיד. סליחה בכפייה מלמדת רק להגיד מילים; מעשה קטן של תיקון שווה יותר.",
+    related: ["consequence"]
+  },
+  praise: {
+    group: "concepts",
+    icon: "👀",
+    title: "שבח ספציפי",
+    what: "שבח שמתאר בדיוק מה הילד עשה, מיד כשזה קורה. למשל: \"ראיתי שוויתרת לאחיך על התור – זה היה בוגר\", במקום \"כל הכבוד\".",
+    why: "ילדים חוזרים על מה שמקבל תשומת לב. שבח ספציפי אומר לו בדיוק מה כדאי לעשות שוב, ומראה לו שרואים גם את הרגעים הטובים, לא רק את הקשים.",
+    howLabel: "איך עושים",
+    how: [
+      "\"תופסים\" אותו מתנהג יפה – גם בדברים קטנים ורגילים.",
+      "מתארים את המעשה: \"ראיתי ש…\"",
+      "מוסיפים מילה חמה או את ההשפעה: \"…וזה עזר לאחותך.\"",
+      "בלי \"אבל\" בסוף, ובלי להזכיר את מה שהיה פעם.",
+      "מכוונים ל-5 שבחים ביום, ורושמים ב\"תפסתי אותו מתנהג יפה\"."
+    ],
+    tip: "מול האחים, שבח בלחישה או אגודל למעלה עובד מצוין – בלי להביך אותו.",
+    related: ["bed", "one"]
+  },
+  delay: {
+    group: "concepts",
+    icon: "⏳",
+    title: "דחיית סיפוק",
+    what: "היכולת לחכות למשהו שרוצים – לוותר על \"עכשיו\" בשביל משהו טוב יותר אחר כך.",
+    why: "ילד שמתאמן בהמתנה לומד להחזיק דחף לרגע – אותה יכולת שהוא צריך כשאח לוקח לו משהו או כשהוא מפסיד. כמו כל מיומנות, היא משתפרת באימון.",
+    howLabel: "איך מלמדים",
+    how: [
+      "מתחילים בהמתנות קצרות וקלות: \"עוד 2 דקות ונתחיל.\"",
+      "משתמשים בטיימר שהוא רואה – קל יותר לחכות כשרואים את הסוף.",
+      "מציעים בחירה: פרס קטן עכשיו, או גדול יותר אחרי המתנה (ראו \"אתגר דחיית סיפוק\").",
+      "מאריכים את ההמתנה בהדרגה, ומשבחים כל המתנה מוצלחת.",
+      "עומדים בהבטחה – תמיד. אחרת אין סיבה לחכות."
+    ],
+    tip: "עזרו לו למצוא מה לעשות בזמן ההמתנה – לשיר, לספור, לשחק במשהו אחר. כשהידיים עסוקות, קל יותר לחכות.",
+    related: ["delaygame"]
+  }
+};
+const INFO_GROUPS = [
+  { id: 'calm', icon: '🧘', title: 'כלי רגיעה', ids: ['balloon', 'candle', 'box', 'robot', 'wall', 'stop'] },
+  { id: 'routine', icon: '📅', title: 'סדר היום', ids: ['morning', 'move', 'bed'] },
+  { id: 'games', icon: '🛑', title: 'משחקי עצירה', ids: ['colorword', 'freeze', 'jenga', 'headshoulders', 'traffic', 'simon', 'drum', 'chess', 'delaygame', 'roleplay'] },
+  { id: 'concepts', icon: '💡', title: 'מושגים', ids: ['thermo', 'corner', 'stopgame', 'one', 'consequence', 'repair', 'praise', 'delay'] }
 ];
+const CHECK_INFO = { morning: 'morning', move: 'move', stop: 'stopgame', one: 'one', bed: 'bed' };
+const CHECK_ARIA = { morning: 'מה זה נשימת הבוקר ושאלת המדחום?', move: 'למה תנועה בחוץ?', stop: 'מה זה משחק עצירה?', one: 'מה זה זמן אחד-על-אחד?', bed: 'הסבר: "מה הצלחת היום?" וסיפור' };
+/* the order drives gameOfDay(); names and summaries come from INFO */
+const GAMES = ['colorword', 'freeze', 'jenga', 'headshoulders', 'traffic', 'simon', 'drum', 'chess', 'delaygame', 'roleplay'].map(id => ({ id }));
 const gameOfDay = (d = new Date()) => GAMES[Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) % GAMES.length];
 const CHECKS = [
   { id: 'morning', when: 'בוקר', icon: '🌅', title: '3 דקות נשימת בלון', sub: 'ושאלה: "איפה אתה במדחום?"' },
@@ -896,14 +1419,17 @@ function renderToday() {
             ${c.sub ? `<span class="sub">${esc(c.sub)}</span>` : ''}
           </span>
         </button>
-        ${c.id === 'stop' ? `<div class="check-extra"><div class="game"><b>המשחק של היום: ${esc(g.n)}</b><br>${esc(g.d)}</div></div>` : ''}
+        ${infoBtn(CHECK_INFO[c.id], 'today', CHECK_ARIA[c.id])}
+        ${c.id === 'stop' ? `<div class="check-extra"><div class="game"><b>המשחק של היום: ${esc(INFO[g.id].title)}</b><br>${esc(INFO[g.id].what)}
+          <br><button type="button" class="info-link" data-act="info" data-info="${g.id}" data-ctx="today" aria-haspopup="dialog" aria-controls="infoSheet" aria-label="איך משחקים ${esc(INFO[g.id].title)}?">${ICON.info}איך משחקים?</button></div></div>` : ''}
         ${c.id === 'morning' && !done ? `<div class="check-extra"><button type="button" class="btn small" data-act="morningBreath">${ICON.play}התחילו 3 דקות נשימה</button></div>` : ''}
       </div>`;
     }).join('')}
   </section>
 
-  <section class="card">
+  <section class="card has-info">
     <h2>👀 תפסתי ${esc(himName())} מתנהג יפה</h2>
+    ${infoBtn('praise', 'today', 'מה זה שבח ספציפי?')}
     <p class="sub">שבח ספציפי וחם, מיד כשרואים – למשל: "ראיתי שוויתרת לאחיך על התור". היעד: 5 ביום.</p>
     <label class="sr-only" for="praiseNote">מה ראיתם?</label>
     <input class="input mt3" id="praiseNote" maxlength="120" value="${esc(praiseDraft)}" placeholder="מה ראיתם? (לא חובה)" enterkeyhint="done">
@@ -937,15 +1463,19 @@ function renderToday() {
 
 /* ---------- Tab 2: Calm ---------- */
 let selMood = null;
-function toolBtn(t, wide) {
+/* tile + ⓘ are siblings in a cell (a button can't contain a button); a tap on the tile still starts the exercise */
+function toolBtn(t, wide, info = true) {
   const x = TOOLS[t];
-  return `<button type="button" class="tool ${wide ? 'wide' : ''}" data-act="ex" data-ex="${t}"><span class="ti" aria-hidden="true">${x.icon}</span><span>${esc(x.name)}<br><small>${esc(x.sub)}</small></span></button>`;
+  return `<div class="tool-cell ${wide ? 'wide' : ''} ${info ? 'has-info' : ''}">
+    <button type="button" class="tool ${wide ? 'wide' : ''}" data-act="ex" data-ex="${t}"><span class="ti" aria-hidden="true">${x.icon}</span><span>${esc(x.name)}<br><small>${esc(x.sub)}</small></span></button>
+    ${info ? infoBtn(t, 'calm', `מה זה ${x.name}?`) : ''}
+  </div>`;
 }
 /* 2-column grid without an orphan tile: an odd tile out becomes full width */
-function toolGrid(ids, wideIds = []) {
+function toolGrid(ids, wideIds = [], info = true) {
   const narrow = ids.filter(t => !wideIds.includes(t));
   const extra = narrow.length % 2 ? narrow[narrow.length - 1] : null;
-  return ids.map(t => toolBtn(t, wideIds.includes(t) || t === extra)).join('');
+  return ids.map(t => toolBtn(t, wideIds.includes(t) || t === extra, info)).join('');
 }
 function renderCalm() {
   const todays = S.moods.filter(m => keyOf(new Date(m.ts)) === todayKey());
@@ -972,7 +1502,7 @@ function renderCalm() {
   <section class="card" id="moodTools">
     <div class="mood-msg" style="--mood-c:${moodColor(selMood)};background:color-mix(in srgb, ${moodColor(selMood)} 18%, var(--surface))">${esc(m.msg)}</div>
     <h2>מה יעזור לך עכשיו:</h2>
-    <div class="tools">${toolGrid(m.tools, selMood === 'red' ? ['stop'] : [])}</div>
+    <div class="tools">${toolGrid(m.tools, selMood === 'red' ? ['stop'] : [], selMood !== 'red')}</div>
   </section>
   <section class="card"><details><summary>🧰 כל הכלים</summary><div class="tools mt3">${toolGrid(all, ['stop'])}</div></details></section>` : `
   <section class="card">
@@ -1058,11 +1588,11 @@ function protocolHTML(withTitle) {
       <li><b>לתת שם לרגש:</b> "היית ממש כועס כשהוא לקח לך את הלגו."</li>
       <li><b>"מותר לכעוס, אסור להכות."</b></li>
       <li><b>לחשוב יחד מה במקום:</b> "מה תוכל לעשות בפעם הבאה?" – משפט העצירה או כלי מהרשימה.</li>
-      <li><b>תיקון מול הנפגע:</b> לא רק "סליחה" – לעזור לבנות מחדש, להביא קרח, לצייר ציור.</li>
+      <li><b>תיקון מול הנפגע:</b>${infoInline('repair', 'מה זה תיקון?')} לא רק "סליחה" – לעזור לבנות מחדש, להביא קרח, לצייר ציור.</li>
     </ul>
     <h3><span class="num">3</span> אחר כך</h3>
     <ul class="bullets">
-      <li><b>תוצאה הגיונית, קצרה וצמודה למעשה</b> – שבר? עוזר לתקן. היכה במשחק? המשחק נגמר להיום.</li>
+      <li><b>תוצאה הגיונית, קצרה וצמודה למעשה</b>${infoInline('consequence', 'מה זה תוצאה הגיונית?')} – שבר? עוזר לתקן. היכה במשחק? המשחק נגמר להיום.</li>
       <li><b>מחר מתחילים דף חדש.</b> לא מזכירים שוב ושוב.</li>
     </ul>
     <div class="callout">💙 וגם לכם: נשימה ארוכה. אתם עושים עבודה קשה וחשובה.</div>`;
@@ -1323,7 +1853,7 @@ function renderGuide() {
   $('#tab-guide').innerHTML = `
   <section class="card">
     <h2>📖 מדריך להורה</h2>
-    <p class="sub">${raw < 1 ? `התוכנית מתחילה ב-${esc(fmtFullDate(S.settings.startDate))}. אפשר כבר לקרוא ולהתכונן.` : 'השלב הנוכחי פתוח ומודגש. השלבים חופפים מעט – זה מכוון.'}</p>
+    <p class="sub">${raw < 1 ? `התוכנית מתחילה ב-${esc(fmtFullDate(S.settings.startDate))}. אפשר כבר לקרוא ולהתכונן.` : 'השלב הנוכחי פתוח ומודגש. השלבים חופפים מעט – זה מכוון.'} בסוף המדריך: מילון של כל הכלים, המשחקים והמושגים.</p>
   </section>
   ${PHASES.map(p => {
     const on = cur.has(p.id), main = p.id === latest;
@@ -1335,6 +1865,19 @@ function renderGuide() {
       </details>
     </section>`;
   }).join('')}
+
+  ${INFO_GROUPS.map(g => `
+  <section class="card phase-card dict" id="dict-${g.id}">
+    <details>
+      <summary><span><span class="wk">מילון כלים ומושגים</span>${g.icon} ${esc(g.title)} <span class="dict-count">${g.ids.length}</span></span></summary>
+      <div class="body">${g.ids.map(id => `
+        <details class="dict-item" id="info-${id}">
+          <summary><span class="di-ic" aria-hidden="true">${esc(INFO[id].icon)}</span><span class="di-t">${esc(INFO[id].title)}</span></summary>
+          <div class="dict-body">${infoContent(id, 'guide')}${infoActionBtn(id, 'guide', 'btn small')}</div>
+        </details>`).join('')}
+      </div>
+    </details>
+  </section>`).join('')}
 
   <section class="card phase-card">
     <details>
@@ -1418,7 +1961,7 @@ function exTotalRemain() {
 function startEx(id, opts = {}) {
   const def = EXS[id]; if (!def) return;
   stopEx(true);
-  EX = { id, def, step: 0, cycle: 0, cycles: opts.cycles || def.cycles, remain: def.steps[0].s, stepEnd: Date.now() + def.steps[0].s * 1000, paused: false, onDone: opts.onDone, returnTo: opts.returnTo || 'calm', timer: null };
+  EX = { id, def, step: 0, cycle: 0, cycles: opts.cycles || def.cycles, remain: def.steps[0].s, stepEnd: Date.now() + def.steps[0].s * 1000, paused: false, onDone: opts.onDone, returnTo: opts.returnTo || 'calm', morning: !!opts.morning, timer: null };
   $('#exInner').innerHTML = `
     <div class="sheet-head" style="width:100%"><span></span><button type="button" class="icon-btn" data-act="exClose" aria-label="סגירה">${ICON.close}</button></div>
     <h2 id="exTitle" tabindex="-1">${esc(def.title)}</h2>
@@ -1502,19 +2045,22 @@ function pauseEx() {
 }
 function finishEx() {
   clearTimeout(EX.timer);
-  const cb = EX.onDone, back = EX.returnTo;
+  const cb = EX.onDone, back = EX.returnTo, morning = EX.morning;
   EX = null;
+  const BACK = { calm: 'חזרה למדחום', today: 'חזרה להיום', guide: 'חזרה למדריך', incident: 'חזרה לרישום אירוע', progress: 'חזרה להתקדמות' };
   vibrate(HAPTIC.done);
   $('#exInner').innerHTML = `
     <div class="sheet-head" style="width:100%"><span></span><button type="button" class="icon-btn" data-act="exClose" aria-label="סגירה">${ICON.close}</button></div>
     <div class="done">
       <div class="done-face" aria-hidden="true">🌟</div>
       <h2 id="exTitle" tabindex="-1">כל הכבוד!</h2>
-      ${back === 'today'
+      ${morning
         ? `<p class="ex-text">סיימתם 3 דקות נשימה. המשימה סומנה בסדר היום.</p>`
-        : `<p class="ex-text">הגוף שלך יודע להירגע. איך אתה מרגיש עכשיו?</p>
-           <div class="done-moods" role="group" aria-label="איך אתה מרגיש עכשיו?">${MOOD_ORDER.map(c => `<button type="button" class="mood-dot" data-act="doneMood" data-c="${c}" style="background:var(--${c})" aria-label="${MOODS[c].name} – ${MOODS[c].label}">${MOODS[c].face}</button>`).join('')}</div>`}
-      <button type="button" class="btn big block" data-act="exClose" data-goto="${back === 'today' ? 'today' : 'calm'}">${back === 'today' ? 'חזרה להיום' : 'חזרה למדחום'}</button>
+        : back === 'calm'
+        ? `<p class="ex-text">הגוף שלך יודע להירגע. איך אתה מרגיש עכשיו?</p>
+           <div class="done-moods" role="group" aria-label="איך אתה מרגיש עכשיו?">${MOOD_ORDER.map(c => `<button type="button" class="mood-dot" data-act="doneMood" data-c="${c}" style="background:var(--${c})" aria-label="${MOODS[c].name} – ${MOODS[c].label}">${MOODS[c].face}</button>`).join('')}</div>`
+        : `<p class="ex-text">עכשיו אתם מכירים את התרגיל מבפנים – וקל יותר ללמד אותו.</p>`}
+      <button type="button" class="btn big block" data-act="exClose" data-goto="${esc(BACK[back] ? back : 'calm')}">${BACK[back] || BACK.calm}</button>
     </div>`;
   $('#exTitle').focus();
   if (cb) cb();
@@ -1527,7 +2073,7 @@ function stopEx(silent) {
 /* =========================================================
    Overlays: focus, inert background, scroll lock, back button
    ========================================================= */
-const OVERLAY_ORDER = ['#dlg', '#celOverlay', '#exOverlay', '#setOverlay'];   // top-most first
+const OVERLAY_ORDER = ['#dlg', '#infoSheet', '#celOverlay', '#exOverlay', '#setOverlay'];   // top-most first
 const openers = new Map();
 let openSet = new Set();
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([type=hidden]):not([disabled]), select, textarea, summary, [tabindex]:not([tabindex="-1"])';
@@ -1574,11 +2120,12 @@ function restartAnim(el, cls) {
   const tok = guardTok[el.id] = (guardTok[el.id] || 0) + 1;
   setTimeout(() => { if (guardTok[el.id] === tok) el.classList.remove(cls); }, 450);
 }
-['#dlg', '#tapShield'].forEach(s => $(s).addEventListener('animationend', e => {
-  if (e.animationName === 'tapGuard') e.currentTarget.classList.remove(e.currentTarget.id === 'dlg' ? 'arm' : 'on');
+['#dlg', '#infoSheet', '#tapShield'].forEach(s => $(s).addEventListener('animationend', e => {
+  if (e.animationName === 'tapGuard') e.currentTarget.classList.remove(e.currentTarget.id === 'tapShield' ? 'on' : 'arm');
 }));
 /* the sheet accepts activation only once its 400 ms arming cover is gone */
-const dlgArmed = () => { const d = $('#dlg'); return !d.hidden && (!d.classList.contains('arm') || getComputedStyle(d, '::before').visibility === 'hidden'); };
+const sheetArmed = d => !d.hidden && (!d.classList.contains('arm') || getComputedStyle(d, '::before').visibility === 'hidden');
+const dlgArmed = () => sheetArmed($('#dlg'));
 /* after a sheet is closed by a tap, swallow the second tap of a double tap so it never reaches the screen behind */
 const shieldTaps = () => restartAnim($('#tapShield'), 'on');
 function ask({ title, body = '', ok = 'אישור', cancel = 'ביטול', danger = false, swap = false }) {
@@ -1604,6 +2151,7 @@ function closeCelebration() { $('#celOverlay').hidden = true; $$('.confetti').fo
    Returns true when something was closed/handled, false to let the app go to the background. */
 function androidBack() {
   if (!$('#dlg').hidden) { if (dlgDone) dlgDone(false); else $('#dlg').hidden = true; return true; }
+  if (!$('#infoSheet').hidden) { closeInfo(); return true; }
   if (!$('#exOverlay').hidden) { stopEx(); return true; }
   if (!$('#celOverlay').hidden) { closeCelebration(); return true; }
   if (!$('#setOverlay').hidden) { if (S.settings.onboarded) { closeSettings(); return true; } return false; }
@@ -1611,6 +2159,66 @@ function androidBack() {
   return false;
 }
 window.__androidBack = () => { try { return androidBack() === true; } catch (e) { return false; } };
+
+/* =========================================================
+   Explanations: ⓘ buttons, the explanation sheet, the guide dictionary
+   ========================================================= */
+const infoAttrs = (id, ctx) => `data-act="info" data-info="${esc(id)}" data-ctx="${esc(ctx)}" aria-haspopup="dialog" aria-controls="infoSheet"`;
+function infoBtn(id, ctx, label) { return `<button type="button" class="info-btn" ${infoAttrs(id, ctx)} aria-label="${esc(label)}">${ICON.info}</button>`; }
+function infoInline(id, label) { return `<button type="button" class="info-inline" ${infoAttrs(id, 'today')} aria-label="${esc(label)}">${ICON.info}</button>`; }
+/* the four fixed sections (+ child line and "ראו גם" for parents); ctx 'calm' = the child's simple version */
+function infoContent(id, ctx) {
+  const e = INFO[id];
+  const secs = `
+    <div class="info-sec"><h3>מה זה</h3><p>${esc(e.what)}</p></div>
+    <div class="info-sec"><h3>למה זה עוזר</h3><p>${esc(e.why)}</p></div>
+    <div class="info-sec"><h3>${esc(e.howLabel)}</h3><ol class="info-steps">${e.how.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+    <div class="info-tip"><span aria-hidden="true">💡</span><p><b>טיפ:</b> ${esc(e.tip)}</p></div>`;
+  if (ctx === 'calm') return `<p class="info-kid">${esc(e.kid || e.what)}</p><details class="info-parents"><summary>להורים: מה זה ואיך מלמדים</summary>${secs}</details>`;
+  return secs +
+    (e.kid ? `<div class="info-say"><b>איך להסביר לו</b><p>${esc(e.kid)}</p></div>` : '') +
+    (e.related && e.related.length ? `<div class="info-related"><b>ראו גם</b>${e.related.filter(r => INFO[r]).map(r => `<button type="button" class="chip" data-act="info" data-info="${esc(r)}" data-ctx="${esc(ctx)}">${esc(INFO[r].icon)} ${esc(INFO[r].title)}</button>`).join('')}</div>` : '');
+}
+/* "בוא ננסה" (child, Calm) / "נסו עכשיו" (parents) / the morning breathing while it is not done yet */
+function infoActionBtn(id, ctx, cls) {
+  const e = INFO[id];
+  let label = '';
+  if (e.ex) label = ctx === 'calm' ? 'בוא ננסה' : 'נסו עכשיו';
+  else if (e.act === 'morningBreath' && !day().checks.morning) label = 'התחילו 3 דקות נשימה';
+  return label ? `<button type="button" class="${cls}" data-act="infoAction" data-info="${esc(id)}" data-ctx="${esc(ctx)}">${ICON.play}${label}</button>` : '';
+}
+function openInfo(id, ctx) {
+  const e = INFO[id]; if (!e) return;
+  const sh = $('#infoSheet'), reopen = !sh.hidden;
+  $('#infoIcon').textContent = e.icon;
+  $('#infoTitle').textContent = e.title;
+  $('#infoBody').innerHTML = infoContent(id, ctx) + (ctx === 'calm' ? '' : `<div class="info-more"><button type="button" class="info-link" data-act="infoToGuide" data-info="${esc(id)}">${ICON.info}כל הכלים והמושגים במדריך</button></div>`);
+  $('#infoFoot').innerHTML = infoActionBtn(id, ctx, 'btn block');
+  sh.dataset.ctx = ctx;
+  fixRanges(sh);
+  $('#toast').classList.remove('show');
+  sh.hidden = false;
+  $('#infoBody').scrollTop = 0;
+  restartAnim(sh, 'arm');                     // same 400 ms tap guard as the confirm sheet
+  if (reopen) $('#infoTitle').focus({ preventScroll: true });
+}
+function closeInfo() { $('#infoSheet').hidden = true; }
+/* a tap on ✕ / the scrim: ignored while arming; closes with the tap shield */
+function infoTapClose() { const sh = $('#infoSheet'); if (!sheetArmed(sh)) return; shieldTaps(); closeInfo(); }
+$('#infoSheet').addEventListener('click', e => { if (e.target === e.currentTarget) infoTapClose(); });
+function openDictEntry(id) {
+  const e = INFO[id]; if (!e) return;
+  const grp = $('#dict-' + e.group), item = $('#info-' + id);
+  if (!grp || !item) return;
+  grp.querySelector(':scope > details').open = true;
+  item.open = true;
+  item.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  item.querySelector('summary').focus({ preventScroll: true });
+}
+let lastInfoId = null;
+function startMorning(returnTo = 'today') {
+  startEx('balloon', { cycles: 18, returnTo, morning: true, onDone: () => { day().checks.morning = true; save(); rerender(); } });
+}
 
 /* =========================================================
    Settings, import/export
@@ -1877,8 +2485,29 @@ const ACT = {
     const again = $(`#tab-today .check-hit[data-id="${id}"]`); if (again && document.activeElement === document.body) again.focus({ preventScroll: true });
     if (d.checks[id] && CHECKS.every(c => d.checks[c.id])) toast('כל סדר היום הושלם! 🌟');
   },
-  morningBreath() {
-    startEx('balloon', { cycles: 18, returnTo: 'today', onDone: () => { day().checks.morning = true; save(); renderToday(); } });
+  morningBreath() { startMorning('today'); },
+  info(el) {
+    const id = el.dataset.info;
+    if (!INFO[id]) return;
+    if (el.closest('#infoSheet') && !sheetArmed($('#infoSheet'))) return;
+    if (el.closest('.dict-body')) { openDictEntry(id); return; }           // "ראו גם" inside the guide
+    openInfo(id, el.dataset.ctx === 'calm' ? 'calm' : el.dataset.ctx || 'today');
+  },
+  infoClose: infoTapClose,
+  infoAction(el) {
+    const e = INFO[el.dataset.info]; if (!e) return;
+    const inSheet = !!el.closest('#infoSheet');
+    if (inSheet && !sheetArmed($('#infoSheet'))) return;
+    const back = el.dataset.ctx === 'calm' ? 'calm' : S.ui.tab;
+    lastInfoId = el.dataset.info;
+    if (inSheet) closeInfo();
+    if (e.ex) startEx(e.ex, { returnTo: back });
+    else if (e.act === 'morningBreath') startMorning(back === 'guide' ? 'guide' : 'today');
+  },
+  infoToGuide(el) {
+    if (!sheetArmed($('#infoSheet'))) return;
+    const id = el.dataset.info;
+    closeInfo(); showTab('guide', false); openDictEntry(id);
   },
   praise() {
     const input = $('#praiseNote');
@@ -1917,7 +2546,12 @@ const ACT = {
   },
   ex: el => startEx(el.dataset.ex),
   exPause: pauseEx,
-  exClose(el) { stopEx(); if (el.dataset.goto) showTab(el.dataset.goto); },
+  exClose(el) {
+    stopEx();
+    if (!el.dataset.goto) return;
+    showTab(el.dataset.goto);
+    if (el.dataset.goto === 'guide' && lastInfoId) openDictEntry(lastInfoId);   // back to the entry the parent was reading
+  },
   chip(el) {
     const f = el.dataset.field, v = el.dataset.val, multi = el.dataset.multi === '1';
     if (multi) { const a = draft[f]; const i = a.indexOf(v); i >= 0 ? a.splice(i, 1) : a.push(v); }

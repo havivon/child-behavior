@@ -2206,6 +2206,214 @@ test('tap guards: without CSS animations the JS fallback still arms the sheet an
   eq(await page.evaluate(() => S.ui.tab), 'progress', 'shield removed by the fallback');
 });
 
+/* ================================================================== *
+ * 21. In-app explanations (docs/explanations-spec.md): ⓘ buttons, sheet, guide dictionary
+ * ================================================================== */
+const sheetOpen = page => page.waitForSelector('#infoSheet:not([hidden])');
+const sheetClosed = page => page.waitForSelector('#infoSheet', { state: 'hidden' });
+async function closeSheet(page) { await page.click('#infoSheet [data-act=infoClose]'); await sheetClosed(page); }
+const INFO_TOOLS = ['balloon', 'candle', 'box', 'robot', 'wall', 'stop'];
+const TOOL_NAMES = { balloon: 'נשימת בלון', candle: 'נשימת נר', box: 'נשימת קובייה', robot: 'רובוט וספגטי', wall: 'לדחוף את הקיר', stop: 'משפט העצירה' };
+test('info: every Calm tile (both grids) has an ⓘ that opens the child version; the tile itself still starts the exercise', 'explanations §3.2 / §4.3', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  await page.click('#tab-calm .mood[data-c=green]');
+  for (const scope of ['#moodTools', '#tab-calm .card:not(#moodTools)']) {
+    if (scope !== '#moodTools') await page.evaluate(() => document.querySelectorAll('#tab-calm details').forEach(d => { d.open = true; }));
+    for (const id of INFO_TOOLS) {
+      const btn = page.locator(`${scope} .tool-cell:has([data-ex=${id}]) .info-btn`);
+      if (!(await btn.count())) { assert(scope === '#moodTools', `${id}: no ⓘ in ${scope}`); continue; }
+      eq(await btn.getAttribute('aria-label'), `מה זה ${TOOL_NAMES[id]}?`, `${id}: accessible name`);
+      const bx = await btn.boundingBox(); assert(bx.width >= 44 && bx.height >= 44, `${id}: ⓘ hit area ${bx.width}x${bx.height}`);
+      await btn.click();
+      await sheetOpen(page);
+      eq(await txt(page, '#infoTitle'), TOOL_NAMES[id], `${id}: right entry`);
+      assert(await page.locator('#infoBody .info-kid').isVisible(), `${id}: child line first`);
+      eq(await page.locator('#infoBody details.info-parents').evaluate(d => d.open), false, `${id}: parent part collapsed`);
+      eq(await txt(page, '#infoFoot'), 'בוא ננסה', `${id}: child CTA`);
+      assert(await page.locator('#exOverlay').isHidden(), `${id}: ⓘ did not start the exercise`);
+      await closeSheet(page);
+    }
+  }
+  eq(await page.locator('#moodTools .info-btn').count(), 4, 'green: 4 recommended tiles with ⓘ');
+  await page.click('#tab-calm .card:not(#moodTools) [data-ex=candle]');
+  assert(await visible(page, '#exOverlay') && (await txt(page, '#exTitle')).includes('נשימת נר'), 'tile tap starts the exercise');
+});
+test('info: in the red state the recommended tiles have no ⓘ, the full grid keeps them', 'explanations ruling 3', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  await page.click('#tab-calm .mood[data-c=red]');
+  eq(await page.locator('#moodTools [data-ex]').count(), 3, 'three recommended tools');
+  eq(await page.locator('#moodTools .info-btn').count(), 0, 'no ⓘ on the recommended tiles');
+  eq(await page.locator('#tab-calm .card:not(#moodTools) .info-btn').count(), 6, 'full grid: ⓘ on all six');
+});
+test('info: checklist rows, the game of the day, the praise card and both protocol terms open the right entries', 'explanations §3.3–3.5, ruling 1 & 5', async t => {
+  const page = await t.open();
+  const rows = { morning: ['נשימת בוקר ושאלת המדחום', 'מה זה נשימת הבוקר ושאלת המדחום?'], move: ['תנועה בחוץ', 'למה תנועה בחוץ?'], stop: ['משחק עצירה', 'מה זה משחק עצירה?'], one: ['זמן אחד-על-אחד', 'מה זה זמן אחד-על-אחד?'], bed: ['"מה הצלחת היום?" וסיפור', 'הסבר: "מה הצלחת היום?" וסיפור'] };
+  for (const [id, [title, label]] of Object.entries(rows)) {
+    const btn = page.locator(`#tab-today .check[data-id=${id}] > .info-btn`);
+    eq(await btn.getAttribute('aria-label'), label, `${id}: accessible name`);
+    await btn.click(); await sheetOpen(page);
+    eq(await txt(page, '#infoTitle'), title, `${id}: entry`);
+    eq(await page.locator('#infoBody .info-sec').count(), 3, `${id}: parent version with sections`);
+    await closeSheet(page);
+    eq(await page.getAttribute(`#tab-today .check-hit[data-id=${id}]`, 'aria-checked'), 'false', `${id}: ⓘ did not toggle the row`);
+  }
+  eq(await page.evaluate(() => document.activeElement.className), 'info-btn', 'focus returns to the ⓘ');
+  // game of the day: summary from INFO, link to that game's entry
+  const g = await page.evaluate(() => { const id = gameOfDay().id; return { id, title: INFO[id].title, what: INFO[id].what }; });
+  assert((await txt(page, '#tab-today .game')).includes(g.what), 'game box text comes from INFO');
+  eq(await page.getAttribute('#tab-today .game .info-link', 'aria-label'), `איך משחקים ${g.title}?`, 'game link name');
+  await page.click('#tab-today .game .info-link'); await sheetOpen(page);
+  eq(await txt(page, '#infoTitle'), g.title, 'game entry');
+  await closeSheet(page);
+  await page.click('#tab-today .card.has-info > .info-btn'); await sheetOpen(page);
+  eq(await txt(page, '#infoTitle'), 'שבח ספציפי', 'praise card → praise');
+  await closeSheet(page);
+  await go(page, 'incident');
+  for (const [label, title] of [['מה זה תוצאה הגיונית?', 'תוצאה הגיונית'], ['מה זה תיקון?', 'תיקון']]) {
+    await page.click(`#tab-incident .steps-card [aria-label="${label}"]`); await sheetOpen(page);
+    eq(await txt(page, '#infoTitle'), title, 'protocol term → ' + title);
+    await closeSheet(page);
+  }
+});
+test('info: all 27 entries render in the guide dictionary (4 groups 6/3/10/8, 4 sections each) and every "ראו גם" resolves', 'explanations §2, §5', async t => {
+  const page = await t.open();
+  await go(page, 'guide');
+  const r = await page.evaluate(() => {
+    const groups = [...document.querySelectorAll('#tab-guide .dict')].map(g => [g.id, g.querySelectorAll('.dict-item').length]);
+    const bad = [];
+    Object.keys(INFO).forEach(id => {
+      const e = INFO[id], el = document.querySelector('#info-' + id);
+      if (!el) { bad.push(id + ': missing'); return; }
+      const secs = [...el.querySelectorAll('.info-sec h3')].map(h => h.textContent);
+      if (JSON.stringify(secs) !== JSON.stringify(['מה זה', 'למה זה עוזר', e.howLabel])) bad.push(id + ': sections ' + secs);
+      if (!el.querySelector('.info-tip') || !el.querySelector('.info-tip').textContent.includes('טיפ:')) bad.push(id + ': no tip');
+      if (el.querySelectorAll('.info-steps li').length !== e.how.length || e.how.length < 3) bad.push(id + ': steps');
+      if (el.querySelector('summary .di-t').textContent !== e.title) bad.push(id + ': title');
+      const chips = [...el.querySelectorAll('.info-related [data-info]')].map(c => c.dataset.info);
+      if (JSON.stringify(chips) !== JSON.stringify(e.related)) bad.push(id + ': related chips');
+      e.related.forEach(rid => { if (!INFO[rid]) bad.push(id + ': unknown related ' + rid); });
+      if (!!el.querySelector('.info-say') !== !!e.kid) bad.push(id + ': child line');
+    });
+    return { n: Object.keys(INFO).length, groups, bad, open: [...document.querySelectorAll('#tab-guide .dict > details')].some(d => d.open) };
+  });
+  eq(r.n, 27, '27 entries');
+  eq(r.groups, [['dict-calm', 6], ['dict-routine', 3], ['dict-games', 10], ['dict-concepts', 8]], 'four groups in order');
+  eq(r.open, false, 'groups collapsed by default');
+  assert(!r.bad.length, r.bad.join('\n      '));
+  // a chip inside the guide opens that entry
+  await page.evaluate(() => { document.querySelector('#dict-calm > details').open = true; document.querySelector('#info-balloon').open = true; });
+  await page.click('#info-balloon .info-related [data-info=thermo]');
+  assert(await page.evaluate(() => document.querySelector('#dict-concepts > details').open && document.querySelector('#info-thermo').open), 'chip opened "מדחום הרגשות" in the concepts group');
+  eq(await page.evaluate(() => document.activeElement.closest('.dict-item').id), 'info-thermo', 'focus on that entry');
+  // chips inside the sheet replace the content in place, and every entry opens in the sheet
+  await go(page, 'today');
+  await page.click('#tab-today .check[data-id=morning] > .info-btn'); await sheetOpen(page);
+  for (const [rid, title] of [['balloon', 'נשימת בלון'], ['candle', 'נשימת נר'], ['box', 'נשימת קובייה']]) {
+    await page.click(`#infoSheet .info-related [data-info=${rid}]`);
+    eq(await txt(page, '#infoTitle'), title, 'sheet chip → ' + rid);
+    eq(await page.evaluate(() => document.activeElement.id), 'infoTitle', 'focus on the new title');
+  }
+  await closeSheet(page);
+  const allOpen = await page.evaluate(() => Object.keys(INFO).map(id => { openInfo(id, 'today'); const ok = document.querySelectorAll('#infoBody .info-sec').length === 3 && !!document.querySelector('#infoBody .info-tip') && document.querySelector('#infoTitle').textContent === INFO[id].title; return ok ? '' : id; }).filter(Boolean));
+  eq(allOpen, [], 'every entry renders in the sheet');
+  await page.evaluate(() => closeInfo());
+});
+test('info: "בוא ננסה" / "נסו עכשיו" start the right exercise; the morning entry starts the 3-minute breathing', 'explanations §4.3, ruling 4', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  await page.click('#tab-calm .tool-cell:has([data-ex=box]) .info-btn'); await sheetOpen(page);
+  await page.click('#infoFoot [data-act=infoAction]');
+  assert(await page.locator('#infoSheet').isHidden() && (await txt(page, '#exTitle')).includes('נשימת קובייה'), 'בוא ננסה → box breathing');
+  await page.click('#exOverlay .ex-actions [data-act=exClose]');
+  await go(page, 'today');
+  await page.click('#tab-today .check[data-id=morning] > .info-btn'); await sheetOpen(page);
+  eq(await txt(page, '#infoFoot'), 'התחילו 3 דקות נשימה', 'morning CTA');
+  await page.click('#infoFoot [data-act=infoAction]');
+  assert((await txt(page, '#exMeta')).includes('3:00') && (await txt(page, '#exTitle')).includes('נשימת בלון'), 'morning breathing (18 cycles)');
+  await page.clock.runFor(180e3);
+  await page.click('#exInner [data-goto=today]');
+  eq(await page.getAttribute('#tab-today .check-hit[data-id=morning]', 'aria-checked'), 'true', 'morning item completed');
+  await page.click('#tab-today .check[data-id=morning] > .info-btn'); await sheetOpen(page);
+  eq(await page.locator('#infoFoot [data-act=infoAction]').count(), 0, 'no morning CTA once it is done');
+  await page.click('#infoBody .info-related [data-info=balloon]');
+  eq(await txt(page, '#infoFoot'), 'נסו עכשיו', 'parent CTA for a calm tool');
+  await page.click('#infoFoot [data-act=infoAction]');
+  assert((await txt(page, '#exTitle')).includes('נשימת בלון'), 'נסו עכשיו → balloon');
+  eq(await page.evaluate(() => EX.returnTo), 'today', 'returns to Today');
+});
+test('info: a parent practising from the guide logs no mood and the completion screen returns to the guide entry', 'explanations §4.3', async t => {
+  const page = await t.open();
+  await go(page, 'guide');
+  await page.evaluate(() => { document.querySelector('#dict-calm > details').open = true; document.querySelector('#info-wall').open = true; });
+  await page.click('#info-wall [data-act=infoAction]');
+  assert((await txt(page, '#exTitle')).includes('לדחוף את הקיר'), 'guide "נסו עכשיו" starts the wall push');
+  await page.clock.runFor(15e3);
+  const done = await txt(page, '#exInner');
+  assert(done.includes('מכירים את התרגיל') && done.includes('חזרה למדריך'), 'parent completion text: ' + done);
+  eq(await page.locator('#exInner [data-act=doneMood]').count(), 0, 'no mood dots');
+  await page.click('#exInner [data-goto=guide]');
+  assert(await page.locator('#tab-guide.active').count() === 1, 'back on the guide');
+  eq(await page.evaluate(() => document.querySelector('#info-wall').open), true, 'the entry is open again');
+  eq((await getState(page)).moods, [], 'no mood logged');
+});
+test('info: the sheet closes with ✕, scrim, Escape and Android back (stays on the tab); focus in and back', 'explanations §4.4', async t => {
+  const page = await t.open();
+  await go(page, 'calm');
+  const open = async () => { await page.click('#tab-calm .tool-cell:has([data-ex=balloon]) .info-btn'); await sheetOpen(page); };
+  await open();
+  eq(await page.getAttribute('#infoSheet', 'role'), 'dialog', 'role=dialog');
+  eq(await page.evaluate(() => document.activeElement.id), 'infoTitle', 'focus on the title');
+  eq(await page.evaluate(() => document.querySelector('main').inert), true, 'background inert');
+  await closeSheet(page);
+  eq(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'מה זה נשימת בלון?', 'focus back on the ⓘ');
+  await open(); await page.waitForTimeout(700); await page.mouse.click(30, 30);
+  await sheetClosed(page);
+  await open(); await page.keyboard.press('Escape'); await sheetClosed(page);
+  await open();
+  eq(await page.evaluate(() => window.__androidBack()), true, 'back handled');
+  await sheetClosed(page);
+  assert(await page.locator('#tab-calm.active').count() === 1, 'back did not leave the tab');
+  await open();
+  const [x, y] = await center(page, '#infoFoot .btn');
+  await page.touchscreen.tap(x, y);                 // inside the 400 ms arming window: ignored
+  assert(await visible(page, '#infoSheet') && await page.locator('#exOverlay').isHidden(), 'tap guard protects "בוא ננסה"');
+});
+test('info: no interactive control is nested inside another on any screen (incl. the open sheet)', 'explanations §3 / a11y', async t => {
+  const page = await t.open({ state: richState(4) });
+  const nested = () => page.evaluate(() => {
+    const sel = 'button, a[href], input, select, textarea, summary, [role=button], [role=checkbox], [tabindex="0"]';
+    return [...document.querySelectorAll(sel)].filter(e => e.parentElement && e.parentElement.closest(sel.replace(', summary', '').replace(', [tabindex="0"]', '')) && !e.closest('[hidden]')).map(e => e.outerHTML.slice(0, 80));
+  });
+  const bad = [];
+  for (const tab of ['today', 'calm', 'incident', 'guide']) {
+    await go(page, tab);
+    await page.evaluate(() => document.querySelectorAll('main details').forEach(d => { d.open = true; }));
+    bad.push(...(await nested()).map(x => tab + ': ' + x));
+  }
+  await page.evaluate(() => openInfo('balloon', 'today'));
+  bad.push(...(await nested()).map(x => 'sheet: ' + x));
+  assert(!bad.length, [...new Set(bad)].join('\n      '));
+});
+for (const scheme of ['light', 'dark']) {
+  test(`info: 320px ${scheme} – no horizontal scroll with the sheets open and the dictionary expanded`, 'דרישות טכניות: "בלי גלילה אופקית"', async t => {
+    const page = await t.open({ width: 320, scheme, state: richState(4) });
+    const problems = [];
+    const check = async where => { const r = await page.evaluate(overflowProbe); if (r.sw > r.vw + 1) problems.push(`${where}: scrollWidth ${r.sw}`); r.off.forEach(o => problems.push(`${where}: ${o}`)); };
+    await page.click('#tab-today .check[data-id=morning] > .info-btn'); await sheetOpen(page); await check('parent sheet'); await closeSheet(page);
+    await go(page, 'calm');
+    await page.click('#tab-calm .tool-cell:has([data-ex=stop]) .info-btn'); await sheetOpen(page);
+    await page.evaluate(() => { document.querySelector('#infoBody details').open = true; });
+    await check('child sheet'); await closeSheet(page);
+    await check('calm tiles');
+    await go(page, 'guide');
+    await page.evaluate(() => document.querySelectorAll('#tab-guide details').forEach(d => { d.open = true; }));
+    await check('guide dictionary');
+    assert(!problems.length, problems.join('\n      '));
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */
