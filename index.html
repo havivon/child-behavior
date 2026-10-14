@@ -2612,6 +2612,36 @@ function androidBack() {
 }
 window.__androidBack = () => { try { return androidBack() === true; } catch (e) { return false; } };
 
+/* Browser back button (HTML version only; the APK keeps its native contract and never touches history).
+   One guard entry sits above a base entry of this page – never more, never one per tab or overlay. Back lands
+   on the base entry: androidBack() runs, and if it handled something the guard is pushed again; if not
+   (Today, nothing open, or the onboarding form) the page steps back once more, so one press leaves. */
+function setupBackGuard() {
+  if (window.AndroidBridge) return;
+  let leaving = 0;
+  const rv = () => history.state && history.state.rv;
+  const arm = () => {
+    if (rv() === 'guard') return;
+    try {
+      if (rv() !== 'base') history.replaceState({ rv: 'base' }, '');
+      history.pushState({ rv: 'guard' }, '');
+    } catch (e) { /* history unavailable (sandboxed frame): back simply leaves */ }
+  };
+  // Chrome skips entries pushed without a user gesture, so the guard is (re-)armed on the first interaction too
+  const onUser = () => { if (leaving && Date.now() - leaving < 1500) return; leaving = 0; arm(); };
+  addEventListener('pointerdown', onUser, true);
+  addEventListener('keydown', onUser, true);
+  addEventListener('popstate', () => {
+    if (leaving || rv() !== 'base') return;
+    let handled = false;
+    try { handled = androidBack() === true; } catch (e) { /* fall through: leave */ }
+    if (handled) arm();
+    else { leaving = Date.now(); history.back(); }
+  });
+  addEventListener('pageshow', e => { if (e.persisted) { leaving = 0; arm(); } });   // back from the bfcache
+  arm();
+}
+
 /* =========================================================
    Explanations: ⓘ buttons, the explanation sheet, the guide dictionary
    ========================================================= */
@@ -3270,6 +3300,7 @@ if (window.AndroidBridge) window.__androidSaveResult = onAndroidSave;
 showTab(S.ui.tab || 'today', false);
 if (!S.settings.onboarded) openSettings(true);
 if (loadNotice) toast(loadNotice);
+setupBackGuard();
 </script>
 </body>
 </html>

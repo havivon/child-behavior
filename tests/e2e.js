@@ -3088,6 +3088,122 @@ test('wording: with exactly one sibling the examples say "האח או האחות
   assert((await vtxt(s2, '#tab-today .card.has-info > .sub')).includes('ראיתי שוויתרת לאחיך על התור'), 's2 keeps the base example');
 });
 
+/* ================================================================== *
+ * 26. Browser back button (HTML version): same priority as androidBack(), one guard entry
+ * ================================================================== */
+const PREV_PAGE = 'file://' + path.join(os.tmpdir(), 'ragua-prev-page.html');
+/** open a blank "previous" page first, then the app, so a back that leaves the app has somewhere to go */
+async function openFromPrev(t, opts = {}) {
+  fs.writeFileSync(new URL(PREV_PAGE).pathname, '<!doctype html><meta charset="utf-8"><title>prev</title><p>previous page</p>');
+  const page = await t.open(Object.assign({}, opts, { goto: false }));
+  await page.goto(PREV_PAGE);
+  page.prevLen = await page.evaluate(() => history.length);   // entries up to and including the previous page
+  await page.goto(APP);
+  await page.waitForSelector('main .tab.active', { state: 'attached' });
+  return page;
+}
+/** history as seen by the app: len = entries added above the previous page (base + guard = 2) */
+const hist = page => page.evaluate(n => ({ len: history.length - n, rv: history.state && history.state.rv, url: location.href }), page.prevLen);
+/** a real browser back; it must stay on the app (same document) */
+async function backStays(page, msg) {
+  await page.goBack();
+  await page.waitForFunction(() => history.state && history.state.rv === 'guard');
+  const h = await hist(page);
+  eq([h.len, h.rv, h.url], [2, 'guard', APP], msg + ': still in the app, one guard entry, URL unchanged');
+}
+/** the open overlays, listed in androidBack() priority order */
+const openOverlays = page => page.evaluate(() => ['dlg', 'infoSheet', 'exOverlay', 'celOverlay', 'setOverlay'].filter(id => !document.getElementById(id).hidden));
+test('browser back: closes the confirm sheet, info sheet, exercise, celebration, settings in androidBack() order, then Today, then leaves', 'client request "back button like the app" / android/README.md back contract', async t => {
+  const page = await openFromPrev(t);
+  eq(await hist(page), { len: 2, rv: 'guard', url: APP }, 'base + one guard above the previous page');
+  // real taps first: a tab and the settings sheet
+  await go(page, 'guide');
+  await page.click('.topbar [data-act=openSettings]');
+  eq(await openOverlays(page), ['setOverlay'], 'settings open');
+  await backStays(page, 'settings');
+  eq(await openOverlays(page), [], 'back closed the settings');
+  eq(await page.evaluate(() => S.ui.tab), 'guide', 'the tab is not changed by that back');
+  await go(page, 'calm');
+  await page.click('#tab-calm .info-btn');
+  await sheetOpen(page);
+  await backStays(page, 'info sheet');
+  eq(await openOverlays(page), [], 'back closed the info sheet');
+  await backStays(page, 'tab');
+  eq(await page.evaluate(() => S.ui.tab), 'today', 'back from another tab goes to Today');
+  // everything at once: each back closes exactly the next one in androidBack() order
+  await page.evaluate(() => {
+    showTab('calm'); openSettings(); celebrate(0); startEx('balloon', { returnTo: 'calm' }); openInfo('balloon', 'calm');
+    window.__dlgResult = 'open'; ask({ title: 'בדיקה' }).then(v => { window.__dlgResult = v; });
+  });
+  eq(await openOverlays(page), ['dlg', 'infoSheet', 'exOverlay', 'celOverlay', 'setOverlay'], 'all five open');
+  for (const [closed, left] of [['dlg', ['infoSheet', 'exOverlay', 'celOverlay', 'setOverlay']], ['infoSheet', ['exOverlay', 'celOverlay', 'setOverlay']], ['exOverlay', ['celOverlay', 'setOverlay']], ['celOverlay', ['setOverlay']], ['setOverlay', []]]) {
+    await backStays(page, closed);
+    eq(await openOverlays(page), left, `back closed ${closed} only`);
+    if (closed === 'dlg') eq(await page.evaluate(() => window.__dlgResult), false, 'the confirm sheet resolves as "cancel"');
+  }
+  eq(await page.evaluate(() => S.ui.tab), 'calm', 'still on the tab behind the overlays');
+  await backStays(page, 'calm tab');
+  eq(await page.evaluate(() => S.ui.tab), 'today', 'Today');
+  // Today, nothing open: a single back leaves the app
+  await page.goBack();
+  await page.waitForURL(PREV_PAGE);
+  eq(await page.title(), 'prev', 'one back from Today left the app');
+  eq(page.errors, [], 'no errors');
+});
+test('browser back: with the Android bridge the page adds no history entries at all', 'ruling "only when window.AndroidBridge is absent"', async t => {
+  const page = await t.open({ goto: false, init: () => { window.AndroidBridge = { saveFile() {}, vibrate() {}, getAppVersion: () => '1.1.0' }; } });
+  fs.writeFileSync(new URL(PREV_PAGE).pathname, '<!doctype html><title>prev</title>');
+  await page.goto(PREV_PAGE);
+  page.prevLen = await page.evaluate(() => history.length);
+  await page.goto(APP);
+  await page.waitForSelector('main .tab.active', { state: 'attached' });
+  const h0 = await hist(page);
+  eq([h0.len, h0.rv], [1, null], 'only the page itself: no guard entry and no state object');
+  await go(page, 'guide');
+  await page.click('.topbar [data-act=openSettings]');
+  await page.keyboard.press('Escape');
+  await go(page, 'calm');
+  await page.click('#tab-calm .info-btn'); await sheetOpen(page); await closeSheet(page);
+  await reload(page);
+  await go(page, 'progress');
+  eq([(await hist(page)).len, (await hist(page)).rv], [1, null], 'still no entries after interactions and a reload');
+  eq(await page.evaluate(() => window.__androidBack()), true, 'the native back contract still works (tab → Today)');
+});
+test('browser back: never more than one guard – after many interactions, handled backs and reloads', 'ruling "never stack more than one guard"', async t => {
+  const page = await openFromPrev(t);
+  for (let i = 0; i < 3; i++) {
+    for (const tab of ['calm', 'incident', 'progress', 'guide', 'today']) await go(page, tab);
+    await page.click('.topbar [data-act=openSettings]');
+    await page.keyboard.press('Escape');                         // Escape: same function, no history change
+    eq(await openOverlays(page), [], 'Escape closed the settings');
+    await go(page, 'guide');
+    await backStays(page, `round ${i}: tab`);
+    await reload(page);
+    eq(await hist(page), { len: 2, rv: 'guard', url: APP }, `round ${i}: after a reload`);
+    await page.click('main');                                    // first interaction after the reload
+    eq((await hist(page)).len, 2, `round ${i}: the interaction does not add a second guard`);
+  }
+  await page.goBack();
+  await page.waitForURL(PREV_PAGE);
+  eq(await page.title(), 'prev', 'one back from Today leaves');
+  // coming back to the app (reload of the base entry): the guard is restored, still one
+  await page.goForward();
+  await page.waitForSelector('main .tab.active', { state: 'attached' });
+  await page.click('main');
+  const h = await hist(page);
+  eq([h.rv, h.url], ['guard', APP], 'guard re-armed after returning');
+  eq(h.len, 2, 'no stacked guards');
+});
+test('browser back: during onboarding (form cannot be dismissed) back leaves the app', 'ruling "back during onboarding leaves" / §6 onboarding', async t => {
+  const page = await openFromPrev(t, { state: null });
+  assert(await visible(page, '#setOverlay'), 'the welcome form is open');
+  await page.click('#pfBlock [data-field=age][data-val="8"]');  // a real interaction (arms the guard with a user gesture)
+  eq(await hist(page), { len: 2, rv: 'guard', url: APP }, 'one guard');
+  await page.goBack();
+  await page.waitForURL(PREV_PAGE);
+  eq(await page.title(), 'prev', 'back left the app');
+});
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */
