@@ -3104,18 +3104,20 @@ async function openFromPrev(t, opts = {}) {
 }
 /** history as seen by the app: len = entries added above the previous page (base + guard = 2) */
 const hist = page => page.evaluate(n => ({ len: history.length - n, rv: history.state && history.state.rv, url: location.href }), page.prevLen);
-/** a real browser back; it must stay on the app (same document) */
-async function backStays(page, msg) {
+/** a real browser back; it must stay on the app (same document). Round 6 (R6-1): the guard is held only while back
+ *  has something to do, so a back that ends on Today with nothing open leaves NO guard (state 'base'; the popped
+ *  guard stays as the forward entry, hence still 2 entries). guard=false asserts that end state. */
+async function backStays(page, msg, guard = true) {
   await page.goBack();
-  await page.waitForFunction(() => history.state && history.state.rv === 'guard');
+  await page.waitForFunction(g => (history.state && history.state.rv) === (g ? 'guard' : 'base'), guard);
   const h = await hist(page);
-  eq([h.len, h.rv, h.url], [2, 'guard', APP], msg + ': still in the app, one guard entry, URL unchanged');
+  eq([h.len, h.rv, h.url], [2, guard ? 'guard' : 'base', APP], msg + `: still in the app, ${guard ? 'one guard entry' : 'no guard on Today'}, URL unchanged`);
 }
 /** the open overlays, listed in androidBack() priority order */
 const openOverlays = page => page.evaluate(() => ['dlg', 'infoSheet', 'exOverlay', 'celOverlay', 'setOverlay'].filter(id => !document.getElementById(id).hidden));
 test('browser back: closes the confirm sheet, info sheet, exercise, celebration, settings in androidBack() order, then Today, then leaves', 'client request "back button like the app" / android/README.md back contract', async t => {
   const page = await openFromPrev(t);
-  eq(await hist(page), { len: 2, rv: 'guard', url: APP }, 'base + one guard above the previous page');
+  eq(await hist(page), { len: 1, rv: null, url: APP }, 'Today, nothing open: no guard (round 6, R6-1)');
   // real taps first: a tab and the settings sheet
   await go(page, 'guide');
   await page.click('.topbar [data-act=openSettings]');
@@ -3128,7 +3130,7 @@ test('browser back: closes the confirm sheet, info sheet, exercise, celebration,
   await sheetOpen(page);
   await backStays(page, 'info sheet');
   eq(await openOverlays(page), [], 'back closed the info sheet');
-  await backStays(page, 'tab');
+  await backStays(page, 'tab', false);
   eq(await page.evaluate(() => S.ui.tab), 'today', 'back from another tab goes to Today');
   // everything at once: each back closes exactly the next one in androidBack() order
   await page.evaluate(() => {
@@ -3142,7 +3144,7 @@ test('browser back: closes the confirm sheet, info sheet, exercise, celebration,
     if (closed === 'dlg') eq(await page.evaluate(() => window.__dlgResult), false, 'the confirm sheet resolves as "cancel"');
   }
   eq(await page.evaluate(() => S.ui.tab), 'calm', 'still on the tab behind the overlays');
-  await backStays(page, 'calm tab');
+  await backStays(page, 'calm tab', false);
   eq(await page.evaluate(() => S.ui.tab), 'today', 'Today');
   // Today, nothing open: a single back leaves the app
   await page.goBack();
@@ -3177,28 +3179,30 @@ test('browser back: never more than one guard – after many interactions, handl
     await page.keyboard.press('Escape');                         // Escape: same function, no history change
     eq(await openOverlays(page), [], 'Escape closed the settings');
     await go(page, 'guide');
-    await backStays(page, `round ${i}: tab`);
+    await backStays(page, `round ${i}: tab`, false);
     await reload(page);
-    eq(await hist(page), { len: 2, rv: 'guard', url: APP }, `round ${i}: after a reload`);
+    eq(await hist(page), { len: 2, rv: 'base', url: APP }, `round ${i}: after a reload (Today: no guard)`);
     await page.click('main');                                    // first interaction after the reload
     eq((await hist(page)).len, 2, `round ${i}: the interaction does not add a second guard`);
   }
   await page.goBack();
   await page.waitForURL(PREV_PAGE);
   eq(await page.title(), 'prev', 'one back from Today leaves');
-  // coming back to the app (reload of the base entry): the guard is restored, still one
+  // coming back to the app (reload of the base entry): Today has no guard; the next tab holds one again, still one
   await page.goForward();
   await page.waitForSelector('main .tab.active', { state: 'attached' });
   await page.click('main');
+  eq((await hist(page)).rv, 'base', 'Today after returning: no guard');
+  await go(page, 'guide');
   const h = await hist(page);
-  eq([h.rv, h.url], ['guard', APP], 'guard re-armed after returning');
+  eq([h.rv, h.url], ['guard', APP], 'guard re-armed by the next tab');
   eq(h.len, 2, 'no stacked guards');
 });
 test('browser back: during onboarding (form cannot be dismissed) back leaves the app', 'ruling "back during onboarding leaves" / §6 onboarding', async t => {
   const page = await openFromPrev(t, { state: null });
   assert(await visible(page, '#setOverlay'), 'the welcome form is open');
-  await page.click('#pfBlock [data-field=age][data-val="8"]');  // a real interaction (arms the guard with a user gesture)
-  eq(await hist(page), { len: 2, rv: 'guard', url: APP }, 'one guard');
+  await page.click('#pfBlock [data-field=age][data-val="8"]');  // a real interaction
+  eq(await hist(page), { len: 1, rv: null, url: APP }, 'onboarding holds no guard (round 6: back has nothing to do there)');
   await page.goBack();
   await page.waitForURL(PREV_PAGE);
   eq(await page.title(), 'prev', 'back left the app');
@@ -3243,6 +3247,107 @@ test('browser back (fresh history): Calm → back → Today → the next press e
   await page.click('nav.bottom [data-tab=guide]');
   await pressBack(page);
   eq(await page.evaluate(() => S.ui.tab), 'today', 'back from Guide returns to Today (it must not be the exit press)');
+});
+
+/* ================================================================== *
+ * 28. Round-6 fix (R6-1): the guard is held only while back has something to do
+ * ================================================================== */
+/** the guard entry must exist exactly when back has something to do (an overlay open or a tab other than Today) */
+const guardState = page => page.evaluate(n => ({
+  len: history.length - (n || 0), rv: history.state && history.state.rv,
+  need: S.settings.onboarded && (S.ui.tab !== 'today' || ['dlg', 'infoSheet', 'exOverlay', 'celOverlay', 'setOverlay'].some(id => !document.getElementById(id).hidden))
+}), page.prevLen);
+const settled = page => page.waitForFunction(() => {
+  const need = S.ui.tab !== 'today' || ['dlg', 'infoSheet', 'exOverlay', 'celOverlay', 'setOverlay'].some(id => !document.getElementById(id).hidden);
+  return need === (!!history.state && history.state.rv === 'guard');
+});
+test('browser back (fresh history): no entry above the app on Today; settings add one guard; back closes them and the guard is gone; with a previous page ONE press leaves', 'round-6 ruling R6-1', async t => {
+  const page = await openFresh(t);
+  await page.click('main');
+  eq([await page.evaluate(() => history.length), await navIndex(page)], [1, 0], 'Today: the app is the only entry (nothing above the base)');
+  await page.click('.topbar [data-act=openSettings]');
+  await settled(page);
+  eq([await page.evaluate(() => [history.length, history.state && history.state.rv]), await navIndex(page)], [[2, 'guard'], 1], 'settings open: one guard');
+  await pressBack(page);
+  eq(await openOverlays(page), [], 'back closed the settings');
+  eq([await page.evaluate(() => history.state && history.state.rv), await navIndex(page)], ['base', 0], 'the guard is gone: the next press is the browser\'s own (closes / backgrounds the tab)');
+  // the same with a previous page: after the handled back, ONE press from Today leaves
+  const p2 = await openFromPrev(t);
+  await p2.click('.topbar [data-act=openSettings]');
+  await backStays(p2, 'settings on Today', false);
+  await p2.goBack();
+  await p2.waitForURL(PREV_PAGE);
+  eq(await p2.title(), 'prev', 'one press from Today left the app');
+});
+test('browser back: a quick tab tap right after a handled back never exits', 'round-6 ruling R6-1 (no "leaving" window)', async t => {
+  const page = await openFresh(t, { state: makeState({ ui: { tab: 'calm' } }) });
+  await page.click('main');
+  for (const tab of ['guide', 'progress', 'incident', 'calm', 'guide']) {
+    await pressBack(page);
+    eq(await page.evaluate(() => S.ui.tab), 'today', 'back → Today');
+    await page.click(`nav.bottom [data-tab=${tab}]`);           // at once, no pause
+    await settled(page);
+    eq([await page.evaluate(() => history.state && history.state.rv), await navIndex(page)], ['guard', 1], `${tab}: the guard is back`);
+  }
+  await pressBack(page);
+  eq([await page.evaluate(() => S.ui.tab), page.url()], ['today', APP], 'the last back went to Today, still in the app');
+  // with a previous page and Playwright's own back: tab, back, tab, back … never leaves
+  const p2 = await openFromPrev(t);
+  for (const tab of ['calm', 'guide', 'progress', 'incident']) {
+    await go(p2, tab);
+    await backStays(p2, tab, false);
+    eq(await p2.evaluate(() => S.ui.tab), 'today', `${tab} → Today`);
+  }
+  eq(await p2.title(), 'רגוע וחזק', 'still in the app');
+});
+test('browser back: Escape / ✕ closing an overlay on Today removes the guard without leaving the page', 'round-6 ruling R6-1 / Escape uses androidBack()', async t => {
+  const page = await openFromPrev(t);
+  const check = async msg => { await settled(page); const g = await guardState(page); eq([g.rv, g.len, page.url(), await page.title()], ['base', 2, APP, 'רגוע וחזק'], msg); };
+  await page.click('.topbar [data-act=openSettings]');
+  await settled(page);
+  eq((await guardState(page)).rv, 'guard', 'settings: guard');
+  await page.keyboard.press('Escape');
+  eq(await openOverlays(page), [], 'Escape closed the settings');
+  await check('after Escape: no guard, still on the page, no extra entry');
+  await page.click('.topbar [data-act=openSettings]');
+  await page.click('#setOverlay [data-act=closeSettings]');
+  await check('after ✕ on the settings');
+  await page.click('#tab-today .card.has-info > .info-btn'); await sheetOpen(page);
+  await settled(page);
+  eq((await guardState(page)).rv, 'guard', 'info sheet: guard');
+  await closeSheet(page);
+  await check('after ✕ on the info sheet');
+  await page.click('#tab-today [data-act=morningBreath]');
+  await page.click('#exOverlay [data-act=exClose]');
+  await check('after ✕ on the exercise');
+  await page.goBack();
+  await page.waitForURL(PREV_PAGE);
+  eq(await page.title(), 'prev', 'then one back leaves');
+});
+test('browser back: a long session (tabs, overlays, Escape, ✕, backs, reloads) never stacks guards', 'round-6 ruling "never more than one guard"', async t => {
+  const page = await openFromPrev(t);
+  const steps = [
+    p => go(p, 'calm'), p => go(p, 'today'), p => p.click('.topbar [data-act=openSettings]'), p => p.keyboard.press('Escape'),
+    p => go(p, 'guide'), p => p.goBack(), p => p.click('#tab-today .card.has-info > .info-btn'), p => closeSheet(p),
+    p => go(p, 'progress'), p => p.click('.topbar [data-act=openSettings]'), p => p.goBack(), p => p.goBack(),
+    p => go(p, 'incident'), p => p.click('.topbar [data-act=openSettings]'), p => p.click('#setOverlay [data-act=closeSettings]'), p => go(p, 'today')
+  ];
+  for (let round = 0; round < 4; round++) {
+    for (const [i, step] of steps.entries()) {
+      await step(page);
+      await settled(page);
+      const g = await guardState(page);
+      assert(g.len <= 2, `round ${round} step ${i}: ${g.len} entries above the previous page`);
+      eq(g.rv === 'guard', !!g.need, `round ${round} step ${i}: guard iff back has something to do`);
+    }
+    await reload(page);
+    await settled(page);
+    assert((await guardState(page)).len <= 2, `round ${round}: after a reload`);
+  }
+  eq(page.url(), APP, 'still in the app');
+  await page.goBack();
+  await page.waitForURL(PREV_PAGE);
+  eq(await page.title(), 'prev', 'one back from Today leaves');
 });
 
 /* ------------------------------------------------------------------ *

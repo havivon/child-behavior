@@ -2613,33 +2613,39 @@ function androidBack() {
 window.__androidBack = () => { try { return androidBack() === true; } catch (e) { return false; } };
 
 /* Browser back button (HTML version only; the APK keeps its native contract and never touches history).
-   One guard entry sits above a base entry of this page – never more, never one per tab or overlay. Back lands
-   on the base entry: androidBack() runs, and if it handled something the guard is pushed again; if not
-   (Today, nothing open, or the onboarding form) the page steps back once more, so one press leaves. */
+   A guard entry is held only while back has something to do – an overlay is open or another tab is shown
+   (after onboarding). Back then lands on the base entry underneath: androidBack() runs and the guard is
+   reconciled. On Today with nothing open there is no guard, so back is the browser's own: one press leaves
+   (or closes / backgrounds a fresh tab). Never more than one guard; never an entry per tab or overlay. */
 function setupBackGuard() {
   if (window.AndroidBridge) return;
-  let leaving = 0;
+  let silentPop = false;   // our own step off the guard is in flight; its popstate is not a back press
   const rv = () => history.state && history.state.rv;
-  const arm = () => {
-    if (rv() === 'guard') return;
+  const needsGuard = () => S.settings.onboarded === true && (S.ui.tab !== 'today' || OVERLAY_ORDER.some(s => !$(s).hidden));
+  const syncGuard = () => {
+    if (silentPop) return;   // popstate of the step-off syncs again
     try {
-      if (rv() !== 'base') history.replaceState({ rv: 'base' }, '');
-      history.pushState({ rv: 'guard' }, '');
-    } catch (e) { /* history unavailable (sandboxed frame): back simply leaves */ }
+      if (needsGuard()) {
+        if (rv() === 'guard') return;
+        if (rv() !== 'base') history.replaceState({ rv: 'base' }, '');
+        history.pushState({ rv: 'guard' }, '');
+      } else if (rv() === 'guard') { silentPop = true; history.back(); }
+    } catch (e) { silentPop = false; /* history unavailable (sandboxed frame): back is the browser's own */ }
   };
-  // Chrome skips entries pushed without a user gesture, so the guard is (re-)armed on the first interaction too
-  const onUser = () => { if (leaving && Date.now() - leaving < 1500) return; leaving = 0; arm(); };
-  addEventListener('pointerdown', onUser, true);
-  addEventListener('keydown', onUser, true);
+  // after every user action, once the app's own handlers have run: the push happens inside the user gesture
+  const later = () => queueMicrotask(syncGuard);
+  document.addEventListener('click', later);
+  document.addEventListener('keydown', later);
+  // programmatic changes too (completion screen, celebration, import, reset): overlays shown / hidden, tab switched
+  new MutationObserver(syncGuard).observe(document.body, { attributes: true, attributeFilter: ['hidden'], subtree: true });
+  $$('.tab').forEach(el => new MutationObserver(syncGuard).observe(el, { attributes: true, attributeFilter: ['class'] }));
   addEventListener('popstate', () => {
-    if (leaving || rv() !== 'base') return;
-    let handled = false;
-    try { handled = androidBack() === true; } catch (e) { /* fall through: leave */ }
-    if (handled) arm();
-    else { leaving = Date.now(); history.back(); }
+    if (silentPop) { silentPop = false; syncGuard(); return; }
+    if (rv() === 'base') { try { androidBack(); } catch (e) { /* the guard is reconciled below anyway */ } }
+    syncGuard();
   });
-  addEventListener('pageshow', e => { if (e.persisted) { leaving = 0; arm(); } });   // back from the bfcache
-  arm();
+  addEventListener('pageshow', e => { if (e.persisted) { silentPop = false; syncGuard(); } });   // back from the bfcache
+  syncGuard();   // after a reload: step off a guard that is no longer needed, or hold one for the restored tab
 }
 
 /* =========================================================
