@@ -3204,6 +3204,47 @@ test('browser back: during onboarding (form cannot be dismissed) back leaves the
   eq(await page.title(), 'prev', 'back left the app');
 });
 
+/* ================================================================== *
+ * 27. Round-6 QA: browser back with a fresh history (new tab, home-screen shortcut, file opened from Files)
+ * ================================================================== */
+/** open the app as the FIRST entry of the tab's history (nothing to go back to) */
+async function openFresh(t, opts = {}) {
+  fs.writeFileSync(new URL(PREV_PAGE).pathname, '<!doctype html><title>prev</title>');
+  const page = await t.open(Object.assign({}, opts, { goto: false }));
+  page.cdp = await page.context().newCDPSession(page);
+  await page.goto(PREV_PAGE);
+  await page.cdp.send('Page.resetNavigationHistory');
+  await page.evaluate(u => location.replace(u), APP);
+  await page.waitForSelector('main .tab.active', { state: 'attached' });
+  return page;
+}
+const navIndex = async page => (await page.cdp.send('Page.getNavigationHistory')).currentIndex;
+/** a back press as the browser does it: one entry back (no-op when nothing is behind) */
+async function pressBack(page) {
+  const h = await page.cdp.send('Page.getNavigationHistory');
+  if (h.currentIndex === 0) return false;
+  await page.cdp.send('Page.navigateToHistoryEntry', { entryId: h.entries[h.currentIndex - 1].id });
+  await page.waitForTimeout(300);
+  return true;
+}
+test('browser back (fresh history): from Today with nothing open, ONE press exits – no silent first press', 'release 1.1.1 spec: "Only from Today with nothing open does one press leave the site"', async t => {
+  const page = await openFresh(t);
+  await page.click('main');                                         // a real tap
+  eq(await page.evaluate(() => S.ui.tab), 'today', 'on Today, nothing open');
+  eq(await navIndex(page), 0, 'a guard entry is held on Today with nothing to close, so the first back press does nothing visible and only the second exits');
+});
+test('browser back (fresh history): Calm → back → Today → the next press exits; a quick tap after a press keeps the guard working', 'release 1.1.1 spec (back priority)', async t => {
+  const page = await openFresh(t, { state: makeState({ ui: { tab: 'calm' } }) });
+  await page.click('main');
+  await pressBack(page);
+  eq(await page.evaluate(() => S.ui.tab), 'today', 'first press: Calm → Today');
+  eq(await navIndex(page), 0, 'second press must exit (nothing left behind on Today)');
+  // after a press on Today, go to another tab quickly: back must bring him to Today again, not exit
+  await page.click('nav.bottom [data-tab=guide]');
+  await pressBack(page);
+  eq(await page.evaluate(() => S.ui.tab), 'today', 'back from Guide returns to Today (it must not be the exit press)');
+});
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */

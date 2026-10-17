@@ -890,3 +890,86 @@ I found three new bugs, two Minor and one Cosmetic. None affects a normal instal
 
 - **Middle child of 3** (exactly one older and one younger sibling): the role chapter keeps the plural "בין הגדולים לקטנים" and "מול הגדולים הוא הקטן, ומול הקטנים הוא הגדול". The spec has no singular variant for `older = 1` / `younger = 1`.
 - **s1 (exactly one sibling):** the praise example "ראיתי שוויתרת **לאחיך** על התור" and "איך לדעתך הרגיש **אחיך**" assume a brother. The other s1 texts use "האח או האחות". Consider aligning them.
+
+---
+
+# Round 6: browser back button in the HTML version (release 1.1.1, `f34a8af`)
+
+- **Scope:** `git diff 8a40e80 f34a8af -- index.html tests/e2e.js README.md`. The change is `setupBackGuard()` (index.html 2619–2643; called at the end of init) plus 4 tests in section 26.
+- **Method:**
+  1. Audited the 4 section-26 tests.
+  2. Explored adversarially. Real back navigations were driven through Playwright `goBack()` and through CDP `Page.navigateToHistoryEntry`, which behaves like the browser's back button. A truly fresh tab history was simulated with `Page.resetNavigationHistory` + `location.replace()`.
+  3. Ran the full suite twice.
+- **What I changed:** added 2 tests (section 27). `index.html` was not edited.
+
+## Verdict: **don't ship as final; patch R6-1 first (small fix)**
+
+When the app is opened *from another page*, the feature works exactly to spec. Each press closes the next thing in `androidBack()` order, then goes to Today, then leaves; there is never more than one guard entry; and nothing changes when `AndroidBridge` is present.
+
+It fails, however, when the app is the **first entry in the tab's history**. That is how the HTML version is usually opened: a new tab, a home-screen shortcut or standalone window, or the file opened from a file manager. There, leaving from Today takes two presses, and the first one does nothing visible.
+
+This is also a regression against 1.1.0. Before the guard, one press left in that case.
+
+## Suite result
+
+| Run | Tests | Pass | Fail |
+|---|---|---|---|
+| Lead's runs at `f34a8af` | 177 | 177 | 0 |
+| With my 2 new tests (section 27), run 1 | **179** | **177** | **2** (#178, #179: R6-1) |
+| With my 2 new tests, run 2 | 179 | 177 | 2 (identical PASS/FAIL list) |
+
+## Audit of the 4 section-26 tests
+
+**Real coverage, nothing tautological.** The tests use real `goBack()` presses and check the history length, the `rv` state and the URL after each press. They cover:
+- the full 5-overlay priority, including the confirm sheet resolving as "cancel" during its arming window;
+- tab → Today, and one press from Today leaving;
+- no history entries with the bridge, even after interactions and a reload;
+- no stacking after 3 rounds of tabs, Escape, reloads and taps, and the guard re-armed after leaving and coming forward;
+- leaving during onboarding.
+
+**Gap:** every one of them starts from a *previous page* (`openFromPrev`), so the fresh-history case, where R6-1 lives, is never exercised. Also not covered: rapid presses, a `#hash` URL, and a real bfcache return. I covered the first two by hand (below); the bfcache path can only be checked by code reading, because `file://` pages are not bfcache-eligible.
+
+## Exploration results (correct unless marked)
+
+| Case | Result |
+|---|---|
+| Back during an exercise mid-breath | The exercise stops (`EX = null`) and the overlay closes. The app stays, with one guard. |
+| Back on the exercise completion screen | It closes. |
+| Back during the confirm sheet's 400 ms arming window | Cancels the sheet only; settings stay open. The next back closes settings. |
+| Rapid presses (CDP, 30/80/200 ms apart) | From Calm with settings open: a double press closes settings, then goes to Today; a triple press does that and then leaves. Correct. Only a 0 ms "double" (two navigations sent before the first commits, which no human can do) skips a step. |
+| Reload in the middle; long sessions | Still one guard (history length unchanged). The section-26 test covers this, and I confirmed it. |
+| Leave, then forward | Returns to the base entry; the guard is re-armed. Back → Today, then back leaves. |
+| `pageshow` persisted (bfcache) | By code: it resets `leaving` and re-arms from the base entry. Correct. |
+| Opening with a `#hash` URL | The hash is kept on both entries; back works normally. The app has no in-page anchors. |
+| Escape | Same `androidBack()` without touching history. Afterwards one back from Today leaves. |
+| Today profile prompt; onboarding | Not overlays: back from Today leaves, and back during onboarding leaves (as ruled). |
+| Fake `AndroidBridge` | No state object and no extra entries; the browser's own back is untouched. |
+| **Fresh history (new tab / home screen / file)** | **Fails: R6-1.** |
+
+## New bugs
+
+#### R6-1. In a fresh tab history, leaving from Today needs two back presses, and a quick tap after the silent press makes back exit from another tab
+- **Severity:** Major. It breaks the feature's stated rule in the usual way the HTML version is launched, and it's a regression from 1.1.0. No data is lost.
+- **Tests:** #178, #179
+- **Repro 1** (new tab or home-screen shortcut; nothing earlier in the tab's history):
+  1. Open the app; it shows Today with nothing open. Tap anywhere.
+  2. Press back: nothing visible happens.
+  3. Press back again: the browser exits.
+  - The same happens after Calm → back → Today: two more presses are needed to exit.
+- **Repro 2** (follows Repro 1):
+  1. After the silent press, tap a tab (e.g. Guide) within 1.5 s.
+  2. Press back: the browser exits immediately, instead of returning to Today.
+- **Cause:** `setupBackGuard()` (index.html 2619–2643) always keeps a guard entry, even when there is nothing for `androidBack()` to handle.
+  - When `androidBack()` returns false, the code calls `history.back()` to leave. In a fresh history there is nothing behind the base entry, so the call is a no-op and the press is wasted.
+  - `leaving` is then set, and taps within 1.5 s are ignored by `onUser`, so the guard is not re-armed. The next press from a non-Today tab therefore lands on the browser's own "nothing behind", i.e. it exits.
+- **Fix hint:** Hold the guard only while back has something to do (not on Today, or an overlay is open).
+  - Push the guard from the action that leaves the root state (tab switch, opening an overlay). These are user-activation tasks, which also satisfies Chrome's intervention.
+  - When the app returns to Today with nothing open, step off the guard with a flagged `history.back()`.
+  - Then a press from Today is the browser's own back, which exits in every launch mode.
+
+## Not verifiable here (real-device check recommended)
+
+**Chrome's history-manipulation intervention.** The guard pushed at load happens without a user gesture. `arm()` returns early when the current entry is already the guard (2622), so the first tap never re-pushes it with a gesture.
+- If Chrome keeps that entry marked "skippable" despite the later tap, a back press could skip the guard and exit, e.g. back from a non-Today tab right after the app was restored.
+- Playwright's and CDP's back navigations don't apply the intervention, so this needs a phone.
+- The README already asks for a real-device test. The R6-1 fix (pushing the guard from user actions) would also remove this risk.
