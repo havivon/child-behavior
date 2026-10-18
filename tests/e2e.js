@@ -3350,6 +3350,42 @@ test('browser back: a long session (tabs, overlays, Escape, ✕, backs, reloads)
   eq(await page.title(), 'prev', 'one back from Today leaves');
 });
 
+/* ================================================================== *
+ * 29. Round-7 QA: back guard – programmatic overlays, reload with an overlay, first save, rapid presses
+ * ================================================================== */
+test('browser back: celebration after a star, reload with an overlay on Today, onboarding → first save, rapid presses', 'round-6 ruling R6-1 (guard iff back has something to do)', async t => {
+  const need = p => p.evaluate(() => [history.state && history.state.rv, S.ui.tab, ['dlg', 'infoSheet', 'exOverlay', 'celOverlay', 'setOverlay'].filter(id => !document.getElementById(id).hidden)]);
+  // celebration opened by a star tap holds a guard; one back closes it and removes the guard
+  const c = await openFresh(t, { state: makeState({ settings: { starsNeeded: 1 } }) });
+  await c.click('#tab-today [data-act=star] >> nth=0');
+  await settled(c);
+  eq(await need(c), ['guard', 'today', ['celOverlay']], 'celebration: guard');
+  await pressBack(c);
+  eq([await need(c), await navIndex(c)], [['base', 'today', []], 0], 'back closed it; nothing left above the app');
+  // reload with settings open on Today: overlays close on reload, so the guard is stepped off
+  const r = await openFromPrev(t);
+  await r.click('.topbar [data-act=openSettings]'); await settled(r);
+  await reload(r); await settled(r);
+  eq((await need(r))[0], 'base', 'after the reload on Today: no guard');
+  await r.goBack(); await r.waitForURL(PREV_PAGE);
+  eq(await r.title(), 'prev', 'one press leaves');
+  // onboarding → first save: no guard at any point on Today
+  const o = await openFresh(t, { state: null });
+  await o.click('#pfBlock [data-field=age][data-val="8"]'); await o.click('#pfBlock [data-field=n][data-val="1"]');
+  eq(await navIndex(o), 0, 'onboarding: no guard');
+  await o.click('#setOverlay [data-act=saveSettings]'); await settled(o);
+  eq(await navIndex(o), 0, 'after the first save on Today: no guard');
+  // back-to-back presses from Calm with settings open: settings → Today → leave (30–200 ms gaps checked by hand)
+  const q = await openFromPrev(t);
+  await go(q, 'calm'); await q.click('.topbar [data-act=openSettings]'); await settled(q);
+  q.cdp = await q.context().newCDPSession(q);
+  for (let i = 0; i < 2; i++) { await pressBack(q).catch(() => {}); }
+  await settled(q);
+  eq(await need(q), ['base', 'today', []], 'two quick presses: settings closed, then Today');
+  await q.goBack(); await q.waitForURL(PREV_PAGE);
+  eq(await q.title(), 'prev', 'the third press leaves');
+});
+
 /* ------------------------------------------------------------------ *
  * Runner
  * ------------------------------------------------------------------ */

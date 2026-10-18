@@ -973,3 +973,76 @@ This is also a regression against 1.1.0. Before the guard, one press left in tha
 - If Chrome keeps that entry marked "skippable" despite the later tap, a back press could skip the guard and exit, e.g. back from a non-Today tab right after the app was restored.
 - Playwright's and CDP's back navigations don't apply the intervention, so this needs a phone.
 - The README already asks for a real-device test. The R6-1 fix (pushing the guard from user actions) would also remove this risk.
+
+---
+
+# Round 7: back-guard redesign, fix for R6-1 (commit `0111c41`)
+
+- **Scope:** `git diff 132f5ca HEAD -- index.html tests/e2e.js`. The change is `setupBackGuard()` with `needsGuard()` / `syncGuard()` / `silentPop`, plus the updated section-26 tests and the 4 new section-28 tests.
+- **Method:**
+  1. Re-ran my R6-1 repros.
+  2. Ran adversarial variants on a fresh history (CDP `resetNavigationHistory` + `location.replace`) and on an opened-from-another-page history. Real back presses went through CDP `navigateToHistoryEntry` and Playwright `goBack()`.
+  3. Ran the full suite twice.
+- **What I changed:** added 1 test (section 29). `index.html` was not edited.
+
+## Verdict: **ship**
+
+R6-1 is fixed, and I found no new bugs. Wherever I looked, the guard exists exactly when back has something to do. From Today with nothing open, one press leaves (or, in a fresh history, nothing is left above the app, so the browser's own back exits).
+
+## Suite result
+
+| Run | Tests | Pass | Fail |
+|---|---|---|---|
+| Engineer's suite at `0111c41`, run 1 | 183 | 183 | 0 |
+| Engineer's suite at `0111c41`, run 2 | 183 | 183 | 0 (identical PASS/FAIL list) |
+| With my section-29 test (full run) | **184** | **184** | **0** |
+
+My R6-1 tests #178 and #179 now pass unchanged.
+
+## Test audit
+
+**Section-26 changes are legitimate, not weakened.**
+- The tests used to expect "always one guard"; they now expect **no guard on Today**, which is the new design. `backStays()` gained a `guard=false` mode that asserts the base state with the URL unchanged.
+- The onboarding test now asserts that no guard is held there.
+- The "return after leaving" step now checks that Today has no guard, and that the next tab re-arms one.
+- All the priority, bridge and stacking checks are kept.
+
+**Section 28 gives real coverage:**
+- fresh history: settings add a guard and back removes it; with a previous page, one press leaves;
+- a tab tap right after a handled back, repeated 5 times;
+- Escape / ✕ on 3 overlay types leaving no guard and no extra entry;
+- a 4-round long session with reloads, checking "guard iff back has something to do" after every step.
+
+**My section-29 test adds** the gaps that section 28 doesn't cover:
+- a celebration opened by a star tap;
+- a reload with an overlay open on Today;
+- onboarding → first save in a fresh history;
+- back-to-back presses from Calm with settings open (settings → Today → the third press leaves).
+
+## R6-1 and adversarial variants (all correct)
+
+| Case | Fresh history | From another page |
+|---|---|---|
+| R6-1 repro: Today, nothing open, one press | Nothing above the app (index 0), so the browser exits | Leaves |
+| Calm → back → Today → back | Today, then exit | Today, then leaves |
+| Back, then a tab tap 0 / 50 / 150 / 300 ms later | Guard re-pushed every time; the next back → Today | Same |
+| 2 / 3 presses at 30 / 80 / 200 ms from Calm + settings | Settings → Today → (exit) | Settings → Today → leaves |
+| ✕ starts the silent step-off, then ⓘ tapped 0 / 20 / 80 ms later | Ends with the info sheet open and one guard | Same |
+| ✕ on Today, then a real back 0 / 10 / 50 ms later | Ends at index 0 (exit) | Leaves (correct: Today, nothing open) |
+| Celebration after a star tap | Guard; back closes it; no entry left | Same |
+| Exercise completion screen (opened by the timer) → "חזרה למדחום" → tap Today | Guard held while on Calm, stepped off on Today | Same |
+| Reload on Calm | Guard kept; back → Today | Same |
+| Reload with settings open on Today | Guard stepped off (overlays close on reload) | Same; one press leaves |
+| Onboarding → first save | No guard during onboarding or after the save; the first tab tap adds one | Same |
+| Fake `AndroidBridge` | No state object and no entries; the browser's own back leaves | – |
+
+`needsGuard()` and the guard state agreed after every step of every scenario.
+
+The only edge I found is a deliberate back pressed in the same instant as the silent step-off: that press is absorbed by the step-off. No human can produce that timing, and the end state is still correct (Today, no guard).
+
+## Still to verify on a real phone (no change from round 6)
+
+**Chrome's history-manipulation intervention.** Most guard pushes now happen inside a user gesture (a click or keydown, deferred by one microtask) or during a back navigation. One push still happens without a gesture: **at load, when the app reopens on a non-Today tab** (the last tab is restored from `ui.tab`, and after a reload).
+- If Chrome marks that entry skippable, the *first* back after reopening, before any tap, could skip the guard and exit instead of going to Today.
+- This needs a real device; Playwright and CDP back navigations don't apply the intervention.
+- **Low risk.** Worst case is one premature exit, and any tap restores normal behaviour.
