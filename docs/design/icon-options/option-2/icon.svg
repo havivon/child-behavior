@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>רגוע וחזק – עץ מגן</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3fae8f"/>
+      <stop offset="0.6" stop-color="#1f8470"/>
+      <stop offset="1" stop-color="#155f58"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.55">
+      <stop offset="0" stop-color="#fff6dc" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#fff6dc" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4fcf7"/>
+      <stop offset="1" stop-color="#b9e5cb"/>
+    </linearGradient>
+    <linearGradient id="trunk" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#c9925a"/>
+      <stop offset="1" stop-color="#a26c38"/>
+    </linearGradient>
+  </defs>
+  <!-- full-bleed background (launcher masks crop the corners) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <!-- artwork: inside the central 66% safe circle (r ≤ 160 of 169) -->
+  <!-- ground -->
+  <path d="M188 388q68-18 136 0" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="10" stroke-linecap="round"/>
+  <!-- sturdy trunk with roots and branches -->
+  <path d="M236 250h40v92c0 18 10 30 30 40h-100c20-10 30-22 30-40z" fill="url(#trunk)"/>
+  <path d="M256 296l-40-38M256 284l38-36" stroke="#a26c38" stroke-width="16" stroke-linecap="round"/>
+  <!-- sheltering canopy: wide and rounded, wider than the trunk is tall -->
+  <circle cx="256" cy="186" r="80" fill="url(#leaf)"/>
+  <circle cx="186" cy="210" r="58" fill="url(#leaf)"/>
+  <circle cx="326" cy="210" r="58" fill="url(#leaf)"/>
+  <circle cx="214" cy="252" r="46" fill="url(#leaf)"/>
+  <circle cx="298" cy="252" r="46" fill="url(#leaf)"/>
+  <circle cx="256" cy="246" r="44" fill="url(#leaf)"/>
+</svg>

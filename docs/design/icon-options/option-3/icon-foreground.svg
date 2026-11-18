@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>רגוע וחזק – מהסערה לשקט – foreground</title>
+  <!-- Android adaptive foreground: transparent, artwork inside the central 66% safe circle -->
+  <!-- storm (red) settles through orange into a calm teal-green line: the emotion thermometer, red to green -->
+  <g transform="translate(256 257) scale(0.9) translate(-256 -257)">
+  <path d="M138 178l40-34 40 34 38-34 38 34 40-34 40 34" fill="none" stroke="#e25555" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M138 258c26-30 52-30 78 0s52 30 78 0 52-30 78 0" fill="none" stroke="#f0912e" stroke-width="30" stroke-linecap="round"/>
+  <path d="M138 336c40-14 79-14 118 0s79 14 118 0" fill="none" stroke="#1f9a74" stroke-width="30" stroke-linecap="round"/>
+  </g>
+</svg>

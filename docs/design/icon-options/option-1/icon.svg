@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>רגוע וחזק – נשימת בלון</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2aa699"/>
+      <stop offset="0.55" stop-color="#1a7f76"/>
+      <stop offset="1" stop-color="#2a6797"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.55">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bal" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cdeee8"/>
+    </linearGradient>
+  </defs>
+  <!-- full-bleed background (launcher masks crop the corners) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <!-- artwork: inside the central 66% safe circle (r ≤ 160 of 169) -->
+  <!-- breath arcs: the balloon is breathing in -->
+  <path d="M159.3 168.3A118 118 0 0 0 159.3 303.7" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="12" stroke-linecap="round"/>
+  <path d="M352.7 168.3A118 118 0 0 1 352.7 303.7" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="12" stroke-linecap="round"/>
+  <path d="M141.3 155.7A140 140 0 0 0 141.3 316.3" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="10" stroke-linecap="round"/>
+  <path d="M370.7 155.7A140 140 0 0 1 370.7 316.3" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="10" stroke-linecap="round"/>
+  <!-- balloon -->
+  <path d="M256 118c-54 0-94 42-94 96 0 58 46 106 82 120h24c36-14 82-62 82-120 0-54-40-96-94-96z" fill="url(#bal)"/>
+  <path d="M244 334h24l-6 14h-12z" fill="#cdeee8"/>
+  <ellipse cx="222" cy="176" rx="20" ry="30" transform="rotate(-24 222 176)" fill="#ffffff" fill-opacity="0.9"/>
+  <!-- string -->
+  <path d="M256 348c-22 18 20 30 0 52" fill="none" stroke="#ffffff" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+</svg>
