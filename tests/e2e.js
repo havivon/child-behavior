@@ -1848,16 +1848,18 @@ test('fonts: Heebo is embedded (data: URL, Hebrew + Latin) and the app makes no 
   await page.click('.topbar [data-act=openSettings]');
   eq(t.remote, [], 'no remote request while using the app');
 });
-test('install: icon is the designer\'s stones icon (teal → blue gradient, light stones in the middle)', 'ruling 14 / design §6', async t => {
+test('install: icon is the designer\'s balloon icon (teal → blue gradient, white balloon, breath arcs)', 'ruling 14 / design §6 / client choice: icon option 1', async t => {
   const page = await t.open();
   const px = await page.evaluate(() => new Promise(res => {
     const i = new Image();
-    i.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d'); x.drawImage(i, 0, 0); const at = (a, b) => [...x.getImageData(a, b, 1, 1).data]; res({ tl: at(4, 4), br: at(507, 507), mid: at(256, 270) }); };
+    i.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d'); x.drawImage(i, 0, 0); const at = (a, b) => [...x.getImageData(a, b, 1, 1).data]; res({ tl: at(4, 4), br: at(507, 507), mid: at(256, 270), top: at(256, 140), arc: at(138, 236), bg: at(100, 236) }); };
     i.src = JSON.parse(atob(document.querySelector('link[rel=manifest]').href.split(',')[1].replace(/\s/g, ''))).icons.find(x => x.sizes === '512x512').src;
   }));
   assert(px.tl[1] > px.tl[0] && px.tl[1] > 120, 'teal top-left: ' + px.tl);
   assert(px.br[2] > px.br[1] - 10, 'blue-ish bottom-right: ' + px.br);
-  assert(px.mid[0] > 200 && px.mid[1] > 200 && px.mid[2] > 200, 'light stone in the centre: ' + px.mid);
+  assert(px.mid[0] > 200 && px.mid[1] > 200 && px.mid[2] > 200, 'light balloon body in the centre: ' + px.mid);
+  assert(px.top[0] > 200 && px.top[1] > 200, 'balloon reaches up to y=140: ' + px.top);
+  assert(px.arc[0] - px.bg[0] > 60, `a light breath arc left of the balloon (arc ${px.arc}, background ${px.bg})`);
 });
 
 /* ================================================================== *
