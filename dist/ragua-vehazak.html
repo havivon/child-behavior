@@ -3251,29 +3251,29 @@ function makeIcon(size) {
     const c = document.createElement('canvas'); c.width = c.height = size;
     const x = c.getContext('2d');
     x.scale(size / 512, size / 512);
-    const lin = (y1, y2, stops) => { const g = x.createLinearGradient(0, y1, 0, y2); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; };
+    // background: teal → blue, soft glow (docs/design/icon.svg, "נשימת בלון")
     let g = x.createLinearGradient(0, 0, 512, 512);
-    g.addColorStop(0, '#26a093'); g.addColorStop(.55, '#1a7f76'); g.addColorStop(1, '#2a6797');
+    g.addColorStop(0, '#2aa699'); g.addColorStop(.55, '#1a7f76'); g.addColorStop(1, '#2a6797');
     x.fillStyle = g; x.fillRect(0, 0, 512, 512);
-    g = x.createRadialGradient(256, 215, 0, 256, 215, 256);
-    g.addColorStop(0, 'rgba(255,255,255,.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    g = x.createRadialGradient(256, 204.8, 0, 256, 204.8, 281.6);
+    g.addColorStop(0, 'rgba(255,255,255,.2)'); g.addColorStop(1, 'rgba(255,255,255,0)');
     x.fillStyle = g; x.fillRect(0, 0, 512, 512);
-    const circle = r => { x.beginPath(); x.arc(256, 256, r, 0, Math.PI * 2); };
-    circle(160); x.fillStyle = 'rgba(255,255,255,.07)'; x.fill();
-    x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = 5; x.stroke();
-    circle(126); x.fillStyle = 'rgba(255,255,255,.06)'; x.fill();
-    x.save();
-    x.translate(256, 290); x.scale(1.2, 1.2); x.translate(-256, -290);
-    const ell = (cx, cy, rx, ry, a) => { x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); x.fillStyle = `rgba(11,63,69,${a})`; x.fill(); };
-    ell(256, 344, 84, 14, .28);
-    x.fillStyle = lin(274, 356, [[0, '#e6f6f3'], [1, '#b5e0d9']]); x.fill(new Path2D('M168 318c0-26 38-44 88-44s90 16 90 42-38 40-90 40-88-12-88-38z'));
-    ell(258, 282, 60, 10, .22);
-    x.fillStyle = lin(223, 291, [[0, '#f4fbfa'], [1, '#cdebe6']]); x.fill(new Path2D('M196 258c2-22 30-36 64-35s62 15 60 37-30 32-64 31-62-11-60-33z'));
-    ell(254, 226, 38, 7, .2);
-    x.fillStyle = lin(178, 232, [[0, '#ffffff'], [1, '#e2f4f1']]); x.fill(new Path2D('M216 206c1-17 19-29 40-28s39 12 38 29-19 26-40 25-39-9-38-26z'));
+    // breath arcs around the balloon
+    x.lineCap = 'round';
+    const arc = (d, a, w) => { x.strokeStyle = `rgba(255,255,255,${a})`; x.lineWidth = w; x.stroke(new Path2D(d)); };
+    arc('M159.3 168.3A118 118 0 0 0 159.3 303.7', .6, 12);
+    arc('M352.7 168.3A118 118 0 0 1 352.7 303.7', .6, 12);
+    arc('M141.3 155.7A140 140 0 0 0 141.3 316.3', .3, 10);
+    arc('M370.7 155.7A140 140 0 0 1 370.7 316.3', .3, 10);
+    // balloon, knot, highlight, string
+    g = x.createLinearGradient(199.6, 118, 312.4, 334);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#cdeee8');
+    x.fillStyle = g; x.fill(new Path2D('M256 118c-54 0-94 42-94 96 0 58 46 106 82 120h24c36-14 82-62 82-120 0-54-40-96-94-96z'));
+    x.fillStyle = '#cdeee8'; x.fill(new Path2D('M244 334h24l-6 14h-12z'));
+    x.save(); x.translate(222, 176); x.rotate(-24 * Math.PI / 180);
+    x.beginPath(); x.ellipse(0, 0, 20, 30, 0, 0, Math.PI * 2); x.fillStyle = 'rgba(255,255,255,.9)'; x.fill();
     x.restore();
-    x.beginPath(); x.moveTo(196, 394); x.lineTo(316, 394);
-    x.strokeStyle = 'rgba(255,255,255,.5)'; x.lineWidth = 9; x.lineCap = 'round'; x.stroke();
+    arc('M256 348c-22 18 20 30 0 52', .85, 7);
     return c.toDataURL('image/png');
   } catch (e) { return ''; }
 }
